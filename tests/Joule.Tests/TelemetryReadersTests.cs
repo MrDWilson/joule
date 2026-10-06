@@ -159,15 +159,18 @@ public sealed class TelemetryReadersTests : IDisposable
         Assert.Contains(load.Kw, kw => kw > 7);
     }
 
+    // Seeded at a pinned time after today's solar has started. Until then (00:00 to about 07:30 London) yesterday's last
+    // five minutes of solar, which end on today's first "unknown", stay an open idle stretch rather than a known zero.
     [Fact]
     public void DemoMetersBehaveLikeTheRealInstallation()
     {
-        using var db = new DataStore(path);
+        var now = DateTimeOffset.Parse("2026-10-06T12:00:00Z", CultureInfo.InvariantCulture);
+        using var db = new DataStore(path, new ManualClock(now));
         DemoTelemetry.Seed(db);
         var profiles = db.ReadSensorProfiles();
         Assert.Equal(SensorProfiles.DailyCounter, profiles["load"]); Assert.Equal(SensorProfiles.SolarDaily, profiles["pv"]);
         Assert.Equal(SensorProfiles.DailyCounter, profiles["grid_export"]); Assert.Equal(SensorProfiles.SessionCounter, profiles["ev"]);
-        var yesterday = CivilTime.FirstValidInstant(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, db.TelemetryZone).Date.AddDays(-1), db.TelemetryZone);
+        var yesterday = CivilTime.FirstValidInstant(TimeZoneInfo.ConvertTime(now, db.TelemetryZone).Date.AddDays(-1), db.TelemetryZone);
         var day = db.ReadEnergySummary(yesterday, yesterday.AddDays(1));
         // Overnight solar and pre-export unknowns are known zeros; the counters reconcile.
         foreach (var metric in new[] { "grid_import", "grid_export", "battery_charge", "battery_discharge" }) { Assert.Equal(1, day.Metrics[metric].CoverageFraction, 3); Assert.True(day.Metrics[metric].Reconciled, metric); }
