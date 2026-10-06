@@ -2,7 +2,7 @@
 # Joule: multi-arch (linux/amd64, linux/arm64) image. The web and SDK stages run on the build machine's own
 # architecture and cross-target the runtime, so an arm64 image builds quickly on an x64 runner (and vice versa).
 
-FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS web
+FROM --platform=$BUILDPLATFORM node:25-bookworm-slim AS web
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
