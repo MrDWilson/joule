@@ -120,11 +120,11 @@ public sealed class TelemetryProfileTests : IDisposable
     }
 
     [Fact]
-    public void AnEntityMissingFromHomeAssistantIsNotFoundNotOffline()
+    public async Task AnEntityMissingFromHomeAssistantIsNotFoundNotOffline()
     {
         var options = new HomeAssistantOptions(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["HomeAssistant:BaseUrl"] = "http://ha.test", ["HomeAssistant:AccessToken"] = "x", ["HomeAssistant:Entities:Pv"] = "sensor.renamed_solar" }).Build());
         var client = new HomeAssistantClient(new HttpClient(new Handler(_ => new(HttpStatusCode.OK) { Content = new StringContent("[]") })), options);
-        var sample = Assert.Single(client.CollectAsync(default).GetAwaiter().GetResult());
+        var sample = Assert.Single(await client.CollectAsync(default));
         Assert.Equal("not_found", sample.Status); Assert.Equal("entity not found in Home Assistant", sample.RawState); Assert.False(client.LastReadFailed);
     }
 
