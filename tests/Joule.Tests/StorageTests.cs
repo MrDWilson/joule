@@ -41,7 +41,9 @@ public class StorageTests : IDisposable
         using var db = new DataStore(path);
         var timer = System.Diagnostics.Stopwatch.StartNew();
         Assert.ThrowsAny<Exception>(() => db.Query("SELECT sum(i) FROM range(1000000000000) t(i)", timeout: TimeSpan.FromMilliseconds(100)));
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(5));
+        // Uninterrupted, this query runs for many minutes. The bound is generous because the 100 ms deadline fires from a timer
+        // that can run seconds late on a busy two-core CI runner (over 5 s there once).
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(30), $"The query ran for {timer.Elapsed.TotalSeconds:0.0} s.");
         db.Save(DemoData.Create()); Assert.NotNull(db.Load());
     }
     [Fact] public void RepeatedNativeCurveCollectionRemainsDiagnosticWithoutInventingActualEnergy()

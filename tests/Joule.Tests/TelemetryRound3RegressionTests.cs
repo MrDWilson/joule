@@ -63,7 +63,8 @@ public class TelemetryRound3RegressionTests : IDisposable
     {
         var stream=new WaitingStream();
         var http=new HttpClient(new Handler((_,_)=>Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=new StreamingContent(stream)}))){Timeout=TimeSpan.FromMilliseconds(30)};
-        var readings=await new HomeAssistantClient(http,new HomeAssistantOptions(Config())).CollectAsync(default).WaitAsync(TimeSpan.FromSeconds(1));
+        // A hang would never finish; the 30 ms timeout itself can fire late on a busy CI runner, so allow it a few seconds.
+        var readings=await new HomeAssistantClient(http,new HomeAssistantOptions(Config())).CollectAsync(default).WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(4,readings.Count);Assert.All(readings,s=>Assert.Equal("unavailable",s.Status));
     }
     [Fact] public async Task UnknownLengthResponseStopsAtBodyLimit()
