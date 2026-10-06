@@ -67,7 +67,7 @@ public partial class DataStore
             var intervals = LoadIntervals(from, to);
             var byMetric = TelemetrySchema.EnergyMetrics.ToDictionary(m => m, m => intervals.Where(x => x.Metric == m).ToList());
             var includesEv = byMetric["ev"].Count > 0 ? LoadIncludesEv() : false;
-            var now = DateTimeOffset.UtcNow;
+            var now = Clock.GetUtcNow();
             var result = new List<PlanVsActualSlot>();
             for (var t = from; t < to; t = t.AddMinutes(30))
             {

@@ -123,13 +123,38 @@ public partial class DataStore
         return result.OrderBy(s => s.Time).ThenBy(s => s.Metric, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>
+    /// Upserts rows (strings, doubles, timestamps or nulls, in column order) through a scratch table filled by DuckDB's appender, then
+    /// one INSERT OR REPLACE. Planning a parameterised VALUES list for every hundred rows made bulk writes (the demo's five weeks of
+    /// history, interval rebuilds) more than ten times slower: about ten seconds of every first start, and minutes on a small machine.
+    /// </summary>
     void InsertRows(string table, IEnumerable<object?[]> rows, string? columns = null)
     {
-        foreach (var chunk in rows.Chunk(100))
+        var batch = rows as IReadOnlyCollection<object?[]> ?? rows.ToList();
+        if (batch.Count == 0) return;
+        var scratch = "insert_rows_" + table;
+        Execute($"CREATE OR REPLACE TEMP TABLE {scratch} AS SELECT {columns ?? "*"} FROM {table} LIMIT 0");
+        using (var appender = db.CreateAppender("temp", "main", scratch))
         {
-            var placeholders = string.Join(",", chunk.Select(row => "(" + string.Join(",", row.Select(_ => "?")) + ")"));
-            Execute($"INSERT OR REPLACE INTO {table}{(columns is null ? "" : "(" + columns + ")")} VALUES {placeholders}", chunk.SelectMany(row => row).ToArray());
+            foreach (var values in batch)
+            {
+                var row = appender.CreateRow();
+                foreach (var value in values)
+                {
+                    switch (value)
+                    {
+                        case null or DBNull: row.AppendNullValue(); break;
+                        case string s: row.AppendValue(s); break;
+                        case double d: row.AppendValue(d); break;
+                        case DateTimeOffset t: row.AppendValue(t); break;
+                        default: throw new ArgumentException($"Unsupported column value {value.GetType().Name}.", nameof(rows));
+                    }
+                }
+                row.EndRow();
+            }
         }
+        Execute($"INSERT OR REPLACE INTO {table}{(columns is null ? "" : "(" + columns + ")")} SELECT * FROM {scratch}");
+        Execute($"DELETE FROM {scratch}");
     }
     static DateTimeOffset Stamp(object value) => value switch { DateTimeOffset d => d, DateTime d => new DateTimeOffset(DateTime.SpecifyKind(d, DateTimeKind.Utc)), _ => DateTimeOffset.Parse(value.ToString()!, CultureInfo.InvariantCulture) };
 
@@ -189,20 +214,20 @@ public partial class DataStore
         if (telemetrySettings.Profiles is { } overrides && SensorProfiles.Override(overrides, metric) is { } configured)
         {
             var had = profileCache.TryGetValue(metric, out var old) && old.Profile != configured;
-            profileCache[metric] = (configured, DateTimeOffset.UtcNow, double.MaxValue, int.MaxValue);
+            profileCache[metric] = (configured, Clock.GetUtcNow(), double.MaxValue, int.MaxValue);
             StoreProfile(metric, configured, "configured");
             return had;
         }
         // Settled after two days of history: re-check every six hours. Before that, re-check every ten minutes, or at once while there are
         // under fifty readings (the first day decides most profiles from last_reset).
-        if (!force && profileCache.TryGetValue(metric, out var cached) && DateTimeOffset.UtcNow - cached.CheckedAt < (cached.SpanDays >= 2 ? TimeSpan.FromHours(6) : cached.Count < 50 ? TimeSpan.Zero : TimeSpan.FromMinutes(10))) return false;
+        if (!force && profileCache.TryGetValue(metric, out var cached) && Clock.GetUtcNow() - cached.CheckedAt < (cached.SpanDays >= 2 ? TimeSpan.FromHours(6) : cached.Count < 50 ? TimeSpan.Zero : TimeSpan.FromMinutes(10))) return false;
         var history = new List<TelemetrySample>();
         using (var c = Command("SELECT * FROM telemetry_samples WHERE metric=? AND time>=(SELECT max(time) FROM telemetry_samples WHERE metric=?)-INTERVAL 14 DAY ORDER BY time", metric, metric))
         using (var r = c.ExecuteReader()) while (r.Read()) history.Add(ReadSample(r));
         var detected = SensorProfiles.Detect(metric, history, telemetryZone);
         var span = history.Count < 2 ? 0 : (history[^1].Time - history[0].Time).TotalDays;
         var changed = profileCache.TryGetValue(metric, out var previous) ? previous.Profile != detected : StoredProfile(metric) is { } stored && stored != detected;
-        profileCache[metric] = (detected, DateTimeOffset.UtcNow, span, history.Count);
+        profileCache[metric] = (detected, Clock.GetUtcNow(), span, history.Count);
         StoreProfile(metric, detected, "detected");
         return changed;
     }
@@ -214,7 +239,7 @@ public partial class DataStore
     void StoreProfile(string metric, string profile, string origin)
     {
         if (StoredProfile(metric) == profile) return;
-        Execute("INSERT OR REPLACE INTO telemetry_profiles VALUES (?,?,?,?)", metric, profile, DateTimeOffset.UtcNow, origin);
+        Execute("INSERT OR REPLACE INTO telemetry_profiles VALUES (?,?,?,?)", metric, profile, Clock.GetUtcNow(), origin);
     }
 
     // ---- interval derivation ----
@@ -239,7 +264,7 @@ public partial class DataStore
                 RekeySamplesToSourceTime();
                 profileCache.Clear();
                 foreach (var metric in TelemetrySchema.EnergyMetrics) { Transaction(() => RefreshProfile(metric, force: true)); RebuildAll(metric, gap); }
-                Transaction(() => Execute("INSERT INTO store_migrations VALUES (?,?)", marker, DateTimeOffset.UtcNow));
+                Transaction(() => Execute("INSERT INTO store_migrations VALUES (?,?)", marker, Clock.GetUtcNow()));
                 LastIntervalRebuild = clock.Elapsed;
             }
             finally { latestSamples = null; latestObserved = null; firstObservationLoaded = false; }
@@ -340,7 +365,7 @@ public partial class DataStore
                 InsertRows("telemetry_samples", chunk.Select(m => new object?[] { m.Old.Metric, m.Old.EntityId, m.Time, m.Old.Value, m.Old.Unit, m.Old.Source, m.Old.RawState, m.Old.RawUnit, m.Old.SourceUpdatedAt, m.Old.AttributesJson, m.Old.Status }));
             });
         }
-        Transaction(() => Execute("INSERT INTO store_migrations VALUES (?,?)", marker, DateTimeOffset.UtcNow));
+        Transaction(() => Execute("INSERT INTO store_migrations VALUES (?,?)", marker, Clock.GetUtcNow()));
     }
 
     /// <summary>Re-derives every interval of a metric. Inside a caller's transaction (a profile change during a save) it runs as one pass;
@@ -478,7 +503,7 @@ public partial class DataStore
         lock (gate)
         {
             LoadLatestCaches();
-            var now = DateTimeOffset.UtcNow; var result = new Dictionary<string, LatestTelemetry>();
+            var now = Clock.GetUtcNow(); var result = new Dictionary<string, LatestTelemetry>();
             foreach (var (metric, s) in latestSamples!)
             {
                 var observed = latestObserved!.GetValueOrDefault(metric);
@@ -583,7 +608,7 @@ public partial class DataStore
             var latest = LatestSample(metric); if (latest is null) return true;
             var profile = TelemetrySchema.EnergyMetrics.Contains(metric) ? ProfileFor(metric) : SensorProfiles.Default(metric);
             // Solar not yet awake today is judged against Predbat's forecast inside Explain.
-            return Explain(metric, latest, LatestObserved(metric), profile, DateTimeOffset.UtcNow).Expected;
+            return Explain(metric, latest, LatestObserved(metric), profile, Clock.GetUtcNow()).Expected;
         }
     }
 

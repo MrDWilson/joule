@@ -94,7 +94,7 @@ public partial class DataStore
 
     EnergySummary Summarise(DateTimeOffset from, DateTimeOffset to, bool detail)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = Clock.GetUtcNow();
         var all = LoadIntervals(from, to);
         var byMetric = TelemetrySchema.EnergyMetrics.ToDictionary(m => m, m => all.Where(x => x.Metric == m).ToList());
         bool metricOverflowed = false;
@@ -292,7 +292,7 @@ public partial class DataStore
         lock (gate)
         {
             switch (telemetrySettings.LoadIncludesEv.ToLowerInvariant()) { case "true" or "on" or "yes": return true; case "false" or "off" or "no": return false; }
-            if (loadIncludesEv is { } cached && DateTimeOffset.UtcNow - cached.At < TimeSpan.FromHours(1)) return cached.Value;
+            if (loadIncludesEv is { } cached && Clock.GetUtcNow() - cached.At < TimeSpan.FromHours(1)) return cached.Value;
             bool? result = null;
             if (LatestSample("ev") is { } latestEv && LatestSample("load") is not null)
             {
@@ -309,7 +309,7 @@ public partial class DataStore
                 }
                 if (sessions >= 3) result = inside >= .9 * sessions;
             }
-            loadIncludesEv = (result, DateTimeOffset.UtcNow);
+            loadIncludesEv = (result, Clock.GetUtcNow());
             return result;
         }
     }
@@ -343,7 +343,7 @@ public partial class DataStore
             var result = new List<MatchedForecast>();
             foreach (var interval in intervals)
             {
-                if (interval.End > DateTimeOffset.UtcNow) continue;
+                if (interval.End > Clock.GetUtcNow()) continue;
                 var covering = forecasts.Where(f => f.End > interval.Start && f.Start < interval.End).ToList(); var cursor = interval.Start; double energy = 0; bool invalid = false;
                 for (var i = 0; i < covering.Count; i++)
                 {
@@ -375,7 +375,7 @@ public partial class DataStore
             var intervals = LoadIntervals(forecasts[0].Time, forecasts[^1].Time.AddMinutes(30), [metric]);
             foreach (var f in forecasts)
             {
-                var end = f.Time.AddMinutes(30); if (end > to || end > DateTimeOffset.UtcNow) continue;
+                var end = f.Time.AddMinutes(30); if (end > to || end > Clock.GetUtcNow()) continue;
                 var allocation = Allocate(intervals, f.Time, end);
                 double? actual = allocation.Exact && allocation.Measured is { } m ? m : null;
                 if (actual is null && f.Demo)
@@ -407,7 +407,7 @@ public partial class DataStore
     /// <summary>Measured energy for [from,to] from contiguous observed intervals, prorated at the edges; null if any part is missing or estimated.</summary>
     double? EstimateBoundaryEnergy(string metric, DateTimeOffset from, DateTimeOffset to)
     {
-        if (to > DateTimeOffset.UtcNow) return null;
+        if (to > Clock.GetUtcNow()) return null;
         return Allocate(LoadIntervals(from, to, [metric]), from, to).Measured;
     }
 
@@ -454,7 +454,7 @@ public partial class DataStore
     /// </summary>
     PlanSnapshot EnrichPlan(PlanSnapshot plan)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = Clock.GetUtcNow();
         var elapsed = plan.Slots.Where(s => s.DurationMinutes > 0 && s.Time.AddMinutes(s.DurationMinutes) <= now).ToList();
         List<StoredInterval> load = [], pv = [], ev = []; List<TelemetrySample> soc = []; bool? includesEv = null;
         if (elapsed.Count > 0)

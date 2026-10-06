@@ -22,10 +22,11 @@ public sealed class TelemetryCollectionService
     readonly DataStore db;readonly HomeAssistantClient client;readonly HomeAssistantOptions options;
     readonly SemaphoreSlim collecting=new(1,1);
     readonly bool demo;
+    readonly TimeProvider clock;
     DateTimeOffset? last;string? error;string? lastSource;bool intervalRulesChecked;List<TelemetryIssue> issues=[];
-    public TelemetryCollectionService(DataStore db,HomeAssistantClient client,HomeAssistantOptions options,IConfiguration config)
+    public TelemetryCollectionService(DataStore db,HomeAssistantClient client,HomeAssistantOptions options,IConfiguration config,TimeProvider? clock=null)
     {
-        this.db=db;this.client=client;this.options=options;demo=config.GetValue("App:Demo",true);
+        this.db=db;this.client=client;this.options=options;this.clock=clock??db.Clock;demo=config.GetValue("App:Demo",true);
         db.ConfigureTelemetry(options.TelemetrySettings);
     }
     public TelemetryStatus Status()=>new(demo,client.Configured,options.TimeZone,last,error,new(options.Entities),TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!options.Entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,db.ReadLatestTelemetry(options.MaxGap),options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
@@ -38,18 +39,18 @@ public sealed class TelemetryCollectionService
         try
         {
             if(!intervalRulesChecked){db.EnsureIntervalRules(options.MaxGap);intervalRulesChecked=true;}
-            if(demo)DemoTelemetry.Seed(db);
+            if(demo)DemoTelemetry.Seed(db,clock.GetUtcNow());
             else
             {
                 if(!client.Configured)throw new DomainException("Configure explicit Home Assistant entity mappings, plus either the Home Assistant URL and server token or the Predbat URL for mirrored readings.",503);
                 var readings=await client.CollectAsync(ct);lastSource=readings.FirstOrDefault()?.Source;db.SaveTelemetry(readings,options.MaxGap,alignToSource:true);
                 // Readings are persisted and the poll recorded before per-sensor health is judged, so partial data and LastCollection survive a failing sensor.
-                last=DateTimeOffset.UtcNow;
+                last=clock.GetUtcNow();
                 if(client.LastReadFailed){issues=[new("all","Home Assistant could not be read.",null)];throw new DomainException(MissingReadingsMessage(readings,lastSource),502);}
                 issues=Problems(db,readings);
                 if(issues.Count>0)throw new DomainException($"Sensors without a usable reading: {string.Join(", ",issues.Select(x=>$"{x.Metric} ({x.Message})"))}. Other sensors continue collecting (source: {lastSource??"none"}).",502);
             }
-            last=DateTimeOffset.UtcNow;error=null;
+            last=clock.GetUtcNow();error=null;
         }
         catch(Exception e) when(e is not OperationCanceledException || !ct.IsCancellationRequested){error=e is DomainException?e.Message:"HA collection failed. Check endpoint, token, units and sensor timestamps.";throw;}
         finally{collecting.Release();}
@@ -99,7 +100,7 @@ public static class HomeAssistantIntegration
     {
         services.AddSingleton(new HomeAssistantOptions(configuration));
         services.AddHttpClient("homeassistant",c=>c.Timeout=TimeSpan.FromSeconds(25)).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
-        services.AddSingleton(sp=>new HomeAssistantClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("homeassistant"),sp.GetRequiredService<HomeAssistantOptions>(),sp.GetService<IPredbatClient>() as IPredbatEntityReader));
+        services.AddSingleton(sp=>new HomeAssistantClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("homeassistant"),sp.GetRequiredService<HomeAssistantOptions>(),sp.GetService<IPredbatClient>() as IPredbatEntityReader,sp.GetService<TimeProvider>()));
         services.AddSingleton<TelemetryCollectionService>();services.AddHostedService<HomeAssistantTelemetryWorker>();return services;
     }
     public static IEndpointRouteBuilder MapHomeAssistantTelemetry(this IEndpointRouteBuilder app)
@@ -199,7 +200,7 @@ public static class DemoTelemetry
             }
         }
     }
-    public static void Seed(DataStore db) => Seed(db, DateTimeOffset.UtcNow);
+    public static void Seed(DataStore db) => Seed(db, db.Clock.GetUtcNow());
     public static void Seed(DataStore db, DateTimeOffset now)
     {
         var zone = db.TelemetryZone;

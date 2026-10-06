@@ -80,7 +80,7 @@ public partial class DataStore
             catch { Execute("ROLLBACK"); throw; }
         }
         // Bound the published state: history past the retention limits moves to the archive tables (StateRetention.cs).
-        ApplyRetention(state, DateTimeOffset.UtcNow);
+        ApplyRetention(state, Clock.GetUtcNow());
     }
     public List<ToolEvidence> ReadInvestigationEvidence(string id)
     {

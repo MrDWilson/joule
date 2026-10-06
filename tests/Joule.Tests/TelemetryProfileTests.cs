@@ -133,7 +133,7 @@ public sealed class TelemetryProfileTests : IDisposable
         var values = new Dictionary<string, string?> { ["App:Demo"] = "false", ["HomeAssistant:BaseUrl"] = "http://ha.test", ["HomeAssistant:AccessToken"] = "x" };
         foreach (var (name, entity) in entities) values["HomeAssistant:Entities:" + name] = entity;
         var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build(); var options = new HomeAssistantOptions(config);
-        var client = new HomeAssistantClient(new HttpClient(new Handler(_ => states() is { } s ? new(HttpStatusCode.OK) { Content = new StringContent(s.ToJsonString()) } : new(HttpStatusCode.BadGateway))), options);
+        var client = new HomeAssistantClient(new HttpClient(new Handler(_ => states() is { } s ? new(HttpStatusCode.OK) { Content = new StringContent(s.ToJsonString()) } : new(HttpStatusCode.BadGateway))), options, clock: db.Clock);
         return (new TelemetryCollectionService(db, client, options, config), client);
     }
     static JsonObject State(string entity, string state, DateTimeOffset updated, string? lastReset = null)
@@ -143,13 +143,18 @@ public sealed class TelemetryProfileTests : IDisposable
         return new() { ["entity_id"] = entity, ["state"] = state, ["last_updated"] = updated.ToString("O"), ["attributes"] = attributes };
     }
 
-    [Fact]
-    public async Task DaytimeSolarUnknownBeyondTheGracePeriodIsAWarningButOvernightIsNot()
+    // A pinned clock in whole seconds (Home Assistant's timestamps are microseconds; the wall clock on Linux has 100 ns ticks that
+    // the store cannot round-trip). Late morning and late evening, both after the counter's reset two hours earlier.
+    [Theory]
+    [InlineData("2026-10-06T11:10:00Z")]
+    [InlineData("2026-10-06T20:52:54Z")]
+    public async Task DaytimeSolarUnknownBeyondTheGracePeriodIsAWarningButOvernightIsNot(string at)
     {
-        using var db = new DataStore(path);
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Parse(at, CultureInfo.InvariantCulture);
+        var clock = new ManualClock(now);
+        using var db = new DataStore(path, clock);
         var midnight = CivilTime.FirstValidInstant(TimeZoneInfo.ConvertTime(now, London).Date, London);
-        // The counter's current day began two hours ago (whatever the wall clock says when this runs).
+        // The counter's current day began two hours ago.
         var reset = now.AddHours(-2).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture);
         // Solar generated today and Predbat expects more now, but the sensor has said unknown for 40 minutes.
         db.SavePlan(new PlanSnapshot { Source = "Predbat", At = now.AddHours(-2), CollectedAt = now.AddHours(-2), Slots = Enumerable.Range(-4, 8).Select(i => new PlanSlot(new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute < 30 ? 0 : 30, 0, TimeSpan.Zero).AddMinutes(30 * i), .3, null, 1.2, null, 50, null, 25, 15, "Demand", 0)).ToList() });
@@ -161,7 +166,7 @@ public sealed class TelemetryProfileTests : IDisposable
 
         // Overnight (no solar yet today and none forecast), the same unknown is normal and never an error.
         var todayReset = TimeZoneInfo.ConvertTime(midnight, London).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture);
-        using var night = new DataStore(path + "-night");
+        using var night = new DataStore(path + "-night", clock);
         night.SaveTelemetry([new("pv", "sensor.pv", midnight.AddMinutes(-10), 9.4, "kWh", "HomeAssistant", "9.4", "kWh", midnight.AddMinutes(-10), "{\"last_reset\":\"2020-01-01T00:00:00+00:00\"}"),
             new("pv", "sensor.pv", now.AddHours(-2), null, "", "HomeAssistant", "unknown", "", midnight, $"{{\"last_reset\":\"{todayReset}\"}}", "idle")]);
         var (quiet, _) = Collector(night, () => new JsonArray(State("sensor.pv", "unknown", midnight, todayReset)), ("Pv", "sensor.pv"));

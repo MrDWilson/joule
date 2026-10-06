@@ -56,7 +56,7 @@ public sealed class HomeAssistantOptions
         if(LoadIncludesEv is not ("auto" or "true" or "false"))throw new DomainException("HomeAssistant:LoadIncludesEv must be auto, true or false.",400);
     }
 }
-public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions options,IPredbatEntityReader? fallback=null)
+public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions options,IPredbatEntityReader? fallback=null,TimeProvider? clock=null)
 {
     public const string DirectSource="HomeAssistant";
     public const string MirrorSource="Predbat mirror";
@@ -70,7 +70,7 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         var source=DirectSource;
         var states=options.DirectConfigured?await ReadDirectAsync(ct):null;
         if(states is null && fallback?.Configured==true){source=MirrorSource;states=await ReadMirrorAsync(ct);}
-        var observedAt=DateTimeOffset.UtcNow;
+        var observedAt=(clock??TimeProvider.System).GetUtcNow();
         LastReadFailed=states is null;
         if(states is null)return options.Entities.Select(x=>Unavailable(x.Key,x.Value,observedAt,source)).ToList();
         var result=new List<TelemetrySample>();

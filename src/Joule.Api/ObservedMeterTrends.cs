@@ -23,7 +23,7 @@ public partial class DataStore
         if(to<=from || to-from>TimeSpan.FromDays(7))throw new DomainException("Choose a positive meter-trend period of at most seven days.",400);
         if(stepMinutes is not (15 or 30 or 60))throw new DomainException("Choose a trend step of 15, 30 or 60 minutes.",400);
         const int limit=1000;
-        var now=DateTimeOffset.UtcNow;
+        var now=Clock.GetUtcNow();
         var completedThrough=to<now?to:now;
         lock(gate)
         {

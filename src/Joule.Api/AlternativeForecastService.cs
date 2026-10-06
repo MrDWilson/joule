@@ -122,7 +122,7 @@ public partial class DataStore
     internal double? ReadCompleteObservedLoad(DateTimeOffset start,int durationMinutes)
     {
         var end=start.AddMinutes(durationMinutes);
-        if(end>DateTimeOffset.UtcNow)return null;
+        if(end>Clock.GetUtcNow())return null;
         lock(gate)
         {
             var measured=ReadEnergySummary(start,end).Metrics["load"];

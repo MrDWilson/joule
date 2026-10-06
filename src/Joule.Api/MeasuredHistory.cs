@@ -39,7 +39,7 @@ public partial class DataStore
         if (!MeasuredHistorySlotMinutes.Contains(slotMinutes)) throw new DomainException("Choose a slot length of 5, 10, 15, 30 or 60 minutes.", 400);
         if (to <= from || to - from > TimeSpan.FromDays(7)) throw new DomainException("Choose a positive history window of at most seven days.", 400);
         var slot = TimeSpan.FromMinutes(slotMinutes);
-        var now = DateTimeOffset.UtcNow;
+        var now = Clock.GetUtcNow();
         lock (gate)
         {
             var intervals = LoadIntervals(from, to, ["load", "pv", "ev"]);

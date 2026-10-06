@@ -9,8 +9,11 @@ public partial class DataStore : IDisposable
     readonly DuckDBConnection db;
     readonly object gate = new();
     public string DirectoryPath { get; }
-    public DataStore(string directory)
+    /// <summary>The store's "now" (retention, freshness, completed intervals). The app uses the system clock; tests pin it.</summary>
+    public TimeProvider Clock { get; }
+    public DataStore(string directory, TimeProvider? clock = null)
     {
+        Clock = clock ?? TimeProvider.System;
         DirectoryPath = Path.GetFullPath(directory);
         Directory.CreateDirectory(DirectoryPath);
         db = new DuckDBConnection($"Data Source={Path.Combine(DirectoryPath, "predbat.duckdb")}"); db.Open();
@@ -51,7 +54,7 @@ public partial class DataStore : IDisposable
     {
         using (var c = Command("SELECT count(*) FROM store_migrations WHERE name=?", name)) if (Convert.ToInt64(c.ExecuteScalar()) > 0) return;
         Execute("BEGIN TRANSACTION");
-        try { apply(); Execute("INSERT INTO store_migrations VALUES (?,?)", name, DateTimeOffset.UtcNow); Execute("COMMIT"); }
+        try { apply(); Execute("INSERT INTO store_migrations VALUES (?,?)", name, Clock.GetUtcNow()); Execute("COMMIT"); }
         catch { Execute("ROLLBACK"); throw; }
     }
     internal bool MigrationApplied(string name)
@@ -97,13 +100,13 @@ public partial class DataStore : IDisposable
                 {
                     // Predbat replans every 10 minutes and is polled every 5: an unchanged plan adds only changed observations,
                     // not another full source snapshot of the same plan.
-                    if (rawState != null) { Execute("BEGIN TRANSACTION"); try { SaveObservations(DateTimeOffset.UtcNow, rawState); Execute("COMMIT"); } catch { Execute("ROLLBACK"); throw; } }
+                    if (rawState != null) { Execute("BEGIN TRANSACTION"); try { SaveObservations(Clock.GetUtcNow(), rawState); Execute("COMMIT"); } catch { Execute("ROLLBACK"); throw; } }
                     return;
                 }
             Execute("BEGIN TRANSACTION");
             try
             {
-                p.CollectedAt ??= rawState is not null ? DateTimeOffset.UtcNow : p.Source == "Demo" ? p.At : null;
+                p.CollectedAt ??= rawState is not null ? Clock.GetUtcNow() : p.Source == "Demo" ? p.At : null;
                 p = NormalisePlan(p);
                 Execute("INSERT INTO plans (id,recorded_at,source,payload,collected_at,detail_version) VALUES (?, ?, ?, ?, ?, ?)", p.Id, p.At, p.Source, JsonSerializer.Serialize(p, PlanPayloadOptions), p.CollectedAt, rawPlan is not null || p.Source == "Demo" ? PlanDetailVersion : 0);
                 InsertPlanSlots(p);
@@ -124,7 +127,7 @@ public partial class DataStore : IDisposable
     }
     void SaveSourceInternal(string id, string rawState, string rawPlan, DateTimeOffset? receivedAt = null)
     {
-        var at = receivedAt ?? DateTimeOffset.UtcNow;
+        var at = receivedAt ?? Clock.GetUtcNow();
         SaveSnapshot(id, at, rawState, rawPlan);
         // Native curves remain source diagnostics: load_energy_actual can contain
         // forecasts and adjusted load. Existing derived rows remain stored, but
@@ -155,7 +158,7 @@ public partial class DataStore : IDisposable
     }
     public virtual string BeginWrite(List<Change> changes)
     {
-        lock (gate) { var id = Guid.NewGuid().ToString("N"); Execute("INSERT INTO write_journal VALUES (?, ?, 'pending', ?)", id, DateTimeOffset.UtcNow, JsonSerializer.Serialize(changes, JsonDefaults.Options)); return id; }
+        lock (gate) { var id = Guid.NewGuid().ToString("N"); Execute("INSERT INTO write_journal VALUES (?, ?, 'pending', ?)", id, Clock.GetUtcNow(), JsonSerializer.Serialize(changes, JsonDefaults.Options)); return id; }
     }
     public virtual void EndWrite(string id, string status) { lock (gate) Execute("UPDATE write_journal SET status=? WHERE id=?", status, id); }
     public bool HasUncertainWrite()

@@ -208,7 +208,7 @@ public class ApplicationAuthTests
         public async Task<bool> Start()
         {
             process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine();
-            var url = await ready.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            var url = await JouleProcess.WaitUntilListening(ready.Task, () => Log);
             if (url == null) { await process.WaitForExitAsync(); return false; }
             Http.BaseAddress = new Uri(url);
             return true;

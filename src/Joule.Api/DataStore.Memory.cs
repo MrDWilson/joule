@@ -30,7 +30,7 @@ public partial class DataStore
             var existing = ListMemory();
             if (existing.FirstOrDefault(f => string.Equals(f.Text, text, StringComparison.OrdinalIgnoreCase)) is { } same) return same;
             if (existing.Count >= MemoryFactLimit) throw new DomainException($"Shared memory holds at most {MemoryFactLimit} facts. Remove one before adding another.", 400);
-            var fact = new MemoryFact(Guid.NewGuid().ToString("N"), text, source, DateTimeOffset.UtcNow, investigationId);
+            var fact = new MemoryFact(Guid.NewGuid().ToString("N"), text, source, Clock.GetUtcNow(), investigationId);
             Execute("INSERT INTO agent_memory (id,created_at,source,text,investigation_id,active) VALUES (?,?,?,?,?,true)", fact.Id, fact.CreatedAt, fact.Source, fact.Text, fact.InvestigationId);
             return fact;
         }

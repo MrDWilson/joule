@@ -66,11 +66,22 @@ sealed class JouleProcess : IAsyncDisposable
     public async Task<bool> Start()
     {
         process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine();
-        var url = await ready.Task.WaitAsync(TimeSpan.FromSeconds(40));
+        var url = await WaitUntilListening(ready.Task, () => Log);
         if (url == null) { await process.WaitForExitAsync(); return false; }
         BaseAddress = new Uri(url);
         Http.BaseAddress = BaseAddress;
         return true;
+    }
+
+    /// <summary>How long a child API may take to listen. The demo seeds five weeks of readings first: a second or two on a laptop,
+    /// several on a small CI runner.</summary>
+    public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(90);
+
+    /// <summary>The listening URL (null if the process exited first); a timeout names the wait and includes the process log.</summary>
+    public static async Task<string?> WaitUntilListening(Task<string?> ready, Func<string> log)
+    {
+        try { return await ready.WaitAsync(StartTimeout); }
+        catch (TimeoutException) { throw new TimeoutException($"The API did not listen within {StartTimeout.TotalSeconds:0} s. Its log so far:\n{log()}"); }
     }
 
     /// <summary>Runs the process to completion (for command-line switches such as --health).</summary>
