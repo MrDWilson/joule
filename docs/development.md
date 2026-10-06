@@ -39,4 +39,4 @@ builds the dashboard, starts a throwaway demo on port 5090, and saves desktop (1
 
 ## Releases
 
-CI (`.github/workflows/ci.yml`) runs the .NET tests, the dashboard build and the browser tests on every pull request and push to `master`. Pushing a tag such as `v1.0.0` runs `.github/workflows/release.yml`: the tests again, then a multi-architecture image (`linux/amd64`, `linux/arm64`) pushed to `ghcr.io/<owner>/joule` as `1.0.0`, `1.0` and `latest`, and a GitHub release with generated notes. The version shown in `/api/health` and the dashboard comes from the tag.
+CI (`.github/workflows/ci.yml`) runs the .NET tests, the dashboard build, the browser tests and an image build for both architectures (not pushed) on every pull request and push to `master`. Pushing a tag such as `v1.0.0` runs `.github/workflows/release.yml`: the tests again, then a multi-architecture image (`linux/amd64`, `linux/arm64`) pushed to `ghcr.io/<owner>/joule` as `1.0.0`, `1.0`, `1` and `latest`, and a GitHub release with generated notes. The version shown in `/api/health` and the dashboard comes from the tag.
