@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 import { openPage } from './support/navigation';
 import { fetchFresh, fulfillRewritten } from './support/routes';
 
+// A route handler still reading a fetched response when the test ends would fail it as the context closes.
+test.afterEach(async ({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
+
 test('no-auth mode opens the dashboard and persists changes without a login', async ({ page, request }) => {
   const reset = await request.post('/api/mode', { headers: { 'X-Joule-Request': '1' }, data: { mode: 'Monitor' } });
   expect(reset.ok()).toBeTruthy();

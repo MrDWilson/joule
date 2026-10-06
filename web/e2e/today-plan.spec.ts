@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 import { fetchFresh, fulfillRewritten } from "./support/routes";
 import { openPage } from "./support/navigation";
 
+// A route handler still reading a fetched response when the test ends would fail it as the context closes.
+test.afterEach(async ({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
+
 // Today and Plan: the Now hero, honest figures, merged plan windows and the Plan page's tables, at phone,
 // tablet and desktop widths, on the demo and on live-shaped payloads.
 test.use({ timezoneId: "Europe/London" });

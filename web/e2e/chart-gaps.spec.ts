@@ -1,6 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openPage } from './support/navigation';
 import { fetchFresh, fulfillRewritten } from './support/routes';
+
+// A route handler still reading a fetched response when the test ends would fail it as the context closes.
+test.afterEach(async ({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
+
 // The energy timeline: one calm chart for what happened and what Predbat plans, the same encoding everywhere.
 test.beforeEach(async ({ request }) => {
   const response = await request.post('/api/telemetry/collect', { headers: { 'X-Joule-Request': '1' }, data: {} });

@@ -1,6 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openPage } from "./support/navigation";
 
+// A route handler still reading a fetched response when the test ends would fail it as the context closes.
+test.afterEach(async ({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
+
 // The app shell: routing, focus and titles, the status chip, notifications, resilience when the server is slow or
 // away, the session-expired screen and error boundaries.
 test.use({ timezoneId: "Europe/London" });
