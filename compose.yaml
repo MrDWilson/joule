@@ -1,0 +1,26 @@
+# Joule: a dashboard and AI analyst that works alongside Predbat.
+#
+#   docker compose up -d       then open http://localhost:5080 and follow Setup.
+#
+# Joule starts with a demo house. Setup's "Connect my Predbat" switches it to your own Predbat and keeps your choices
+# in the joule-data volume, so there is nothing else to edit here. A .env file next to this one is optional (see
+# .env.example); anything set there wins over Setup. To build from source instead of pulling the image:
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  joule:
+    image: ${JOULE_IMAGE:-ghcr.io/mrdwilson/joule:latest}
+    restart: unless-stopped
+    ports:
+      # Only this computer can open Joule. Running it on a server you reach from another computer? Use "5080:5080"
+      # instead, and put an HTTPS reverse proxy in front before opening it beyond your home network (docs/security.md).
+      - "127.0.0.1:5080:5080"
+    extra_hosts:
+      # So a Predbat running on this Docker host is http://host.docker.internal:5052 from inside Joule.
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - joule-data:/data
+volumes:
+  joule-data:

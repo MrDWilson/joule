@@ -1,0 +1,21 @@
+{
+  "name": "Joule",
+  "short_name": "Joule",
+  "description": "Watches your Predbat home-battery plan, measures what really happened and explains it in plain English.",
+  "start_url": "/#/today",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080d13",
+  "theme_color": "#080d13",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Plan", "short_name": "Plan", "url": "/#/plan", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Insights", "short_name": "Insights", "url": "/#/insights", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Energy", "short_name": "Energy", "url": "/#/energy", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

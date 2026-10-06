@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state-header.schema.json",
+  "title": "Joule GET /api/state?view=header",
+  "description": "The slim state header the dashboard polls. Mirrors StateHeader in web/src/types.ts and StateProjection.cs. Fields are only ever added.",
+  "type": "object",
+  "required": ["schemaVersion", "version", "dataSource", "mode", "revision", "lastCollection", "lastAnalysis", "lastAnalysisAttemptAt", "connection", "ai", "health", "predbatStatus", "counts", "plan", "latestInvestigations", "topFinding48h", "todayRunStrip", "proposals", "notifications", "settings", "memory", "reportSchedules", "reportPreferences", "setupProgress", "lastActivity", "timeZone"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "version": { "type": "string" },
+    "dataSource": { "type": "string" },
+    "mode": { "type": "string" },
+    "revision": { "type": "integer" },
+    "lastCollection": { "type": ["string", "null"] },
+    "lastAnalysis": { "type": ["string", "null"] },
+    "lastAnalysisAttemptAt": { "type": ["string", "null"] },
+    "connection": {
+      "type": "object",
+      "required": ["demo", "writesEnabled", "predbatConfigured", "authMode"],
+      "properties": { "demo": { "type": "boolean" }, "writesEnabled": { "type": "boolean" }, "predbatConfigured": { "type": "boolean" }, "authMode": { "type": "string", "enum": ["AccessKey", "None"] } }
+    },
+    "ai": {
+      "type": "object",
+      "required": ["running", "schedule", "apiConfigured", "chatGptConnected", "chatGptEmail", "chatGptLocalSignInAvailable", "preferences"],
+      "properties": {
+        "running": { "type": "boolean" },
+        "schedule": { "type": "object", "required": ["enabled", "state", "reason", "nextRunAt", "runsToday", "maxRunsPerDay", "intervalMinutes"] },
+        "apiConfigured": { "type": "boolean" },
+        "chatGptConnected": { "type": "boolean" },
+        "chatGptEmail": { "type": ["string", "null"] },
+        "chatGptLocalSignInAvailable": { "type": "boolean" },
+        "preferences": { "type": "object", "required": ["provider", "model", "scheduled", "intervalMinutes", "maxRunsPerDay", "inputUsdPerMillion", "outputUsdPerMillion"] },
+        "mcp": { "type": ["object", "null"], "properties": { "at": { "type": "string" }, "connected": { "type": "boolean" }, "toolCount": { "type": "integer" } } },
+        "objective": { "type": ["string", "null"] }
+      }
+    },
+    "health": {
+      "type": "object",
+      "required": ["predbatLastAt", "collectionError", "analysisError", "writeUncertain", "pendingFileReload", "writes", "aiStatus", "homeAssistant"],
+      "properties": {
+        "predbatLastAt": { "type": ["string", "null"] },
+        "collectionError": { "type": ["string", "null"] },
+        "analysisError": { "type": ["string", "null"] },
+        "writeUncertain": { "type": "boolean" },
+        "pendingFileReload": { "type": "boolean" },
+        "writes": { "type": "string", "enum": ["demo", "enabled", "disabled", "blocked"] },
+        "aiStatus": { "type": "string", "enum": ["running", "needs_setup", "last_run_failed", "off", "ready"] },
+        "homeAssistant": {
+          "type": ["object", "null"],
+          "required": ["configured", "lastCollection", "error", "unexpected", "missingMappings"],
+          "properties": {
+            "configured": { "type": "boolean" },
+            "lastCollection": { "type": ["string", "null"] },
+            "error": { "type": ["string", "null"] },
+            "unexpected": { "type": "array", "items": { "type": "string" } },
+            "missingMappings": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "predbatStatus": {
+      "type": "object",
+      "required": ["version", "mode", "currentAction", "reserve", "planAt", "planCollectedAt"],
+      "properties": {
+        "version": { "type": ["string", "null"] },
+        "mode": { "type": ["string", "null"] },
+        "currentAction": { "type": ["string", "null"] },
+        "reserve": { "type": ["number", "null"] },
+        "planAt": { "type": ["string", "null"] },
+        "planCollectedAt": { "type": ["string", "null"] }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["investigations", "archivedInvestigations", "pendingProposals", "openFollowUps", "openFileChanges", "openExperiments", "unreadNotifications", "unreadReports", "activities"],
+      "properties": {
+        "investigations": { "type": "integer" },
+        "archivedInvestigations": { "type": "integer" },
+        "pendingProposals": { "type": "integer" },
+        "openFollowUps": { "type": "integer" },
+        "openFileChanges": { "type": "integer" },
+        "openExperiments": { "type": "integer" },
+        "unreadNotifications": { "type": "integer" },
+        "unreadReports": { "type": "integer" },
+        "activities": { "type": "integer" }
+      }
+    },
+    "plan": { "type": ["object", "null"], "required": ["id", "at", "source", "slots"] },
+    "latestInvestigations": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/investigationSummary" } },
+    "topFinding48h": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/investigationSummary" }] },
+    "todayRunStrip": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "at", "status", "verdict"],
+        "properties": { "id": { "type": "string" }, "at": { "type": "string" }, "status": { "type": "string" }, "verdict": { "type": ["string", "null"] } }
+      }
+    },
+    "proposals": { "type": "array", "items": { "type": "object", "required": ["id", "title", "status", "changes"] } },
+    "notifications": { "type": "array", "maxItems": 20, "items": { "type": "object", "required": ["id", "at", "title", "message", "readAt"] } },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "category", "value", "type", "risk", "editable", "autoAllowed", "entityId"],
+        "properties": {
+          "key": { "type": "string" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "value": { "type": "string" },
+          "type": { "type": "string" },
+          "risk": { "type": "string" },
+          "editable": { "type": "boolean" },
+          "autoAllowed": { "type": "boolean" },
+          "entityId": { "type": "string" }
+        }
+      }
+    },
+    "memory": { "type": "array", "items": { "type": "object", "required": ["id", "text", "source", "createdAt"] } },
+    "reportSchedules": { "type": "object", "required": ["timeZone", "hourLocal", "daily", "weekly"] },
+    "reportPreferences": { "type": "object", "required": ["dailyEnabled", "weeklyEnabled", "timeZone", "hourLocal"] },
+    "setupProgress": {
+      "type": "object",
+      "required": ["done", "total", "requiredDone", "steps"],
+      "properties": {
+        "done": { "type": "integer" },
+        "total": { "type": "integer" },
+        "requiredDone": { "type": "boolean" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "label", "done", "required"],
+            "properties": { "key": { "type": "string" }, "label": { "type": "string" }, "done": { "type": "boolean" }, "required": { "type": "boolean" } }
+          }
+        }
+      }
+    },
+    "lastActivity": {
+      "type": ["object", "null"],
+      "required": ["at", "kind", "message"],
+      "properties": { "at": { "type": "string" }, "kind": { "type": "string" }, "message": { "type": "string" } }
+    },
+    "timeZone": { "type": "string" }
+  },
+  "$defs": {
+    "investigationSummary": {
+      "type": "object",
+      "required": ["id", "at", "status", "verdict", "title", "headline", "plain", "category", "confidence", "provider", "scheduled", "dismissedAt", "openFollowUps", "openFileChanges", "pendingProposals", "impactPence"],
+      "properties": {
+        "id": { "type": "string" },
+        "at": { "type": "string" },
+        "status": { "type": "string" },
+        "verdict": { "type": ["string", "null"] },
+        "title": { "type": "string" },
+        "headline": { "type": "string" },
+        "plain": { "type": ["string", "null"] },
+        "category": { "type": "string" },
+        "confidence": { "type": "string" },
+        "provider": { "type": "string" },
+        "scheduled": { "type": "boolean" },
+        "dismissedAt": { "type": ["string", "null"] },
+        "openFollowUps": { "type": "integer" },
+        "openFileChanges": { "type": "integer" },
+        "pendingProposals": { "type": "integer" },
+        "impactPence": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

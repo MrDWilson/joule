@@ -1,0 +1,1814 @@
+{
+ "ref": "v9.3.5",
+ "about": "Facts extracted from Predbat's docs at this ref by scripts/predbat-docs-index.py: section anchors and the setting keys each mentions. No documentation prose.",
+ "sources": {
+  "customisation.md": "295ced1dc4c143fce24505ccdbbd5b7a0c6979719504104e892d6e42389d0c63",
+  "car-charging.md": "31e47fe7a65ad18d1ab6166cf3f6e197c9da948f5fc52a6bee7635ba767e468e",
+  "energy-rates.md": "fc6aa32aa3e6bec14def99c00d7f9404c689a1a6c0a6b12e30d4fff1a6fd4f73",
+  "compare.md": "ad158ff4953c79d49d30d3a508947344028da382fc067fadae536dab022e8dfd",
+  "predheat.md": "76a67c4c27eb278cc429cfa0986825a09f20d5b4a7cbd7bc16e4d69c987e4763",
+  "install.md": "8971f59626a6fdfcd237c44fa0a792f35e14b747608f4dfef2872d2729e5e46b",
+  "apps-yaml.md": "1d2f744c8d05dfda2eef7121a9117369e30b51b1dde2f7e094ac14ae048794e6",
+  "manual-api.md": "a9e654014840cecdaba9e2882ab246f7fae1d617f3b964425f03eccceabad5a9",
+  "output-data.md": "a828981d3adc6d0dbddeadbe98efa287046ceb4d731e4c87a6b6f53a3925bfa7",
+  "faq.md": "949a251a2fea4c5bc950f8cc7a36399738283ee49982d54d88e3bf0e495ee462",
+  "what-does-predbat-do.md": "6b1088bf9f04d006bf490b6dcb9e0e444f28862d1a4e98ecd08905b14efc48f9",
+  "predbat-plan-card.md": "f8550ed0c21d6c070d93dc2efc42b07f2fc9b43e2056da6970669b9da41b97bd",
+  "web-interface.md": "fa1bdaef621b86ff1f325b0e1d23b003ccf8b4ba51b1ab77826a919ea41db2b3"
+ },
+ "sections": {
+  "customisation.md#customisation": [],
+  "customisation.md#saving-and-restoring-predbat-settings": [
+   "saverestore"
+  ],
+  "customisation.md#predbat-mode": [
+   "mode",
+   "on",
+   "set_read_only"
+  ],
+  "customisation.md#predbat-monitor-mode": [],
+  "customisation.md#predbat-control-soc-only-mode": [],
+  "customisation.md#predbat-control-charge-mode": [],
+  "customisation.md#predbat-control-charge-discharge-mode": [
+   "set_charge_freeze_only",
+   "set_export_freeze_only"
+  ],
+  "customisation.md#expert-mode": [
+   "expert_mode"
+  ],
+  "customisation.md#performance-tweaks-mode": [
+   "calculate_pv90_plan",
+   "calculate_second_pass",
+   "performance_tweaks"
+  ],
+  "customisation.md#performance-related": [
+   "calculate_plan_every",
+   "calculate_pv90_plan",
+   "calculate_second_pass",
+   "combine_charge_slots",
+   "combine_export_slots",
+   "performance_tweaks",
+   "threads"
+  ],
+  "customisation.md#battery-loss-options": [
+   "battery_loss",
+   "battery_loss_discharge",
+   "inverter_hybrid",
+   "inverter_loss",
+   "metric_battery_cycle",
+   "metric_battery_value_export_scaling",
+   "metric_battery_value_scaling",
+   "metric_self_sufficiency"
+  ],
+  "customisation.md#scaling-and-weight-options": [
+   "battery_capacity_nominal",
+   "battery_rate_max_scaling",
+   "battery_rate_max_scaling_discharge",
+   "calculate_pv90_plan",
+   "car_charging_from_battery",
+   "car_charging_now",
+   "car_charging_rate",
+   "car_charging_slot",
+   "charge_scaling10",
+   "load_scaling",
+   "load_scaling10",
+   "load_scaling90",
+   "load_scaling_free",
+   "load_scaling_saving",
+   "metric_dynamic_load_adjust",
+   "octopus_intelligent_dynamic",
+   "pv_metric90_weight"
+  ],
+  "customisation.md#solar-pv-adjustment-options": [
+   "calculate_pv90_plan",
+   "load_scaling90",
+   "metric_pv_calibration_enable",
+   "performance_tweaks",
+   "pv_forecast_h0",
+   "pv_forecast_h0_uncalibrated",
+   "pv_metric10_weight",
+   "pv_metric90_weight",
+   "pv_scaling"
+  ],
+  "customisation.md#historical-load-data": [
+   "days_previous",
+   "days_previous_weight",
+   "load_filter_modal",
+   "predheat_enable"
+  ],
+  "customisation.md#car-charging": [
+   "car_charging_energy",
+   "car_charging_energy_scale",
+   "car_charging_from_battery",
+   "car_charging_hold",
+   "car_charging_loss",
+   "car_charging_manual_soc",
+   "car_charging_manual_soc_1",
+   "car_charging_manual_soc_kwh",
+   "car_charging_manual_soc_kwh_1",
+   "car_charging_now",
+   "car_charging_plan_max_price",
+   "car_charging_plan_smart",
+   "car_charging_plan_time",
+   "car_charging_rate",
+   "car_charging_slot",
+   "car_charging_soc",
+   "car_charging_threshold",
+   "car_energy_reported_load",
+   "octopus_intelligent_charging",
+   "octopus_intelligent_dynamic",
+   "octopus_intelligent_ignore_unplugged",
+   "octopus_intelligent_trust_slots"
+  ],
+  "customisation.md#calculation-options": [
+   "calculate_export_high_import",
+   "calculate_export_on_pv",
+   "calculate_export_oncharge",
+   "calculate_import_low_export",
+   "calculate_second_pass",
+   "export_more_solar",
+   "export_more_solar_threshold",
+   "forecast_plan_hours",
+   "inverter_set_charge_before",
+   "metric_keep",
+   "mode",
+   "performance_tweaks",
+   "set_discharge_during_charge",
+   "set_export_freeze"
+  ],
+  "customisation.md#battery-margins-and-metrics-options": [
+   "best_soc_keep",
+   "best_soc_keep_weight",
+   "best_soc_max",
+   "best_soc_min",
+   "calculate_inday_adjustment",
+   "carbon_enable",
+   "carbon_metric",
+   "combine_charge_slots",
+   "combine_export_slots",
+   "combine_rate_threshold",
+   "metric_future_rate_offset_export",
+   "metric_future_rate_offset_import",
+   "metric_inday_adjust_damping",
+   "metric_min_improvement",
+   "metric_min_improvement_export",
+   "metric_min_improvement_export_freeze",
+   "metric_min_improvement_swap",
+   "pv_metric10_weight",
+   "rate_high_threshold",
+   "rate_low_threshold"
+  ],
+  "customisation.md#notifications": [
+   "set_event_notify",
+   "set_inverter_notify",
+   "set_status_notify",
+   "set_system_notify"
+  ],
+  "customisation.md#inverter-control-options": [
+   "charge_low_power_margin",
+   "inverter_hybrid",
+   "inverter_limit_override",
+   "inverter_soc_reset",
+   "low_power_pv_threshold_w",
+   "set_charge_freeze",
+   "set_charge_freeze_only",
+   "set_charge_low_power",
+   "set_charge_low_power_solar_full_rate",
+   "set_export_freeze",
+   "set_export_freeze_only",
+   "set_reserve_enable",
+   "set_reserve_min",
+   "set_reserve_min_1"
+  ],
+  "customisation.md#balance-inverters": [
+   "balance_inverters_charge",
+   "balance_inverters_crosscharge",
+   "balance_inverters_discharge",
+   "balance_inverters_enable",
+   "balance_inverters_threshold_charge",
+   "balance_inverters_threshold_discharge",
+   "givtcp_xxxx_real_time_control"
+  ],
+  "customisation.md#freeze-export-during-demand": [
+   "set_freeze_export_during_demand"
+  ],
+  "customisation.md#cloud-coverage-and-load-variance": [
+   "metric_cloud_enable",
+   "metric_load_divergence_enable",
+   "pv_array_kwp"
+  ],
+  "customisation.md#iboost-model-options": [
+   "iboost_enable"
+  ],
+  "customisation.md#iboost-basic-configuration": [
+   "iboost_energy_subtract",
+   "iboost_energy_today",
+   "iboost_max_energy",
+   "iboost_max_power",
+   "iboost_min_power",
+   "iboost_value_scaling"
+  ],
+  "customisation.md#iboost-modes": [],
+  "customisation.md#solar": [
+   "iboost_min_soc",
+   "iboost_on_export",
+   "iboost_solar",
+   "iboost_solar_excess"
+  ],
+  "customisation.md#battery": [
+   "iboost_charging"
+  ],
+  "customisation.md#energy-rates-only": [
+   "iboost_max_energy",
+   "iboost_on_export",
+   "iboost_prevent_discharge",
+   "iboost_smart",
+   "iboost_smart_min_length"
+  ],
+  "customisation.md#iboost-energy-rate-filtering": [
+   "iboost_gas",
+   "iboost_gas_export",
+   "iboost_gas_scale",
+   "iboost_rate_threshold",
+   "iboost_rate_threshold_export",
+   "metric_octopus_gas",
+   "rates_gas"
+  ],
+  "customisation.md#iboost-control": [],
+  "customisation.md#iboost-output-data": [
+   "iboost_active",
+   "iboost_energy_scaling",
+   "iboost_energy_today",
+   "iboost_today"
+  ],
+  "customisation.md#holiday-mode": [
+   "days_previous_auto",
+   "holiday_days_left",
+   "holiday_load_scaling"
+  ],
+  "customisation.md#holiday-mode-with-days_previous_auto-off": [
+   "days_previous",
+   "days_previous_auto"
+  ],
+  "customisation.md#manual-control": [
+   "manual_",
+   "manual_charge",
+   "manual_demand",
+   "manual_export",
+   "manual_export_rates",
+   "manual_export_value",
+   "manual_freeze_charge",
+   "manual_freeze_export",
+   "manual_import_rates",
+   "manual_import_value",
+   "manual_load_adjust",
+   "manual_load_value",
+   "manual_soc",
+   "manual_soc_max",
+   "manual_soc_max_value",
+   "manual_soc_value",
+   "manual_xx",
+   "off",
+   "png",
+   "select_option",
+   "set_read_only"
+  ],
+  "customisation.md#manual-api": [
+   "manual_api"
+  ],
+  "customisation.md#debug": [
+   "debug_enable",
+   "plan_debug",
+   "turn_off"
+  ],
+  "customisation.md#debug-history": [
+   "debug_enable",
+   "debug_history_count",
+   "debug_history_enable",
+   "debug_history_force_capture",
+   "debug_history_interval"
+  ],
+  "customisation.md#updating-predbat": [
+   "auto_update",
+   "main",
+   "predbat_repository",
+   "update"
+  ],
+  "car-charging.md#car-charging": [],
+  "car-charging.md#configure-appsyaml-for-your-car-charging": [
+   "car_charging_exclusive",
+   "false",
+   "num_cars",
+   "true"
+  ],
+  "car-charging.md#filtering-car-charging-energy-from-house-load": [
+   "ashp_energy_today",
+   "car_charging_energy",
+   "car_charging_energy_scale",
+   "car_charging_from_battery",
+   "car_charging_hold",
+   "car_charging_power",
+   "car_charging_rate",
+   "car_charging_threshold",
+   "car_energy_reported_load",
+   "mixergy_",
+   "myenergi_zappi_",
+   "not",
+   "wallbox_charging_power",
+   "wallbox_portal_added_energy",
+   "zappi_charge_power"
+  ],
+  "car-charging.md#planned-car-charging": [
+   "car_charging_battery_size",
+   "car_charging_from_battery",
+   "car_charging_limit",
+   "car_charging_now",
+   "car_charging_now_response",
+   "car_charging_planned",
+   "car_charging_planned_response",
+   "car_charging_rate",
+   "car_charging_slot",
+   "car_charging_soc",
+   "charging",
+   "enable",
+   "false",
+   "metric_dynamic_load_adjust",
+   "myenergi_automatic",
+   "myenergi_zappi_",
+   "octopus_charge_limit",
+   "octopus_energy",
+   "octopus_intelligent_slot",
+   "octopus_ready_time",
+   "octopus_slot_low_rate",
+   "octopus_slot_max",
+   "ohme_automatic",
+   "on",
+   "plan_interval_minutes",
+   "toyota_",
+   "true",
+   "tsunami_battery",
+   "wallbox_portal_charging_power",
+   "wallbox_portal_status_description",
+   "yes"
+  ],
+  "car-charging.md#multiple-electric-cars": [
+   "car_charging_battery_size",
+   "car_charging_limit",
+   "car_charging_planned",
+   "car_charging_slot_1",
+   "car_charging_soc",
+   "num_cars"
+  ],
+  "car-charging.md#multiple-cars-with-octopus-intelligent-go-iog": [
+   "octopus_automatic",
+   "octopus_charge_limit",
+   "octopus_energy_",
+   "octopus_intelligent_slot",
+   "octopus_ready_time",
+   "octopus_slot_max"
+  ],
+  "car-charging.md#how-predbat-picks-which-car-goes-in-which-slot-octopus_automatic": [
+   "car_charging_battery_size",
+   "car_charging_exclusive",
+   "car_charging_limit",
+   "car_charging_plan_max_price",
+   "car_charging_plan_smart",
+   "not",
+   "num_cars",
+   "octopus_automatic"
+  ],
+  "car-charging.md#ohme-car-charger-direct-integration": [
+   "car_charging_battery_size",
+   "car_charging_energy",
+   "car_charging_limit",
+   "car_charging_now",
+   "car_charging_planned",
+   "car_charging_soc",
+   "false",
+   "num_cars",
+   "octopus_charge_limit",
+   "octopus_intelligent_slot",
+   "octopus_ready_time",
+   "ohme_automatic",
+   "ohme_automatic_octopus_intelligent",
+   "ohme_battery_percent",
+   "ohme_connected",
+   "ohme_power_watts",
+   "true"
+  ],
+  "car-charging.md#predbat-led-ohme-charging": [
+   "car_charging_battery_size",
+   "car_charging_limit",
+   "car_charging_slot",
+   "ohme_automatic",
+   "ohme_control"
+  ],
+  "car-charging.md#ohme-charge-energy": [
+   "car_charging_threshold",
+   "energy",
+   "ohme_automatic",
+   "ohme_energy_today",
+   "true"
+  ],
+  "car-charging.md#givenergy-gateway-ocpp-ev-charger": [
+   "car_charging_battery_size",
+   "car_charging_limit",
+   "car_charging_now",
+   "car_charging_slot",
+   "ev",
+   "gateway_ev_",
+   "gateway_ev_3xb749_power",
+   "gateway_evc_control"
+  ],
+  "car-charging.md#car-charging-planning": [],
+  "car-charging.md#octopus-led-charging": [
+   "car_charging_limit",
+   "car_charging_now",
+   "car_charging_planned",
+   "car_charging_soc",
+   "metric_dynamic_load_adjust",
+   "octopus_charge_limit",
+   "octopus_intelligent_charging",
+   "octopus_intelligent_consider_full",
+   "octopus_intelligent_dynamic",
+   "octopus_intelligent_ignore_unplugged",
+   "octopus_intelligent_trust_slots",
+   "octopus_ready_time",
+   "pv_metric10_weight"
+  ],
+  "car-charging.md#checking-intelligent-dispatches-against-the-car": [
+   "car_charging_now",
+   "car_charging_now_response",
+   "car_charging_threshold",
+   "car_energy_reported_load",
+   "charging",
+   "myenergi_automatic",
+   "myenergi_zappi_",
+   "octopus_intelligent_charging",
+   "octopus_intelligent_dynamic",
+   "octopus_intelligent_trust_slots",
+   "off",
+   "ohme_automatic",
+   "wallbox_portal_charging_power"
+  ],
+  "car-charging.md#reading-the-dispatch-timeline-in-the-logs": [
+   "car_charging_planned",
+   "plugged",
+   "unplugged"
+  ],
+  "car-charging.md#predbat-led-charging": [
+   "car_charging_limit",
+   "car_charging_manual_soc",
+   "car_charging_manual_soc_1",
+   "car_charging_manual_soc_kwh",
+   "car_charging_manual_soc_kwh_1",
+   "car_charging_now",
+   "car_charging_plan_max_price",
+   "car_charging_plan_smart",
+   "car_charging_plan_time",
+   "car_charging_planned",
+   "car_charging_planned_response",
+   "car_charging_rate",
+   "car_charging_rate_1",
+   "car_charging_slot",
+   "car_charging_soc",
+   "myenergi_zappi_charge_mode",
+   "octopus_intelligent_charging",
+   "rate_low_threshold",
+   "select_option"
+  ],
+  "car-charging.md#additional-car-charging-configurations": [
+   "car_charging_from_battery",
+   "car_charging_loss",
+   "car_energy_reported_load",
+   "metric_dynamic_load_adjust",
+   "octopus_intelligent_dynamic",
+   "true"
+  ],
+  "car-charging.md#example-ev-and-charger-setup": [
+   "car_charger_battery_size",
+   "car_charger_plugged_in",
+   "car_charging_energy",
+   "car_charging_hold",
+   "car_charging_manual_soc",
+   "car_charging_manual_soc_1",
+   "car_charging_manual_soc_kwh",
+   "car_charging_manual_soc_kwh_1",
+   "car_charging_now",
+   "car_charging_plan_smart",
+   "car_charging_planned",
+   "car_charging_planned_response",
+   "car_charging_slot",
+   "car_energy_used",
+   "car_max_charge",
+   "octopus_intelligent_charging",
+   "off",
+   "on",
+   "true"
+  ],
+  "car-charging.md#example-separating-car-charging-costs-for-multiple-cars": [
+   "car1_connected",
+   "car2_connected",
+   "car_car1_cost_today",
+   "car_car2_cost_today",
+   "set_value"
+  ],
+  "energy-rates.md#energy-rates": [],
+  "energy-rates.md#plan-interval": [],
+  "energy-rates.md#octopus-energy-direct": [],
+  "energy-rates.md#octopus-free-energy-sessions": [],
+  "energy-rates.md#octopus-energy-home-assistant-integration": [],
+  "energy-rates.md#octopus-energy-integration-setup": [],
+  "energy-rates.md#configuring-predbat-to-use-the-octopus-energy-integration": [
+   "electricity_",
+   "metric_octopus_export",
+   "metric_octopus_gas",
+   "metric_octopus_import",
+   "octopus_energy_",
+   "octopus_energy_electricity_",
+   "octopus_energy_gas_",
+   "octopus_intelligent_slot"
+  ],
+  "energy-rates.md#standing-charge": [
+   "metric_standing_charge",
+   "octopus_energy_electricity_"
+  ],
+  "energy-rates.md#octopus-saving-sessions-power-down-events": [
+   "load_scaling_saving",
+   "mode",
+   "not",
+   "octopus_saving_auto_join",
+   "octopus_saving_auto_join_lead_hours",
+   "octopus_saving_session",
+   "octopus_saving_session_min_octopoints_per_kwh",
+   "octopus_saving_session_octopoints_per_penny"
+  ],
+  "energy-rates.md#octopus-free-power-up-events": [
+   "load_scaling_free",
+   "octopus_free_session"
+  ],
+  "energy-rates.md#octopus-rates-url": [
+   "rates_export_octopus_url",
+   "rates_import_octopus_url"
+  ],
+  "energy-rates.md#kraken-integration-for-edf-or-eonnext": [],
+  "energy-rates.md#energidataservice-integration": [],
+  "energy-rates.md#configuring-predbat-to-use-the-energidataservice-integration": [
+   "energi_data_service",
+   "energi_data_service_export",
+   "metric_energidataservice_export",
+   "metric_energidataservice_import"
+  ],
+  "energy-rates.md#str\u00f8mligning-integration": [
+   "end",
+   "price",
+   "prices_today",
+   "prices_tomorrow",
+   "raw_today",
+   "raw_tomorrow",
+   "start"
+  ],
+  "energy-rates.md#configuring-predbat-to-use-the-str\u00f8mligning-integration": [
+   "metric_stromligning_export_today",
+   "metric_stromligning_export_tomorrow",
+   "metric_stromligning_import_today",
+   "metric_stromligning_import_tomorrow",
+   "prices_today",
+   "prices_tomorrow",
+   "stromligning_export_today",
+   "stromligning_export_tomorrow",
+   "stromligning_import_today",
+   "stromligning_import_tomorrow"
+  ],
+  "energy-rates.md#other-energy-spot-rate-sensor-integrations": [
+   "current_buy_electricity_price_raw",
+   "current_sell_electricity_price_raw"
+  ],
+  "energy-rates.md#czech-republic-example": [
+   "current_buy_electricity_price",
+   "current_buy_electricity_price_15min"
+  ],
+  "energy-rates.md#frank-energie-export-rates-with-export-fee": [
+   "frank_energie_prices_current_electricity_market_price",
+   "frank_export_fee_eur_per_kwh"
+  ],
+  "energy-rates.md#rate-bands-to-manually-configure-energy-rates": [
+   "day_of_week",
+   "end",
+   "must",
+   "rate",
+   "start",
+   "true",
+   "utc"
+  ],
+  "energy-rates.md#manually-configuring-octopus-off-peak-times": [
+   "octopus_night_times",
+   "rates",
+   "times"
+  ],
+  "energy-rates.md#manually-over-riding-energy-rates": [
+   "date",
+   "end",
+   "load_scaling",
+   "rate",
+   "rate_increment",
+   "start"
+  ],
+  "energy-rates.md#rate-offsets": [
+   "metric_future_rate_offset_export",
+   "metric_future_rate_offset_import"
+  ],
+  "energy-rates.md#future-agile-energy-rates": [
+   "futurerate_adjust_auto",
+   "futurerate_adjust_export",
+   "futurerate_adjust_import",
+   "futurerate_peak_end",
+   "futurerate_peak_start",
+   "futurerate_url",
+   "metric_octopus_export",
+   "metric_octopus_import",
+   "true"
+  ],
+  "energy-rates.md#axle-vpp": [
+   "axle_api_key",
+   "axle_automatic",
+   "axle_control",
+   "axle_event",
+   "axle_pence_per_kwh",
+   "axle_session",
+   "false",
+   "load_scaling_free",
+   "load_scaling_saving",
+   "true"
+  ],
+  "energy-rates.md#grid-carbon-intensity": [],
+  "energy-rates.md#uk-grid-carbon-intensity": [
+   "carbon",
+   "carbon_enable",
+   "carbon_metric"
+  ],
+  "energy-rates.md#uk-grid-carbon-intensity-ha-integration": [
+   "carbon_intensity_uk",
+   "carbon_intensity_uk_sensor"
+  ],
+  "compare.md#comparing-energy-tariffs": [],
+  "compare.md#limitations": [],
+  "compare.md#configuring-the-tariffs-to-compare": [
+   "dno_region"
+  ],
+  "compare.md#running-a-comparison": [
+   "compare_active"
+  ],
+  "compare.md#comparison-sensors": [
+   "id"
+  ],
+  "compare.md#overriding-predbat-configuration-per-tariff": [],
+  "compare.md#modelling-a-different-battery-or-inverter": [
+   "all",
+   "export_limit",
+   "not",
+   "override_battery_rate_max_charge_kw",
+   "override_battery_rate_max_discharge_kw",
+   "override_battery_rate_max_export_kw",
+   "override_inverter_limit_kw",
+   "override_soc_max_kwh"
+  ],
+  "predheat.md#predheat": [],
+  "predheat.md#operation": [],
+  "predheat.md#installation-guide": [
+   "predheat",
+   "predheat_enable"
+  ],
+  "predheat.md#weather-install": [],
+  "predheat.md#apex-charts-install": [],
+  "predheat.md#configuration-guide": [
+   "delta_correction",
+   "external_temperature",
+   "flow_difference_target",
+   "flow_temp",
+   "gas_efficiency",
+   "heat_gain_static",
+   "heat_loss_degrees",
+   "heat_loss_watts",
+   "heat_max_power",
+   "heat_min_power",
+   "heat_output",
+   "heat_pump_efficiency",
+   "heat_volume",
+   "heating_cop",
+   "heating_energy",
+   "heating_energy_scaling",
+   "hysteresis",
+   "hysteresis_off",
+   "internal_temperature",
+   "mode",
+   "next_volume_temp",
+   "run_every",
+   "smart_thermostat",
+   "target_temperature",
+   "volume_temp",
+   "weather"
+  ],
+  "predheat.md#weather-compensation": [],
+  "predheat.md#link-predheat-to-predbat": [
+   "load_forecast"
+  ],
+  "predheat.md#exclude-heat-pump-load": [
+   "ashp_energy_today",
+   "car_charging_energy",
+   "load_today"
+  ],
+  "install.md#install": [],
+  "install.md#home-assistant-pre-requisites": [],
+  "install.md#inverter-control-install": [],
+  "install.md#editing-configuration-files-in-home-assistant": [],
+  "install.md#predbat-app-install": [],
+  "install.md#docker-install": [],
+  "install.md#predbat-installation-into-appdaemon": [],
+  "install.md#solar-forecast-install": [],
+  "install.md#predbat-direct-solcast-method": [],
+  "install.md#predbat-direct-to-forecastsolar": [
+   "azimuth_zero_south",
+   "forecast_solar",
+   "forecast_solar_max_age",
+   "open_meteo_forecast_max_age"
+  ],
+  "install.md#predbat-direct-to-open-meteo": [
+   "azimuth_zero_south",
+   "efficiency"
+  ],
+  "install.md#solcast-home-assistant-integration-method": [],
+  "install.md#no-solar": [],
+  "install.md#energy-rates": [
+   "octopus_xxx"
+  ],
+  "install.md#configuring-predbat": [],
+  "install.md#predbat-output-and-configuration-controls": [],
+  "install.md#ready-to-light-the-touch-paper": [
+   "mode",
+   "set_read_only"
+  ],
+  "install.md#updating-predbat": [],
+  "install.md#update-via-home-assistant": [],
+  "install.md#predbat-built-in-update": [
+   "auto_update",
+   "main",
+   "update"
+  ],
+  "install.md#update-integrity-checking": [
+   "main"
+  ],
+  "install.md#manually-installing-a-predbat-release": [
+   "apps",
+   "predbat",
+   "update"
+  ],
+  "install.md#upgrading-from-appdaemon-to-predbat-app": [
+   "appdaemon_running",
+   "running"
+  ],
+  "install.md#backing-up-home-assistant-and-predbat": [],
+  "install.md#uninstalling-predbat": [],
+  "apps-yaml.md#appsyaml-settings": [],
+  "apps-yaml.md#templates": [],
+  "apps-yaml.md#warning-appsyaml-file-format": [],
+  "apps-yaml.md#configuration-items-entities-lists-and-regular-expressions": [
+   "battery_temperature_history",
+   "dno_region",
+   "givtcp_battery_stack_1_bms_temperature",
+   "load_filter_threshold",
+   "metric_octopus_import",
+   "template",
+   "true"
+  ],
+  "apps-yaml.md#checking-your-appsyaml": [],
+  "apps-yaml.md#storing-secrets": [],
+  "apps-yaml.md#using-secretsyaml": [],
+  "apps-yaml.md#referencing-secrets-in-appsyaml": [
+   "password",
+   "secret",
+   "token"
+  ],
+  "apps-yaml.md#benefits-of-using-secrets": [],
+  "apps-yaml.md#redaction-in-logs-and-debug-files": [],
+  "apps-yaml.md#redact_strings-and-redact_strings_labelled": [
+   "entity_id",
+   "password",
+   "redact_strings",
+   "redact_strings_labelled",
+   "secret",
+   "token"
+  ],
+  "apps-yaml.md#basics": [],
+  "apps-yaml.md#prefix": [],
+  "apps-yaml.md#timezone": [],
+  "apps-yaml.md#currency_symbols": [],
+  "apps-yaml.md#template": [
+   "true"
+  ],
+  "apps-yaml.md#home-assistant-connection": [
+   "ha_key"
+  ],
+  "apps-yaml.md#threads": [],
+  "apps-yaml.md#log_count": [
+   "log_count"
+  ],
+  "apps-yaml.md#enable_coarse_fine_levels": [
+   "true"
+  ],
+  "apps-yaml.md#prediction_kernel_enable": [
+   "true"
+  ],
+  "apps-yaml.md#web-interface": [
+   "web_port"
+  ],
+  "apps-yaml.md#notify_devices": [],
+  "apps-yaml.md#days_previous": [],
+  "apps-yaml.md#days_previous_auto-weighted-historical-load-forecast": [
+   "all",
+   "days_previous",
+   "days_previous_auto",
+   "days_previous_weight",
+   "holiday_days_left",
+   "holiday_load_scaling"
+  ],
+  "apps-yaml.md#forecast_hours": [],
+  "apps-yaml.md#plan_random_delay": [],
+  "apps-yaml.md#inverter-information": [],
+  "apps-yaml.md#givenergy-cloud-direct": [
+   "car_charging_battery_size",
+   "car_charging_energy",
+   "car_charging_limit",
+   "car_charging_planned",
+   "car_charging_soc",
+   "days_previous",
+   "false",
+   "gateway_integrate_power",
+   "gateway_shared_ct",
+   "ge_cloud_automatic",
+   "ge_cloud_automatic_evc",
+   "ge_cloud_automatic_shared_ct",
+   "ge_cloud_automatic_split_ct",
+   "ge_cloud_automatic_split_pv",
+   "ge_cloud_data",
+   "ge_cloud_evc_control",
+   "ge_cloud_key",
+   "ge_cloud_load_today_ignore",
+   "ge_cloud_serial",
+   "gecloud_evc_control",
+   "load_today",
+   "num_cars",
+   "pv_power",
+   "pv_today",
+   "true"
+  ],
+  "apps-yaml.md#solax-cloud-direct": [],
+  "apps-yaml.md#solax-cloud-setup": [
+   "false",
+   "grid_power",
+   "inverter_type",
+   "num_inverters",
+   "pv_power",
+   "pv_today",
+   "solax_",
+   "solax_automatic",
+   "solax_client_id",
+   "solax_client_secret",
+   "solax_enable_controls",
+   "solax_plant_id",
+   "solax_region",
+   "true"
+  ],
+  "apps-yaml.md#multi-inverter-multi-plant-setup": [],
+  "apps-yaml.md#supported-inverter-types-solax-cloud": [],
+  "apps-yaml.md#troubleshooting-solax-cloud": [],
+  "apps-yaml.md#solis-cloud-api": [],
+  "apps-yaml.md#solis-cloud-configuration": [
+   "battery_capacity",
+   "battery_rate_max",
+   "false",
+   "load_power",
+   "load_today",
+   "not",
+   "pv_load",
+   "pv_today",
+   "soc_max",
+   "solis_api_key",
+   "solis_api_secret",
+   "solis_automatic",
+   "solis_base_url",
+   "solis_cloud_pv_load_ignore",
+   "solis_control_enable",
+   "solis_inverter_sn",
+   "solis_nominal_voltage",
+   "true"
+  ],
+  "apps-yaml.md#important-notes-solis": [
+   "battery_power",
+   "soc_max",
+   "soc_percent"
+  ],
+  "apps-yaml.md#automatic-configuration-solis_automatic-true": [
+   "battery_rate_max",
+   "inverter_limit_charge",
+   "inverter_limit_discharge",
+   "solis_"
+  ],
+  "apps-yaml.md#manual-configuration-solis_automatic-false": [],
+  "apps-yaml.md#supported-inverter-types-solis-cloud": [],
+  "apps-yaml.md#troubleshooting-solis-cloud": [
+   "control_enable",
+   "soc_max"
+  ],
+  "apps-yaml.md#deye-cloud-api": [],
+  "apps-yaml.md#deye-cloud-configuration": [
+   "automatic",
+   "deye_app_id",
+   "deye_app_secret",
+   "deye_auth_method",
+   "deye_automatic",
+   "deye_automatic_ignore_pv",
+   "deye_company_id",
+   "deye_data_center",
+   "deye_inverter_sn",
+   "deye_password",
+   "deye_username",
+   "false",
+   "pv_power",
+   "true"
+  ],
+  "apps-yaml.md#sunsynk-cloud-api": [],
+  "apps-yaml.md#sunsynk-cloud-configuration": [
+   "automatic",
+   "false",
+   "password_legacy",
+   "pv_power",
+   "sunsynk_auth_method",
+   "sunsynk_automatic",
+   "sunsynk_automatic_ignore_pv",
+   "sunsynk_battery_nominal_voltage",
+   "sunsynk_control_enable",
+   "sunsynk_inverter_sn",
+   "sunsynk_password",
+   "sunsynk_region",
+   "sunsynk_username",
+   "true"
+  ],
+  "apps-yaml.md#alphaess-cloud-api": [
+   "cannot"
+  ],
+  "apps-yaml.md#alphaess-cannot-be-used-to-control-export": [
+   "mode",
+   "plan_interval_minutes"
+  ],
+  "apps-yaml.md#alphaess-cloud-configuration": [
+   "alphaess_",
+   "alphaess_api_delay",
+   "alphaess_app_id",
+   "alphaess_app_secret",
+   "alphaess_automatic",
+   "alphaess_automatic_ignore_pv",
+   "alphaess_battery_rate_max",
+   "alphaess_control_enable",
+   "alphaess_inverter_sn",
+   "alphaess_min_write_interval",
+   "automatic",
+   "battery_rate_max",
+   "battery_rate_max_scaling",
+   "car_charging_energy",
+   "car_charging_hold",
+   "ev_energy_today",
+   "ev_power",
+   "export_limit",
+   "false",
+   "inverter_hybrid",
+   "must",
+   "not",
+   "null",
+   "poinv",
+   "pv_power",
+   "set_read_only",
+   "true",
+   "zero"
+  ],
+  "apps-yaml.md#num_inverters": [],
+  "apps-yaml.md#inverter_type": [
+   "must"
+  ],
+  "apps-yaml.md#geserial": [
+   "givtcp2_",
+   "givtcp_"
+  ],
+  "apps-yaml.md#historical-data": [],
+  "apps-yaml.md#data-from-home-assistant": [
+   "export_today",
+   "import_today",
+   "load_power",
+   "load_power_fill_enable",
+   "load_today",
+   "pv_today"
+  ],
+  "apps-yaml.md#home-consumption-energy-sensor-updated-every-5-minutes-instead-of-the-default-of-every-sensor-state-change": [
+   "givtcp2_yyy_battery_charge_energy_today_kwh",
+   "givtcp2_yyy_battery_discharge_energy_today_kwh",
+   "givtcp2_yyy_pv_energy_today_kwh",
+   "givtcp_xxx_battery_charge_energy_today_kwh",
+   "givtcp_xxx_battery_discharge_energy_today_kwh",
+   "givtcp_xxx_export_energy_today_kwh",
+   "givtcp_xxx_import_energy_today_kwh",
+   "givtcp_xxx_pv_energy_today_kwh"
+  ],
+  "apps-yaml.md#givenergy-cloud-data": [
+   "ge_cloud_data",
+   "ge_cloud_key",
+   "ge_cloud_serial"
+  ],
+  "apps-yaml.md#givenergy-cloud-controls": [
+   "ge_cloud_direct",
+   "ge_cloud_key"
+  ],
+  "apps-yaml.md#load-filtering": [
+   "days_previous",
+   "load_filter_modal",
+   "load_filter_threshold"
+  ],
+  "apps-yaml.md#iboost-energy": [
+   "iboost_energy_today"
+  ],
+  "apps-yaml.md#inverter-control-configurations": [
+   "battery_draw",
+   "battery_rate_max",
+   "export_limit",
+   "inverter_battery_rate_min",
+   "inverter_limit",
+   "inverter_limit_charge",
+   "inverter_limit_charge_dc",
+   "inverter_limit_discharge",
+   "inverter_limit_export",
+   "pv_ac_limit",
+   "unit_of_measurement",
+   "watts"
+  ],
+  "apps-yaml.md#inverter_limit": [],
+  "apps-yaml.md#pv_ac_limit": [
+   "inverter_limit"
+  ],
+  "apps-yaml.md#export_limit": [],
+  "apps-yaml.md#inverter_limit_charge-and-inverter_limit_discharge": [],
+  "apps-yaml.md#inverter_limit_export": [
+   "inverter_limit_discharge"
+  ],
+  "apps-yaml.md#inverter_limit_charge_dc": [
+   "battery_rate_max",
+   "battery_rate_max_charge",
+   "inverter_limit",
+   "inverter_limit_charge",
+   "inverter_limit_charge_dc"
+  ],
+  "apps-yaml.md#inverter_can_charge_during_export": [
+   "false",
+   "inverter_can_charge_during_export",
+   "true"
+  ],
+  "apps-yaml.md#inverter_freeze_export_discharge_rate": [],
+  "apps-yaml.md#controlling-the-inverter": [],
+  "apps-yaml.md#home-assistant-entity-inverter-control": [
+   "givtcp_rest"
+  ],
+  "apps-yaml.md#chargedischarge-rate": [
+   "charge_rate",
+   "charge_rate_percent",
+   "discharge_rate",
+   "discharge_rate_percent",
+   "timed_charge_current",
+   "timed_discharge_current"
+  ],
+  "apps-yaml.md#battery-information": [
+   "battery_calibration",
+   "battery_dod_soh",
+   "battery_min_soc",
+   "battery_power",
+   "battery_rate_max",
+   "battery_scaling",
+   "battery_soh",
+   "battery_temperature",
+   "battery_voltage",
+   "givtcp_battery_dod",
+   "off",
+   "on",
+   "reserve",
+   "set_reserve_enable",
+   "soc_max",
+   "soc_percent"
+  ],
+  "apps-yaml.md#power-data": [
+   "battery_power",
+   "battery_power_invert",
+   "givtcp_",
+   "givtcp_rest_power_ignore",
+   "grid_power",
+   "grid_power_invert",
+   "load_power",
+   "pv_power",
+   "true"
+  ],
+  "apps-yaml.md#home-consumption-power-sensor-updated-every-5-minutes-instead-of-the-default-of-every-sensor-state-change": [
+   "givtcp2_",
+   "givtcp2_yyy_battery_power",
+   "givtcp2_yyy_pv_power",
+   "givtcp_",
+   "givtcp_rest_power_ignore",
+   "givtcp_xxx_battery_power",
+   "givtcp_xxx_grid_power",
+   "givtcp_xxx_pv_power",
+   "grid_power",
+   "load_power",
+   "true"
+  ],
+  "apps-yaml.md#battery-soc": [
+   "soc_kw",
+   "soc_percent"
+  ],
+  "apps-yaml.md#inverter-info": [
+   "inverter_battery_rate_min",
+   "inverter_mode",
+   "inverter_reserve_max",
+   "inverter_time"
+  ],
+  "apps-yaml.md#schedule": [
+   "charge_discharge_update_button",
+   "charge_end_hour",
+   "charge_end_minute",
+   "charge_end_time",
+   "charge_limit",
+   "charge_limit_enable",
+   "charge_start_hour",
+   "charge_start_minute",
+   "charge_start_time",
+   "charge_time",
+   "charge_update_button",
+   "discharge_end_hour",
+   "discharge_end_minute",
+   "discharge_end_time",
+   "discharge_start_hour",
+   "discharge_start_minute",
+   "discharge_start_time",
+   "discharge_target_soc",
+   "discharge_time",
+   "discharge_update_button",
+   "givtcp_xxxx_battery_pause_start_time_slot",
+   "idle_end_time",
+   "idle_start_time",
+   "pause_end_time",
+   "pause_mode",
+   "pause_start_time",
+   "scheduled_charge_enable",
+   "scheduled_discharge_enable"
+  ],
+  "apps-yaml.md#rest-interface-inverter-control": [
+   "export_today",
+   "false",
+   "givtcp_",
+   "givtcp_0_",
+   "givtcp_automatic",
+   "givtcp_rest",
+   "givtcp_rest_power_ignore",
+   "import_today",
+   "inverter_type",
+   "load_today",
+   "num_inverters",
+   "pv_today",
+   "true"
+  ],
+  "apps-yaml.md#service-api": [
+   "charge_freeze_service",
+   "charge_start_service",
+   "charge_stop_service",
+   "device_id",
+   "discharge_freeze_service",
+   "discharge_start_service",
+   "discharge_stop_service",
+   "sunsynk_inverter_use_timer",
+   "turn_off"
+  ],
+  "apps-yaml.md#mqtt-api": [
+   "mqtt_topic",
+   "topic"
+  ],
+  "apps-yaml.md#set-reserve": [
+   "topic"
+  ],
+  "apps-yaml.md#set-target-soc": [
+   "topic"
+  ],
+  "apps-yaml.md#set-charge-rate": [
+   "topic"
+  ],
+  "apps-yaml.md#set-discharge-rate": [
+   "topic"
+  ],
+  "apps-yaml.md#set-charge": [
+   "topic"
+  ],
+  "apps-yaml.md#set-discharge": [
+   "topic"
+  ],
+  "apps-yaml.md#set-auto": [
+   "topic"
+  ],
+  "apps-yaml.md#solar-forecast": [],
+  "apps-yaml.md#solcast-solar-forecast": [
+   "calculate_pv90_plan",
+   "performance_tweaks",
+   "pv_forecast_d3",
+   "pv_forecast_d4",
+   "pv_forecast_today",
+   "pv_forecast_tomorrow",
+   "pv_metric10_weight",
+   "pv_metric90_weight",
+   "solcast_api_key",
+   "solcast_sites"
+  ],
+  "apps-yaml.md#pv_array_kwp": [
+   "forecast_solar",
+   "kwp",
+   "open_meteo_forecast"
+  ],
+  "apps-yaml.md#forecastsolar-solar-forecast": [
+   "azimuth_zero_south"
+  ],
+  "apps-yaml.md#open-meteo-backup-for-forecastsolar": [
+   "forecast_solar",
+   "open_meteo_forecast",
+   "shading_factors"
+  ],
+  "apps-yaml.md#using-open-meteo-as-the-primary-source": [
+   "forecast_solar",
+   "forecast_solar_max_age",
+   "forecast_solar_open_meteo_backup",
+   "forecast_solar_open_meteo_first",
+   "open_meteo_forecast",
+   "open_meteo_forecast_max_age",
+   "shading_factors"
+  ],
+  "apps-yaml.md#open-meteo-solar-forecast": [
+   "azimuth_zero_south",
+   "efficiency",
+   "open_meteo_forecast_max_age"
+  ],
+  "apps-yaml.md#energy-rates": [
+   "axle_api_key",
+   "axle_automatic",
+   "axle_control",
+   "axle_event",
+   "axle_pence_per_kwh",
+   "axle_session",
+   "carbon_automatic",
+   "carbon_intensity",
+   "carbon_postcode",
+   "futurerate_adjust_auto",
+   "futurerate_adjust_export",
+   "futurerate_adjust_import",
+   "futurerate_peak_end",
+   "futurerate_peak_start",
+   "futurerate_url",
+   "kraken_account_id",
+   "kraken_auth_method",
+   "kraken_email",
+   "kraken_export_account_id",
+   "kraken_key",
+   "kraken_password",
+   "kraken_provider",
+   "metric_octopus_export",
+   "metric_octopus_gas",
+   "metric_octopus_import",
+   "metric_standing_charge",
+   "octopus_account",
+   "octopus_api_key",
+   "octopus_intelligent_slot",
+   "octopus_saving_session",
+   "octopus_saving_session_octopoints_per_penny",
+   "plan_interval_minutes",
+   "rates_export",
+   "rates_export_octopus_url",
+   "rates_export_override",
+   "rates_gas",
+   "rates_import",
+   "rates_import_octopus_url",
+   "rates_import_override",
+   "true"
+  ],
+  "apps-yaml.md#energy-comparison": [
+   "compare_list"
+  ],
+  "apps-yaml.md#car-charging-integration": [
+   "car_charging_battery_size",
+   "car_charging_energy",
+   "car_charging_exclusive",
+   "car_charging_from_battery",
+   "car_charging_limit",
+   "car_charging_now",
+   "car_charging_now_response",
+   "car_charging_planned",
+   "car_charging_planned_response",
+   "car_charging_power",
+   "car_charging_soc",
+   "car_energy_reported_load",
+   "charging",
+   "enable",
+   "num_cars",
+   "octopus_charge_limit",
+   "octopus_intelligent_slot",
+   "octopus_ready_time",
+   "octopus_slot_low_rate",
+   "octopus_slot_max",
+   "ohme_automatic_octopus_intelligent",
+   "ohme_login",
+   "ohme_password",
+   "on",
+   "outside",
+   "true",
+   "yes"
+  ],
+  "apps-yaml.md#myenergi-integration": [
+   "car_charging_battery_size",
+   "car_charging_energy",
+   "car_charging_limit",
+   "car_charging_planned",
+   "car_charging_planned_response",
+   "car_charging_power",
+   "car_charging_soc",
+   "direct",
+   "false",
+   "iboost_energy_today",
+   "myenergi_api_key",
+   "myenergi_auth_method",
+   "myenergi_automatic",
+   "myenergi_automatic_eddi",
+   "myenergi_automatic_zappi",
+   "myenergi_enable_controls",
+   "myenergi_hub_serial",
+   "myenergi_key",
+   "myenergi_poll_seconds",
+   "myenergi_token_expires_at",
+   "myenergi_token_hash",
+   "myenergi_zappi_control",
+   "oauth",
+   "true"
+  ],
+  "apps-yaml.md#ai-chat-agent": [
+   "api_key",
+   "chat",
+   "local",
+   "localhost",
+   "model",
+   "ollama",
+   "openai",
+   "openrouter",
+   "providers",
+   "type",
+   "url"
+  ],
+  "apps-yaml.md#reaching-ollama-from-predbat": [
+   "url"
+  ],
+  "apps-yaml.md#ollama-cloud": [
+   "ai_ha_state_enable",
+   "api_key",
+   "chat",
+   "chat_",
+   "chat_confirm_writes",
+   "chat_web_search",
+   "expiry_days",
+   "fetch_allowlist",
+   "fetch_url",
+   "local",
+   "localhost",
+   "max_conversations",
+   "max_history",
+   "max_tokens",
+   "max_tool_rounds",
+   "model",
+   "ollama",
+   "openai",
+   "openrouter",
+   "providers",
+   "request_timeout",
+   "turn_timeout",
+   "type",
+   "url"
+  ],
+  "apps-yaml.md#watch-list-automatically-start-predbat-execution": [
+   "active",
+   "car_charging_now",
+   "car_charging_soc",
+   "octopus_intelligent_slot"
+  ],
+  "apps-yaml.md#load-forecast": [
+   "givtcp_",
+   "load_forecast",
+   "load_forecast_only",
+   "true"
+  ],
+  "apps-yaml.md#balance-inverters": [
+   "balance_inverters_seconds"
+  ],
+  "apps-yaml.md#config-validation-retries": [
+   "validate_config_retries",
+   "validate_config_retry_minutes"
+  ],
+  "apps-yaml.md#workarounds": [],
+  "apps-yaml.md#base-load": [
+   "base_load"
+  ],
+  "apps-yaml.md#clock-skew": [
+   "auto_restart"
+  ],
+  "apps-yaml.md#battery-size-scaling": [
+   "battery_scaling",
+   "soc_max",
+   "soc_max_calculated",
+   "soc_max_calculated_"
+  ],
+  "apps-yaml.md#import-export-scaling": [],
+  "apps-yaml.md#inverter-rate-minimum": [],
+  "apps-yaml.md#inverter-reserve-maximum": [],
+  "apps-yaml.md#savings-max-charge-slots": [],
+  "apps-yaml.md#automatic-restarts": [
+   "addon",
+   "app",
+   "entity_id",
+   "service",
+   "shell"
+  ],
+  "apps-yaml.md#battery-chargedischarge-curves": [
+   "auto",
+   "battery_charge_power_curve",
+   "battery_charge_power_curve_default",
+   "battery_charge_rate",
+   "battery_discharge_power_curve",
+   "battery_discharge_power_curve_default",
+   "battery_discharge_rate",
+   "battery_power",
+   "battery_rate_max_scaling",
+   "givtcp_",
+   "set_charge_low_power",
+   "soc_kw",
+   "soc_percent",
+   "status"
+  ],
+  "apps-yaml.md#battery-temperature-curves": [
+   "battery_temperature_charge_curve",
+   "battery_temperature_discharge_curve",
+   "battery_temperature_history",
+   "givtcp_battery_stack_1_bms_temperature"
+  ],
+  "apps-yaml.md#weather-alert-system": [
+   "alertfeed_status",
+   "alerts",
+   "keep",
+   "latitude",
+   "longitude"
+  ],
+  "apps-yaml.md#triggers": [
+   "charging",
+   "export_trigger_",
+   "export_triggers",
+   "exporting"
+  ],
+  "apps-yaml.md#understanding-how-days_previous-works": [
+   "days_previous"
+  ],
+  "manual-api.md#manual-api": [
+   "manual_api",
+   "predbat_"
+  ],
+  "manual-api.md#data-retention": [],
+  "manual-api.md#supported-command-formats": [
+   "rates_export_override",
+   "rates_import_override"
+  ],
+  "manual-api.md#supported-overrides": [],
+  "manual-api.md#example-solution-to-over-ride-predicted-house-load": [
+   "manual_api",
+   "manual_load_adjust",
+   "override_load_percent",
+   "select_option"
+  ],
+  "output-data.md#output-data": [],
+  "output-data.md#web-interface": [],
+  "output-data.md#displaying-output-data": [
+   "xxx",
+   "yyy",
+   "zzz"
+  ],
+  "output-data.md#creating-a-simple-predbat-dashboard": [],
+  "output-data.md#creating-a-compact-predbat-control-dashboard": [
+   "active",
+   "mode",
+   "predbat",
+   "pv",
+   "saverestore",
+   "update"
+  ],
+  "output-data.md#viewing-the-predbat-plan": [],
+  "output-data.md#graphing-the-predbat-predictions": [],
+  "output-data.md#basic-status": [
+   "active"
+  ],
+  "output-data.md#sensor-data": [
+   "car_charging_power"
+  ],
+  "output-data.md#baseline-data": [
+   "solcast_pv_forecast_today"
+  ],
+  "output-data.md#pv-10-baseline-data": [],
+  "output-data.md#best-prediction-data": [],
+  "output-data.md#best-pv-10-prediction-data": [],
+  "output-data.md#in-day-load-adjustment-data": [
+   "metric_inday_adjust_damping",
+   "results",
+   "today",
+   "today_remaining",
+   "today_so_far",
+   "yesterday_adjustment",
+   "yesterday_weight"
+  ],
+  "output-data.md#today-energy-data": [],
+  "output-data.md#battery-status": [
+   "charging",
+   "exporting"
+  ],
+  "output-data.md#export-trigger": [
+   "export_trigger_"
+  ],
+  "output-data.md#prediction-window": [],
+  "output-data.md#energy-rate-data": [],
+  "output-data.md#low-rate-import-entities": [
+   "low_rate_slot"
+  ],
+  "output-data.md#high-rate-export-entities": [
+   "high_rate_export_slot"
+  ],
+  "output-data.md#other-rate-entities": [],
+  "output-data.md#inverter-data": [
+   "daily_inverter_writes",
+   "inverter_config"
+  ],
+  "output-data.md#battery-data": [
+   "soc_max_calculated"
+  ],
+  "output-data.md#car-data": [
+   "car_charging_slot"
+  ],
+  "output-data.md#iboost-solar-diverter-data": [
+   "iboost_active",
+   "iboost_today"
+  ],
+  "output-data.md#carbon-data": [
+   "carbon_enable"
+  ],
+  "output-data.md#cost-saving-data": [
+   "calculate_savings_max_charge_slots",
+   "saving_adjusted",
+   "saving_real"
+  ],
+  "output-data.md#marginal-energy-cost-data": [],
+  "output-data.md#main-matrix-sensor": [
+   "baseline_metric",
+   "grid_export",
+   "grid_export_now",
+   "grid_import",
+   "grid_import_now",
+   "marginal_energy_costs",
+   "matrix",
+   "rate_now_ev_consumption",
+   "rate_now_high_consumption",
+   "rate_now_low_consumption",
+   "rate_now_med_consumption"
+  ],
+  "output-data.md#cheapmoderate-binary-sensors": [
+   "ev",
+   "high",
+   "low",
+   "marginal_rate_now_ev_is_cheap",
+   "marginal_rate_now_ev_is_moderate",
+   "marginal_rate_now_high_is_cheap",
+   "marginal_rate_now_high_is_moderate",
+   "marginal_rate_now_low_is_cheap",
+   "marginal_rate_now_low_is_moderate",
+   "marginal_rate_now_med_is_cheap",
+   "marginal_rate_now_med_is_moderate",
+   "med",
+   "on"
+  ],
+  "output-data.md#solar-forecast-data": [
+   "dawn",
+   "pv_d2",
+   "pv_d3",
+   "pv_forecast_h0",
+   "pv_forecast_h0_uncalibrated",
+   "pv_scaling",
+   "pv_today",
+   "pv_tomorrow"
+  ],
+  "output-data.md#dummy-inverter-sensors": [
+   "ge_"
+  ],
+  "output-data.md#alert-data": [
+   "alertfeed_status"
+  ],
+  "output-data.md#predbat-logfile": [],
+  "output-data.md#automated-monitoring-that-predbat-and-givtcp-are-running-ok": [],
+  "output-data.md#givtcp-activity-monitor": [
+   "givtcp_",
+   "givtcp_running",
+   "mosquitto_broker_running"
+  ],
+  "output-data.md#predbat-error-monitor": [
+   "active",
+   "appdaemon_running",
+   "components_healthy",
+   "running"
+  ],
+  "faq.md#faq": [],
+  "faq.md#ive-installed-predbat-but-i-dont-see-the-correct-entities": [],
+  "faq.md#predbat-is-failing-with-warn-service-call-selectselect_option-data-failed": [
+   "fox_603j303046yp036_battery_schedule_charge_end_time",
+   "my_input",
+   "select_option"
+  ],
+  "faq.md#predbat-is-running-but-not-producing-a-plan": [
+   "set_read_only"
+  ],
+  "faq.md#why-is-my-house-load-lower-than-expected-or-zero": [
+   "car_charging_energy",
+   "car_charging_hold",
+   "car_charging_threshold",
+   "export_today",
+   "import_today",
+   "load_today",
+   "pv_today"
+  ],
+  "faq.md#why-is-my-predicted-charge-higher-or-lower-than-i-might-expect": [
+   "predbat_load_scaling",
+   "predbat_pv_scaling"
+  ],
+  "faq.md#why-didnt-the-slot-get-configured": [],
+  "faq.md#my-plan-doesnt-include-any-charging": [],
+  "faq.md#the-charge-limit-keeps-increasingdecreasing-in-the-charge-window-or-is-unstable": [],
+  "faq.md#i-changed-a-config-item-but-it-made-no-difference": [],
+  "faq.md#its-all-running-but-im-not-getting-very-good-results": [
+   "best_soc_keep"
+  ],
+  "faq.md#in-the-power-flow-diagram-my-grid-power-is-flowing-in-the-wrong-direction": [
+   "grid_power",
+   "grid_power_invert"
+  ],
+  "faq.md#in-the-power-flow-diagram-the-grid-always-shows-0w-even-though-im-clearly-exporting-or-importing": [
+   "grid_power",
+   "grid_power_invert"
+  ],
+  "faq.md#i-have-a-second-solar-array-that-predbat-doesnt-manage-as-an-inverter-how-do-i-include-its-generation": [
+   "num_inverters",
+   "pv_power",
+   "pv_today"
+  ],
+  "faq.md#combined-pv-power-sensor-updated-every-5-minutes-instead-of-the-default-of-every-sensor-state-change": [
+   "fit_array_pv_power",
+   "givtcp_xxx_pv_power",
+   "pv_today",
+   "time_pattern"
+  ],
+  "faq.md#my-plan-is-freeze-charging-or-holding-at-100-battery-a-lot": [
+   "metric_battery_cycle",
+   "metric_self_sufficiency"
+  ],
+  "faq.md#when-my-battery-is-charging-to-100-it-fluctuates-between-98-and-100-andor-gives-an-error-setting-reserve": [],
+  "faq.md#the-plan-doesnt-charge-or-discharge-when-i-expect-it-to": [
+   "battery_loss",
+   "battery_loss_discharge",
+   "best_soc_keep",
+   "best_soc_min",
+   "inverter_loss",
+   "load_scaling",
+   "metric_battery_cycle",
+   "metric_min_improvement",
+   "metric_min_improvement_discharge",
+   "pv_scaling"
+  ],
+  "faq.md#predbat-is-causing-exceed-maximum-size-warning-messages-in-the-home-assistant-core-log": [
+   "exclude",
+   "include",
+   "load_ml_forecast",
+   "predbat",
+   "pv_d2",
+   "pv_d3",
+   "pv_forecast_h0",
+   "pv_forecast_h0_uncalibrated",
+   "pv_forecast_raw",
+   "pv_today",
+   "pv_tomorrow",
+   "sensor",
+   "temperature"
+  ],
+  "faq.md#filter-out-message-too-large-warnings-from-predbat-entities": [],
+  "faq.md#error-metric_octopus_import-not-set-correctly-in-appsyaml-or-no-energy-rates-can-be-read": [
+   "electricity_",
+   "octopus_electricity_energy_"
+  ],
+  "faq.md#warn-no-solar-data-has-been-configured": [
+   "solcast_pv_api_limit",
+   "solcast_pv_api_used"
+  ],
+  "faq.md#info-cannot-find-battery-charge-curve": [
+   "givtcp_"
+  ],
+  "faq.md#warn-inverter-is-in-calibration-mode": [],
+  "faq.md#inverter-time-is-xxx-predbat-computer-time-is-xxx-this-is-xxx-minutes-skewed-predbat-may-not-function-correctly": [],
+  "faq.md#i-have-another-problem-not-listed-above": [],
+  "what-does-predbat-do.md#what-does-predbat-do": [],
+  "what-does-predbat-do.md#terminology": [],
+  "what-does-predbat-do.md#basic-terminology": [
+   "rate_high_threshold",
+   "rate_low_threshold"
+  ],
+  "what-does-predbat-do.md#predbat-modes": [
+   "mode"
+  ],
+  "what-does-predbat-do.md#predbat-status": [
+   "car_charging_from_battery",
+   "iboost_prevent_discharge"
+  ],
+  "predbat-plan-card.md#predbat-plan-card": [],
+  "predbat-plan-card.md#displaying-the-predbat-plan": [],
+  "predbat-plan-card.md#understanding-the-predbat-plan": [
+   "calculate_export_oncharge",
+   "car_charging_from_battery",
+   "carbon_enable",
+   "iboost_enable",
+   "load_forecast",
+   "metric_future_rate_offset_export",
+   "metric_future_rate_offset_import",
+   "octopus_intelligent_consider_full",
+   "plan_debug"
+  ],
+  "predbat-plan-card.md#debug-mode-for-predbat-plan": [
+   "plan_debug",
+   "pv_metric10_weight"
+  ],
+  "predbat-plan-card.md#customising-and-reformatting-the-predbat-plan": [],
+  "predbat-plan-card.md#pv-prediction-summary": [],
+  "web-interface.md#web-interface": [],
+  "web-interface.md#accessing-the-web-interface": [],
+  "web-interface.md#web-interface-views": [],
+  "web-interface.md#dash-view": [
+   "car_energy_reported_load",
+   "power_xx"
+  ],
+  "web-interface.md#plan-view": [],
+  "web-interface.md#entities-view": [],
+  "web-interface.md#charts-view": [
+   "cheap",
+   "moderate"
+  ],
+  "web-interface.md#compare-view": [],
+  "web-interface.md#chat-view": [],
+  "web-interface.md#finding-your-way-around": [
+   "chat_confirm_writes",
+   "chat_expiry_days"
+  ],
+  "web-interface.md#settings": [
+   "ai_ha_state_enable",
+   "chat_confirm_writes",
+   "chat_web_search",
+   "local",
+   "localhost",
+   "ollama",
+   "openai",
+   "openrouter"
+  ],
+  "web-interface.md#choosing-a-provider-and-a-model": [
+   "free",
+   "model",
+   "varies"
+  ],
+  "web-interface.md#log-view": [],
+  "web-interface.md#config-view": [],
+  "web-interface.md#apps-view": [
+   "compare_list",
+   "id",
+   "name"
+  ],
+  "web-interface.md#components-view": [],
+  "web-interface.md#editor-view": [],
+  "web-interface.md#browse-view": [],
+  "web-interface.md#internals-view": [],
+  "web-interface.md#metrics-view": [
+   "days_previous",
+   "load_today"
+  ],
+  "web-interface.md#docs-view": [],
+  "web-interface.md#toggle-dark-mode": []
+ }
+}

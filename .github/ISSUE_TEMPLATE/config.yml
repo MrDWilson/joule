@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/MrDWilson/joule/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Predbat questions
+    url: https://springfall2008.github.io/batpred/
+    about: How Predbat plans and how to configure it are covered by the Predbat documentation and project.

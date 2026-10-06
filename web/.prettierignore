@@ -1,0 +1,4 @@
+# Kept in its own hand layout rather than reformatted.
+src/lib/planActions.ts
+# A byte-for-byte copy of src/Joule.Api/Knowledge/predbat-states.json (scripts/sync-glossary.sh); a backend test keeps them identical.
+src/lib/predbat-states.json

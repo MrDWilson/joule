@@ -1,0 +1,786 @@
+/*
+ * Energy: the figures for a period, the sensors' health strip and the saved reports. Every value comes from tokens.css.
+ * Phone first: the hero pair stays side by side down to 360px, chips go 6 → 3 → 2 across, nothing scrolls sideways.
+ */
+
+.energy-page {
+  display: flex;
+  flex-direction: column;
+}
+.energy-page .nowrap,
+.sensor-health .nowrap {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ Period bar */
+.energy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+.energy-toolbar .segmented {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.energy-asof {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.energy-dates {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.energy-dates-short {
+  display: none;
+}
+.energy-asof .button {
+  margin-left: var(--space-1);
+}
+/* What the period covers and what it is compared with, under the period bar. */
+.energy-period-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+/* Inline pieces: a wrapped line never starts with the separator. */
+.energy-period-note > span:not(:last-child)::after {
+  content: " · ";
+  white-space: pre;
+}
+.energy-custom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 180px));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.energy-custom .field {
+  margin: 0;
+}
+.energy-custom input {
+  width: 100%;
+}
+.energy-custom-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
+
+/* ------------------------------------------------------------------ Figures */
+.energy-body {
+  margin-top: var(--space-5);
+  transition: opacity var(--dur) var(--ease);
+}
+.energy-body.is-stale {
+  opacity: 0.55;
+}
+.energy-hero {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.energy-hero-stat {
+  padding: var(--space-5) var(--space-6);
+}
+.energy-hero-stat .stat-value > span {
+  font-size: 2rem;
+}
+.energy-hero-stat.is-earnings .stat-value > span {
+  color: var(--success);
+}
+.energy-hero-sub {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-wrap: balance;
+}
+.energy-paid {
+  display: flex;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.energy-paid > span {
+  white-space: pre;
+}
+.energy-hero-note {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+.energy-hero-note + .energy-hero-note {
+  margin-top: calc(2px - var(--space-2));
+}
+.energy-hero-delta {
+  margin: auto 0 0;
+  padding-top: var(--space-2);
+  font-size: var(--fs-xs);
+}
+
+.energy-summary {
+  display: grid;
+  gap: var(--space-3);
+}
+.energy-chips {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+/* Wide screens: the two headline figures beside a 3 × 2 block of chips, one compact band. */
+@media (min-width: 1300px) {
+  .energy-summary {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--space-4);
+  }
+  .energy-summary .energy-chips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* The headline cards are narrow here: Paid and Earned on their own lines. */
+  .energy-summary .energy-paid {
+    flex-direction: column;
+  }
+  .energy-summary .energy-paid-sep {
+    display: none;
+  }
+  /* The cards are as tall as the chips beside them: the figure at the top, its explanation and change at the foot. */
+  .energy-summary .energy-hero-stat {
+    display: flex;
+    flex-direction: column;
+  }
+  .energy-summary .energy-hero-stat > .stat-value {
+    margin-bottom: auto;
+  }
+  .energy-summary .energy-hero-delta {
+    margin-top: 0;
+  }
+}
+.energy-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.energy-chip-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.energy-swatch {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.energy-chip-value {
+  color: var(--text-1);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.energy-chip-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  min-height: 18px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.energy-chip-foot:empty {
+  display: none;
+}
+.energy-chip-foot .chip {
+  max-width: 100%;
+  white-space: normal;
+}
+.energy-chip-meter {
+  color: var(--text-3);
+}
+.energy-change {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.energy-chip .energy-change {
+  color: var(--text-3);
+}
+.energy-change-amount {
+  color: var(--text-1);
+  font-weight: 500;
+}
+.energy-chip .energy-change-amount {
+  color: var(--text-2);
+}
+.energy-change-word.tone-good {
+  color: var(--success);
+}
+.energy-change-word.tone-bad {
+  color: var(--warn);
+}
+.energy-change-pct {
+  color: var(--text-3);
+}
+.energy-summary + * {
+  margin-top: var(--space-6);
+}
+.energy-match {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+}
+
+.energy-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.energy-notes li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.energy-notes svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--info);
+}
+.energy-how {
+  margin-top: var(--space-5);
+}
+.energy-how-list {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  line-height: var(--lh-normal);
+}
+.energy-installers {
+  margin-top: var(--space-4);
+  font-size: var(--fs-sm);
+}
+.energy-installers > summary,
+.energy-installers .disclosure-label {
+  font-size: var(--fs-sm);
+}
+.energy-installers p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: var(--lh-normal);
+}
+.energy-installers p + p {
+  margin-top: var(--space-2);
+}
+.sensors-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.sensors-page > p {
+  margin: 0;
+}
+.sensors-page .energy-installers {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------------ Sensors */
+.sensor-health {
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+.sensor-health-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.sensor-health-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.sensor-health-title p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.sensor-health-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.sensor-health-demo {
+  margin: var(--space-2) 0 0 22px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.sensor-dot {
+  flex: none;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.sensor-dot.tone-success,
+.tone-success > summary > .sensor-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+}
+.sensor-dot.tone-warn,
+.tone-warn > summary > .sensor-dot {
+  background: var(--warn);
+}
+.sensor-dot.tone-danger,
+.tone-danger > summary > .sensor-dot {
+  background: var(--danger);
+}
+.tone-neutral > summary > .sensor-dot {
+  background: var(--text-3);
+}
+.tone-success > summary > .sensor-dot {
+  box-shadow: none;
+}
+.sensor-list {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-1);
+}
+.sensor-list > li {
+  border-bottom: 1px solid var(--border-1);
+}
+.sensor-list > li:last-child {
+  border-bottom: 0;
+}
+.sensor-row > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-1);
+  list-style: none;
+  cursor: pointer;
+}
+.sensor-row > summary::-webkit-details-marker {
+  display: none;
+}
+.sensor-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sensor-name {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+.sensor-meta {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.tone-warn .sensor-state {
+  color: var(--warn);
+}
+.tone-danger .sensor-state {
+  color: var(--danger);
+}
+.sensor-value {
+  max-width: 48vw;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sensor-chevron {
+  color: var(--text-3);
+  transition: transform var(--dur) var(--ease);
+}
+.sensor-row[open] .sensor-chevron {
+  transform: rotate(180deg);
+}
+.sensor-detail {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3) 22px;
+  font-size: var(--fs-sm);
+}
+.sensor-detail > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.sensor-detail .sensor-note {
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--text-2);
+}
+.sensor-detail dt {
+  color: var(--text-3);
+}
+.sensor-detail dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-2);
+}
+.sensor-detail code {
+  overflow-wrap: normal;
+  word-break: normal;
+  font-size: var(--fs-xs);
+}
+
+/* ------------------------------------------------------------------ Saved reports */
+.saved-reports-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.saved-reports-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.saved-reports-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.report-count {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-surface);
+  color: var(--accent-strong);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.report-schedule {
+  display: grid;
+  gap: 2px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.report-schedule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.report-schedule-row select {
+  width: auto;
+}
+.report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-1);
+}
+.report-item {
+  border-bottom: 1px solid var(--border-1);
+  scroll-margin-top: calc(var(--header-height) + var(--space-4));
+}
+.report-item.is-new > details {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.report-item > details > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-2);
+  list-style: none;
+  cursor: pointer;
+}
+.report-item > details > summary::-webkit-details-marker {
+  display: none;
+}
+.report-icon,
+.report-chevron {
+  color: var(--text-3);
+}
+.report-chevron {
+  transition: transform var(--dur) var(--ease);
+}
+.report-item > details[open] .report-chevron {
+  transform: rotate(180deg);
+}
+.report-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.report-title strong {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+.report-meta {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.report-unread {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-strong);
+  font-size: var(--fs-xs);
+}
+.report-unread i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-2) var(--space-5) calc(16px + var(--space-3) + var(--space-2));
+}
+.report-summary {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--text-2);
+  line-height: var(--lh-relaxed);
+}
+.report-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+.report-figures > div {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.report-figures dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.report-figures dd {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 0;
+}
+.report-figures strong {
+  color: var(--text-1);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.report-figures small {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.report-paid {
+  display: flex;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-paid > span {
+  white-space: pre;
+}
+.report-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.report-checks ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.report-checks a {
+  color: var(--text-1);
+}
+.saved-reports > .button {
+  margin-top: var(--space-3);
+}
+
+/* ------------------------------------------------------------------ Narrower screens */
+@media (max-width: 1150px) {
+  .energy-chips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .energy-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .energy-toolbar .segmented {
+    display: flex;
+  }
+  .energy-toolbar .segmented button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 6px;
+  }
+  .energy-asof {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .energy-dates-long {
+    display: none;
+  }
+  .energy-dates-short {
+    display: inline;
+  }
+  .energy-custom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .energy-hero {
+    gap: var(--space-3);
+  }
+  .energy-hero-stat {
+    padding: var(--space-4);
+  }
+  .energy-hero-stat .stat-value > span {
+    font-size: 1.75rem;
+  }
+  /* Paid and Earned on their own lines rather than breaking mid-figure. */
+  .energy-paid {
+    flex-direction: column;
+  }
+  .energy-paid-sep {
+    display: none;
+  }
+  /* Three compact columns: all six meters in two short rows. */
+  .energy-chips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .energy-chip {
+    gap: 4px;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+  }
+  .energy-chip-label {
+    align-items: flex-start;
+    min-height: 2.5em;
+    line-height: var(--lh-tight);
+    white-space: normal;
+  }
+  .energy-chip-label .energy-swatch {
+    margin-top: 0.3em;
+  }
+  .energy-chip-value {
+    font-size: var(--fs-md);
+  }
+  .sensor-health-actions {
+    margin-left: 22px;
+  }
+  .sensor-detail > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .report-body {
+    padding-left: var(--space-2);
+  }
+  /* Two columns of figures with the net cost across the top; Paid and Earned on their own lines. */
+  .report-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .report-figures > .report-figure-net {
+    grid-column: 1 / -1;
+  }
+  .report-paid {
+    flex-direction: column;
+  }
+  .report-paid-sep {
+    display: none;
+  }
+}
+
+/* Narrow phones: two columns of meters, so "Battery discharge" and "143.7 kWh" are never cut off. */
+@media (max-width: 420px) {
+  .energy-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .energy-chip-label {
+    min-height: 0;
+  }
+}
+
+/* Shared primitives on this page, held to the same floor. */
+.energy-toolbar .segmented button,
+.energy-hero-stat .stat-label,
+.sensor-health .button,
+.saved-reports .button,
+.energy-asof .button {
+  font-size: var(--fs-sm);
+}
+.energy-chip-foot .chip,
+.report-checks .disclosure-count {
+  font-size: var(--fs-xs);
+}
+.energy-how > summary,
+.report-checks > summary {
+  font-size: var(--fs-md);
+}
+.energy-how .energy-installers > summary .disclosure-label {
+  font-size: var(--fs-sm);
+}
+.energy-how .disclosure-body {
+  font-size: var(--fs-sm);
+}
+/* The smallest phones (after the shared floor above): the five period buttons share the row without clipping. */
+@media (max-width: 359px) {
+  .energy-toolbar .segmented button {
+    padding: 0 3px;
+    font-size: var(--fs-xs);
+  }
+}

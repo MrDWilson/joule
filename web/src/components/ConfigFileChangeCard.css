@@ -1,0 +1,158 @@
+/* A configuration file edit you apply by hand: where, the exact lines, why and how Joule will confirm it. */
+.config-change-list {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.config-change {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  overflow-wrap: anywhere;
+}
+.config-change.is-embedded {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.config-change.is-closed:not(.is-embedded) {
+  background: transparent;
+}
+.config-change-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.config-change-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.config-change > h3 {
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--text-1);
+  font-size: var(--fs-lg);
+  line-height: 1.4;
+}
+.config-change-location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.config-change-location > span:first-child {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.config-change-place {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.config-change-location code,
+.config-diff figcaption code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+}
+.config-diff {
+  margin: 0;
+  min-width: 0;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-0);
+  overflow: hidden;
+}
+.config-diff > figcaption {
+  padding: 6px var(--space-3);
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.config-diff > pre {
+  margin: 0;
+  padding: var(--space-2) 0;
+  max-height: 320px;
+  overflow: auto;
+  font-size: var(--fs-xs);
+  line-height: 1.65;
+}
+.config-diff > pre:focus-visible {
+  outline: var(--focus);
+  outline-offset: -2px;
+}
+.config-diff > pre > code {
+  display: block;
+  min-width: max-content;
+  font-family: var(--font-mono);
+  color: inherit;
+  font-size: var(--fs-xs);
+}
+.config-diff .diff-add,
+.config-diff .diff-remove {
+  display: block;
+  padding: 0 var(--space-4) 0 0;
+  white-space: pre;
+}
+.config-diff .diff-add {
+  background: color-mix(in srgb, var(--success) 9%, transparent);
+  color: var(--success);
+}
+.config-diff .diff-remove {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  color: var(--danger);
+}
+.config-diff .diff-sign {
+  display: inline-block;
+  width: 26px;
+  text-align: center;
+  color: var(--text-3);
+  user-select: none;
+}
+.config-change-reason {
+  margin-top: var(--space-3);
+}
+.config-change-reason .investigation-text {
+  font-size: var(--fs-sm);
+}
+/* The reason runs the card's full width, like the other cards' text. */
+.config-change-reason .investigation-text p {
+  max-width: none;
+}
+.config-change-hidden {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--warn);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.config-change-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+.config-change > .recommendation-reply {
+  margin-top: var(--space-4);
+}
+@media (max-width: 600px) {
+  .config-change:not(.is-embedded) {
+    padding: var(--space-4);
+  }
+}

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <title>Joule: AI that watches your home battery's plan, and helps fix it</title>
+  <defs>
+    <radialGradient id="glow" cx="270" cy="330" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63e6bd" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#63e6bd" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#63e6bd" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#63e6bd" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#63e6bd" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#63e6bd" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="joule-banner-bolt" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M35.7 4L21 28H34.5L32 60L43.5 22H31L43.3 4Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="1280" height="640" fill="#080d13"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <rect y="0" width="1280" height="3" fill="url(#edge)"/>
+
+  <g transform="translate(110 145) scale(5)">
+    <g mask="url(#joule-banner-bolt)" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M6 25H38L32 58Z" fill="#55dfb6" stroke="#55dfb6"/>
+      <path d="M6 25H17L32 58Z" fill="#46d3aa" stroke="#46d3aa"/>
+      <path d="M38 25H58L32 58Z" fill="#1f9f84" stroke="#1f9f84"/>
+      <path d="M47 25H58L32 58Z" fill="#188873" stroke="#188873"/>
+      <path d="M6 25L19 12H34.4L26 25Z" fill="#b2fae1" stroke="#b2fae1"/>
+      <path d="M6 25L19 12L17 25Z" fill="#9df5d6" stroke="#9df5d6"/>
+      <path d="M34.4 12H45L58 25H26Z" fill="#7cefc9" stroke="#7cefc9"/>
+      <path d="M45 12L58 25H47Z" fill="#6be6be" stroke="#6be6be"/>
+    </g>
+  </g>
+
+  <g font-family="Inter, 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+    <text x="486" y="196" fill="#63e6bd" font-size="20" font-weight="500" letter-spacing="1.5">/dʒuːl/ · A UNIT OF ENERGY. SOUNDS LIKE JEWEL.</text>
+    <text x="478" y="322" fill="#ecf3f7" font-size="146" font-weight="700" letter-spacing="-5">Joule</text>
+    <text x="486" y="390" fill="#c4d2dc" font-size="34" font-weight="500" letter-spacing="-0.4">AI that watches your home battery's plan,</text>
+    <text x="486" y="436" fill="#c4d2dc" font-size="34" font-weight="500" letter-spacing="-0.4">and helps fix it.</text>
+    <text x="486" y="510" fill="#7890a1" font-size="20" font-weight="400">Self-hosted. Works alongside Predbat, the open-source home battery</text>
+    <text x="486" y="538" fill="#7890a1" font-size="20" font-weight="400">optimiser. An independent project, not affiliated with Predbat.</text>
+  </g>
+</svg>

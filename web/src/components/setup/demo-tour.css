@@ -1,0 +1,167 @@
+/* The demo's first-visit tour on Today. */
+.demo-tour {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "title connect got"
+    "note  connect got"
+    "cards cards   cards";
+  align-items: start;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(120% 160% at 0% 0%, rgb(85 223 182 / 0.09), transparent 60%), var(--bg-1);
+}
+.demo-tour-title {
+  grid-area: title;
+  color: var(--text-1);
+}
+.demo-tour-note {
+  grid-area: note;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.demo-tour-connect {
+  grid-area: connect;
+  margin-left: var(--space-3);
+}
+.demo-tour-got {
+  grid-area: got;
+}
+.demo-tour-cards {
+  grid-area: cards;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-tour-cards a {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+}
+.demo-tour-cards a:hover {
+  border-color: var(--border-control);
+}
+.demo-tour-cards a > svg {
+  color: var(--accent);
+}
+.demo-tour-text {
+  grid-column: 1 / -1;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.demo-tour-chevron,
+.demo-tour-note-short {
+  display: none;
+}
+.demo-tour-step {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 900px) {
+  .demo-tour {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title   title"
+      "note    note"
+      "cards   cards"
+      "connect got";
+  }
+  .demo-tour-connect {
+    justify-self: start;
+    margin: var(--space-2) 0 0;
+  }
+  .demo-tour-got {
+    margin-top: var(--space-2);
+  }
+}
+/*
+ * Phones: the whole tour stays under about 300px. The three places are one row that scrolls sideways (icon, title, ›),
+ * and the small print shares its line with "Got it".
+ */
+@media (max-width: 600px) {
+  .demo-tour {
+    grid-template-areas:
+      "title   title"
+      "cards   cards"
+      "connect connect"
+      "note    got";
+    align-items: center;
+    row-gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .demo-tour-title {
+    font-size: var(--fs-md);
+    line-height: var(--lh-tight);
+  }
+  .demo-tour-note {
+    font-size: var(--fs-xs);
+    line-height: var(--lh-tight);
+  }
+  .demo-tour-connect {
+    width: 100%;
+    margin: 0;
+  }
+  .demo-tour-got {
+    margin: 0;
+  }
+  .demo-tour-cards {
+    display: flex;
+    gap: var(--space-2);
+    margin: 0 calc(-1 * var(--space-4));
+    padding: 0 var(--space-4);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+  .demo-tour-cards::-webkit-scrollbar {
+    display: none;
+  }
+  .demo-tour-cards > li {
+    flex: none;
+    scroll-snap-align: start;
+  }
+  .demo-tour-cards a {
+    display: inline-flex;
+    gap: var(--space-2);
+    min-height: 40px;
+    padding: 0 var(--space-2) 0 var(--space-3);
+    white-space: nowrap;
+  }
+  .demo-tour-cards a > svg {
+    flex: none;
+  }
+  .demo-tour-text,
+  .demo-tour-step,
+  .demo-tour-note-long {
+    display: none;
+  }
+  .demo-tour-note-short {
+    display: inline;
+  }
+  .demo-tour-chevron {
+    display: block;
+    color: var(--text-3);
+  }
+}

@@ -1,0 +1,211 @@
+/* Plan pieces shared by Today and Plan: action badges and the window list. Tokens only (tokens.css). */
+
+.tone-blue {
+  --tone: var(--info);
+  --tone-surface: var(--info-surface);
+  --tone-border: var(--info-border);
+}
+.tone-green {
+  --tone: var(--success);
+  --tone-surface: var(--success-surface);
+  --tone-border: var(--success-border);
+}
+.tone-amber {
+  --tone: var(--warn);
+  --tone-surface: var(--warn-surface);
+  --tone-border: var(--warn-border);
+}
+.tone-violet {
+  --tone: var(--violet);
+  --tone-surface: var(--violet-surface);
+  --tone-border: var(--violet-border);
+}
+.tone-neutral {
+  --tone: var(--text-2);
+  --tone-surface: var(--bg-2);
+  --tone-border: var(--border-2);
+}
+
+/* Action badge: 12px, icon, short label with target, one Hint beside it. */
+.plan-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--tone-border, var(--border-2));
+  border-radius: var(--radius-sm);
+  background: var(--tone-surface, var(--bg-2));
+  color: var(--tone, var(--text-2));
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.plan-badge svg {
+  flex-shrink: 0;
+}
+
+/* Window list (Today's "Coming up"). */
+.window-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.window-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-1);
+}
+.window-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.window-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--tone-surface);
+  color: var(--tone);
+}
+.window-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.window-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  color: var(--text-1);
+  font-size: var(--fs-md);
+}
+.window-title strong {
+  font-weight: 600;
+}
+.window-title .hint {
+  margin-left: -4px;
+}
+.window-tag {
+  min-height: 20px;
+  padding: 0 6px;
+}
+.window-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 4px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.window-money {
+  color: var(--text-3);
+}
+/* The live dot sits on the text's x-height, inside the line, so the time doesn't outdent. */
+.window-when .now-dot {
+  width: 0.45em;
+  height: 0.45em;
+  margin-left: 0;
+  margin-right: 2px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.window-notes {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 2px;
+  margin-top: -6px;
+}
+.window-note {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+.window-figures {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.window-figures strong {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.window-figures small {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.window-figures .window-soc {
+  color: var(--text-2);
+}
+.window-item.is-now .window-title strong::after {
+  content: "";
+}
+.now-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.window-list.is-stale {
+  opacity: 0.6;
+}
+.stale-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 700px) {
+  /* Phones: the figures sit under the title instead of squeezing it. */
+  .window-item {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 4px var(--space-3);
+  }
+  .window-glyph {
+    grid-row: span 2;
+    width: 32px;
+    height: 32px;
+  }
+  .window-figures {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 2px var(--space-3);
+    text-align: left;
+  }
+  .window-figures strong {
+    font-size: var(--fs-sm);
+  }
+  .window-notes {
+    grid-column: 2;
+    margin-top: 0;
+  }
+}

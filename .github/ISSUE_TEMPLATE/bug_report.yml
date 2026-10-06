@@ -1,0 +1,70 @@
+name: Bug report
+description: Something in Joule is broken or shows the wrong figure.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **remove secrets and personal details** before posting: access keys, API keys,
+        ChatGPT credentials, Home Assistant tokens, MCP secrets, meter numbers (MPANs and serials) and private hostnames.
+        Security problems go through [private vulnerability reporting](https://github.com/MrDWilson/joule/security/advisories/new), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Does it happen in demo mode (`App__Demo=true`) too?
+      placeholder: |
+        1. Open Plan
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Joule version
+      description: Shown in the dashboard footer and at `/api/health`.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run Joule?
+      options:
+        - Docker image (ghcr.io/mrdwilson/joule)
+        - Docker image built from source
+        - From source (scripts/dev.sh)
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Data source
+      options:
+        - Demo
+        - Live Predbat
+    validations:
+      required: true
+  - type: input
+    id: predbat
+    attributes:
+      label: Predbat version
+      placeholder: "v9.3.3"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: "Safari on iPhone, Chrome on Windows, ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: "`docker compose logs joule` around the time of the problem. Redact anything private."
+      render: text

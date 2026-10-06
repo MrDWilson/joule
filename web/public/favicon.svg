@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Joule</title>
+  <defs>
+    <mask id="joule-bolt">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M35.7 4L21 28H34.5L32 60L43.5 22H31L43.3 4Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0a1219"/>
+  <g mask="url(#joule-bolt)" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M6 25H38L32 58Z" fill="#55dfb6" stroke="#55dfb6"/>
+    <path d="M6 25H17L32 58Z" fill="#46d3aa" stroke="#46d3aa"/>
+    <path d="M38 25H58L32 58Z" fill="#1f9f84" stroke="#1f9f84"/>
+    <path d="M47 25H58L32 58Z" fill="#188873" stroke="#188873"/>
+    <path d="M6 25L19 12H34.4L26 25Z" fill="#b2fae1" stroke="#b2fae1"/>
+    <path d="M6 25L19 12L17 25Z" fill="#9df5d6" stroke="#9df5d6"/>
+    <path d="M34.4 12H45L58 25H26Z" fill="#7cefc9" stroke="#7cefc9"/>
+    <path d="M45 12L58 25H47Z" fill="#6be6be" stroke="#6be6be"/>
+  </g>
+</svg>

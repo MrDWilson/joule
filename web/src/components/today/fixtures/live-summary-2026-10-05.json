@@ -1,0 +1,201 @@
+{
+  "from": "2026-10-04T23:00:00+00:00",
+  "to": "2026-10-05T15:54:05+00:00",
+  "metrics": {
+    "load": {
+      "energyKwh": 16.908505859375,
+      "observedSeconds": 60683.025037000014,
+      "coverageFraction": 1,
+      "missingIntervals": 0,
+      "measuredSeconds": 60683.025037000014,
+      "idleSeconds": 0,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": 0,
+      "gaps": [],
+      "counterDayTotalKwh": 16.908505859375,
+      "reconciled": true,
+      "profile": "daily_counter",
+      "state": "complete",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:51:23.025037+00:00"
+    },
+    "pv": {
+      "energyKwh": 8.344,
+      "observedSeconds": 60683.02565599999,
+      "coverageFraction": 0.9999999999999999,
+      "missingIntervals": 0,
+      "measuredSeconds": 60683.02565599999,
+      "idleSeconds": 27489.153043,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": 0,
+      "gaps": [],
+      "counterDayTotalKwh": 8.344,
+      "reconciled": true,
+      "profile": "solar_daily",
+      "state": "idle_zero",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:51:23.025656+00:00"
+    },
+    "grid_import": {
+      "energyKwh": 26.962056640625,
+      "observedSeconds": 60683.024626,
+      "coverageFraction": 1,
+      "missingIntervals": 0,
+      "measuredSeconds": 60683.024626,
+      "idleSeconds": 0,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": 0,
+      "gaps": [],
+      "counterDayTotalKwh": 26.962056640625,
+      "reconciled": true,
+      "profile": "daily_counter",
+      "state": "complete",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:51:23.024626+00:00"
+    },
+    "grid_export": {
+      "energyKwh": 6.33355078125,
+      "observedSeconds": 60810.50342999997,
+      "coverageFraction": 0.9999999999901328,
+      "missingIntervals": 1,
+      "measuredSeconds": 60810.50342999997,
+      "idleSeconds": 9765.22907,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": null,
+      "gaps": [
+        {
+          "from": "2026-10-05T15:53:30.50343+00:00",
+          "to": "2026-10-05T15:53:30.5034306+00:00",
+          "reason": "no_samples",
+          "knownKwh": null
+        }
+      ],
+      "counterDayTotalKwh": 6.33355078125,
+      "reconciled": true,
+      "profile": "daily_counter",
+      "state": "idle_zero",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:53:30.5034306+00:00"
+    },
+    "battery_charge": {
+      "energyKwh": 23.599,
+      "observedSeconds": 60810.50343000002,
+      "coverageFraction": 0.9999999999901336,
+      "missingIntervals": 1,
+      "measuredSeconds": 60810.50343000002,
+      "idleSeconds": 0,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": null,
+      "gaps": [
+        {
+          "from": "2026-10-05T15:53:30.50343+00:00",
+          "to": "2026-10-05T15:53:30.5034306+00:00",
+          "reason": "no_samples",
+          "knownKwh": null
+        }
+      ],
+      "counterDayTotalKwh": 23.599,
+      "reconciled": true,
+      "profile": "daily_counter",
+      "state": "complete",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:53:30.5034306+00:00"
+    },
+    "battery_discharge": {
+      "energyKwh": 11.535,
+      "observedSeconds": 60683.02540699998,
+      "coverageFraction": 0.9999999999999997,
+      "missingIntervals": 0,
+      "measuredSeconds": 60683.02540699998,
+      "idleSeconds": 0,
+      "estimatedSeconds": 0,
+      "estimatedKwh": null,
+      "missingKwh": 0,
+      "gaps": [],
+      "counterDayTotalKwh": 11.535,
+      "reconciled": true,
+      "profile": "daily_counter",
+      "state": "complete",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:51:23.025407+00:00"
+    },
+    "ev": {
+      "energyKwh": 4.584939289069893,
+      "observedSeconds": 60810.503430000004,
+      "coverageFraction": 0.9999999999901333,
+      "missingIntervals": 1,
+      "measuredSeconds": 60758.171861,
+      "idleSeconds": 56504.369739,
+      "estimatedSeconds": 52.331569,
+      "estimatedKwh": 0.10780726213760877,
+      "missingKwh": null,
+      "gaps": [
+        {
+          "from": "2026-10-05T15:53:30.50343+00:00",
+          "to": "2026-10-05T15:53:30.5034306+00:00",
+          "reason": "no_samples",
+          "knownKwh": null
+        }
+      ],
+      "counterDayTotalKwh": null,
+      "reconciled": null,
+      "profile": "session_counter",
+      "state": "estimated",
+      "coverageFrom": "2026-10-04T23:00:00+00:00",
+      "coverageTo": "2026-10-05T15:53:30.5034306+00:00"
+    }
+  },
+  "importCostGbp": 1.8283465766884877,
+  "exportCreditGbp": 0.7740679404008243,
+  "observedNetCostGbp": 1.0542786362876637,
+  "costCoverageFraction": 0.9973379016517384,
+  "costObservedSeconds": 60683.02462600002,
+  "sources": ["HomeAssistant"],
+  "limitations": [
+    "Totals include measured intervals and 'spread' intervals (energy proved by the meter's counter across a short outage, timing estimated); intervals straddling the period edges are prorated. Missing coverage is not zero.",
+    "netCostGbp is import cost minus export credit, each with its own coverage. observedNetCostGbp counts only periods both meters cover with whole measured intervals. Standing charges are excluded.",
+    "Tariffs are applied as recorded by Home Assistant, split at rate changes; Predbat's plan rates fill periods when the tariff sensor was unavailable.",
+    "Aggregate sensors cannot identify physical battery-to-EV flow or causal savings.",
+    "Home Assistant 'unavailable' means a device is offline. 'unknown' is stored as idle and counts as zero only where the sensor's profile expects it (solar overnight, a charger between sessions, a daily counter before its first reading)."
+  ],
+  "netCostGbp": 1.0542786362876635,
+  "importCostCoverage": 1,
+  "exportCostCoverage": 0.9999999999901328,
+  "importCostEstimated": false,
+  "exportCostEstimated": false,
+  "unpricedGridKwh": 0,
+  "gridEnergyUnknown": true,
+  "estimatedCostGbp": 0,
+  "costGaps": [
+    {
+      "metric": "grid_export",
+      "from": "2026-10-05T15:53:30.50343+00:00",
+      "to": "2026-10-05T15:53:30.5034306+00:00",
+      "reason": "no_samples"
+    }
+  ],
+  "home": {
+    "energyKwh": 12.323566570305108,
+    "observedSeconds": 60683.025037000014,
+    "coverageFraction": 1,
+    "missingIntervals": 0,
+    "measuredSeconds": 60683.025037000014,
+    "idleSeconds": 0,
+    "estimatedSeconds": 0,
+    "estimatedKwh": null,
+    "missingKwh": 0,
+    "gaps": [],
+    "counterDayTotalKwh": null,
+    "reconciled": null,
+    "profile": "derived",
+    "state": "complete",
+    "coverageFrom": "2026-10-04T23:00:00+00:00",
+    "coverageTo": "2026-10-05T15:51:23.025037+00:00"
+  },
+  "loadIncludesEv": true
+}

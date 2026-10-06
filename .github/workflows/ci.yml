@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  # The demo fixtures and reports use the household timezone.
+  TZ: Europe/London
+
+jobs:
+  test:
+    name: .NET tests, dashboard build, unit tests and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Tests and build
+        run: ./scripts/test.sh
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dashboard dependencies
+        working-directory: web
+        run: npm ci
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Restore API
+        run: dotnet restore src/Joule.Api/Joule.Api.csproj
+      - name: Browser tests (production build served by the API too)
+        env:
+          E2E_BUILD_WEB: "1"
+        run: ./scripts/e2e.sh
+      - name: Keep traces and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            web/test-results/
+            .cache/e2e.*/*.log
+          retention-days: 7
+
+  image:
+    name: Image builds (amd64, arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build without pushing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

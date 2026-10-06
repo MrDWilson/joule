@@ -1,0 +1,814 @@
+/* The chart kit: chrome shared by every chart. Marks carry the series colour; every piece of text wears the text tokens,
+   never a series colour, and nothing is smaller than --fs-xs (12px). Series colours live in tokens.css (--load, --solar,
+   --battery, --ev) plus the chart-only roles below. */
+:root {
+  /* Grid import and export (validated next to battery, solar, home and car in the daily-bar stacking order). */
+  --series-grid: #d55181;
+  /* Neutral ink: "actual" on forecast-comparison charts, net-cost bars. */
+  --series-ink: #dce5ed;
+  /* The earlier period (yesterday / last week). */
+  --series-earlier: #b4c3cf;
+  /* Import price heat strip: one neutral ramp, cheap → dear. */
+  --price-low: #1a2631;
+  --price-high: #93a8bb;
+  /* Chart text in px, not the rem type scale: SVG geometry is laid out in px, so its text must not grow with the
+     browser's text size and overflow the lanes. 12px is the floor everywhere. */
+  --chart-fs: 12px;
+  --chart-fs-sm: 13px;
+  --chart-grid: var(--border-1);
+  --chart-tick: var(--text-3);
+}
+
+/* ------------------------------------------------------------------ figure, caption, footer */
+.chart-figure {
+  margin: 0;
+  min-width: 0;
+}
+.chart-figure-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--chart-fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.impact-chart-figure,
+.daily-chart .chart-daily-cost {
+  margin-top: var(--space-4);
+}
+.chart-caption {
+  margin-top: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--chart-fs-sm);
+  line-height: var(--lh-normal);
+  max-width: 72ch;
+}
+.chart-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.chart-table-disclosure .disclosure-body {
+  padding-top: var(--space-2);
+}
+.chart-table table {
+  font-size: var(--chart-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.chart-table th,
+.chart-table td:first-child {
+  white-space: nowrap;
+}
+/* Figures line up on their right edge, headings over them. */
+.chart-table .num {
+  text-align: right;
+}
+.tl-table-caption {
+  caption-side: top;
+  padding: 0 0 var(--space-2);
+  color: var(--text-3);
+  font-size: var(--chart-fs);
+  text-align: left;
+}
+/* A heading row per day: rows then need only their times. */
+.chart-table .tl-day-row th {
+  padding-top: var(--space-3);
+  color: var(--text-1);
+  font-size: var(--chart-fs-sm);
+  font-weight: 600;
+  text-align: left;
+  background: var(--bg-1);
+}
+.chart-table .tl-day-row:hover {
+  background: none;
+}
+.chart-table .tl-plan-cell {
+  white-space: normal;
+  min-width: 9rem;
+}
+/* Phones: the plan wraps under its own column, the figures scroll, and the rows are tighter. */
+.tl-table-compact th,
+.tl-table-compact td {
+  padding: 6px 8px;
+}
+.tl-table-compact .tl-plan-cell {
+  min-width: 7.5rem;
+  max-width: 9.5rem;
+}
+.chart-empty {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  color: var(--text-3);
+  font-size: var(--chart-fs-sm);
+  text-align: center;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ legend chips */
+.chart-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Phones: one row of chips that scrolls sideways (with a fade where more are) rather than a second and third row. */
+.chart-chips.scroll-row {
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.chart-chips.scroll-row .chart-chip {
+  white-space: nowrap;
+}
+.chart-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--chart-fs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+.chart-chips-static .chart-chip {
+  cursor: default;
+}
+.chart-chip:hover {
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+.chart-chip[aria-pressed="false"] {
+  color: var(--text-3);
+  border-style: dashed;
+}
+.chart-chip[aria-pressed="false"] .chart-chip-key {
+  opacity: 0.35;
+}
+.chart-chip-key {
+  display: inline-block;
+  width: 14px;
+  border-top: 2px solid currentColor;
+  border-radius: 1px;
+}
+.chart-chip-key.block {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 3px;
+  background: currentColor;
+}
+.chart-chip-key.strip {
+  width: 16px;
+  height: 6px;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--price-low), var(--price-high));
+  outline: 1px solid var(--border-2);
+}
+
+/* ------------------------------------------------------------------ tooltip */
+.chart-tip {
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  color: var(--text-1);
+  font-size: var(--chart-fs);
+  line-height: 1.45;
+  padding: 10px 12px;
+  min-width: 220px;
+  max-width: 300px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-tip-floating {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+.chart-tip-label {
+  color: var(--text-1);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.chart-tip-note {
+  color: var(--text-3);
+  font-size: var(--chart-fs);
+  margin: 4px 0 0;
+}
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  margin: 0;
+}
+.chart-tip-row span {
+  color: var(--text-2);
+}
+.chart-tip-row strong {
+  margin-left: auto;
+  padding-left: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chart-tip-missing {
+  color: var(--text-3) !important;
+  font-style: italic;
+  font-weight: 400 !important;
+}
+/* Tooltip keys are short strokes in the series colour, 18px so a dash pattern shows. */
+.chart-key {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  border-top: 2px solid currentColor;
+}
+.chart-key.dashed {
+  border-top-style: dashed;
+}
+.chart-key.earlier {
+  border-top: 1.5px dashed var(--text-2);
+  opacity: 0.8;
+}
+.chart-key.block {
+  width: 10px;
+  height: 10px;
+  margin: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  background: currentColor;
+}
+.chart-key.price {
+  height: 8px;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--price-low), var(--price-high));
+}
+
+/* ------------------------------------------------------------------ energy timeline */
+.tl-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.tl-compact .tl-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+}
+.tl-compact .tl-toolbar .segmented {
+  display: flex;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+/* Phones: the short range labels share the row evenly. */
+.tl-compact .tl-toolbar .segmented button {
+  flex: 1 1 0;
+  padding: 0 6px;
+}
+.tl-plot {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.tl-svg {
+  display: block;
+  overflow: visible;
+}
+.tl-svg text {
+  font-family: var(--font-sans);
+}
+.tl-lane-label {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.tl-phase {
+  fill: var(--text-3);
+  font-style: italic;
+}
+.tl-price-key .tl-price-ramp {
+  fill: var(--price-high);
+  letter-spacing: -1px;
+}
+/* A halo in the panel's colour, so a label stays readable where a line or the Now marker passes behind it. */
+.tl-price-key,
+.tl-now text,
+.tl-reserve text,
+.tl-action-key-label {
+  paint-order: stroke;
+  stroke: var(--bg-1);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.tl-action-key-label {
+  fill: var(--text-2);
+  font-size: var(--chart-fs);
+}
+.tl-tick {
+  fill: var(--chart-tick);
+  font-size: var(--chart-fs);
+  font-variant-numeric: tabular-nums;
+}
+.tl-tick-day {
+  fill: var(--text-2);
+  font-weight: 500;
+}
+.tl-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.tl-day-line {
+  stroke: var(--border-2);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.tl-series,
+.tl-bridge,
+.tl-earlier,
+.tl-accuracy {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+/* The earlier period: a neutral dashed reference line over the fills, never mistaken for a series of today's. */
+.tl-earlier {
+  stroke: var(--text-2);
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 3;
+  stroke-linecap: butt;
+  opacity: 0.8;
+}
+.tl-area {
+  stroke: none;
+}
+.tl-wash > rect:first-child,
+rect.tl-wash {
+  fill: var(--text-1);
+  fill-opacity: 0.06;
+}
+.tl-wash-label {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.tl-track {
+  fill: var(--bg-2);
+}
+.tl-block-outline {
+  fill: transparent;
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+.tl-price {
+  shape-rendering: crispEdges;
+}
+.tl-dot {
+  stroke: var(--bg-1);
+  stroke-width: 2;
+}
+.tl-hover {
+  fill: var(--text-1);
+  fill-opacity: 0.05;
+  pointer-events: none;
+}
+.tl-block-text {
+  fill: var(--text-on-accent);
+  font-size: var(--chart-fs);
+  font-weight: 600;
+}
+.tl-block-text.neutral {
+  fill: var(--text-2);
+}
+.tl-tag-mark {
+  fill: var(--text-1);
+  opacity: 0.55;
+}
+.tl-reserve line {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-opacity: 0.7;
+  shape-rendering: crispEdges;
+}
+.tl-reserve text {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.tl-now line {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.tl-now rect {
+  fill: var(--bg-3);
+  stroke: var(--border-control);
+  stroke-width: 1;
+}
+.tl-now text {
+  fill: var(--text-1);
+  font-size: var(--chart-fs);
+  font-weight: 600;
+}
+/* The interaction surface over the plot: a keyboard-operable slider; pointer and touch scrub it. */
+.tl-surface {
+  position: absolute;
+  touch-action: pan-y;
+  cursor: crosshair;
+  border-radius: var(--radius-sm);
+}
+.tl-surface:focus-visible {
+  outline: var(--focus);
+  outline-offset: 2px;
+}
+/* Phone and touch reading: a fixed strip above the plot, so a finger never covers what it reads. */
+/* Always three lines tall (a heading line, then figures that may take two), so reading a slot never moves the chart. */
+.tl-readout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-height: calc(3 * 1.4em + 12px);
+  margin-bottom: var(--space-2);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  font-size: var(--chart-fs);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.tl-readout strong {
+  overflow: hidden;
+  color: var(--text-1);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tl-readout span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-2);
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.tl-readout .tl-readout-hint {
+  display: block;
+  color: var(--text-3);
+}
+.tl-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.tl-compare {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tl-compare-label {
+  color: var(--text-2);
+  font-size: var(--chart-fs-sm);
+}
+.tl-switch:has(.switch:disabled) {
+  color: var(--text-3);
+}
+.tl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--chart-fs-sm);
+}
+.tl-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.tl-tip-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 2px;
+  color: var(--text-1);
+}
+.tl-tip-action i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 3px;
+}
+/* "Power your home" is the ribbon's own quiet fill, never an empty box that reads as an unchecked checkbox. */
+.tl-tip-action i.neutral {
+  background: color-mix(in oklab, var(--text-3) 50%, transparent);
+}
+/* Beats the panel's paragraph spacing (.panel p + p), which would make every tooltip row a paragraph apart. */
+:is(.panel, .modal, details, body) .chart-tip p {
+  margin: 0;
+  line-height: 1.45;
+}
+.tl-tip .chart-tip-row {
+  padding: 1px 0;
+}
+:is(.panel, .modal, details, body) .tl-tip .chart-tip-note {
+  margin-top: 4px;
+}
+.tl-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-style: normal;
+  font-size: var(--chart-fs);
+}
+/* Predbat's reason in full: it wraps rather than ending in "…". */
+.tl-tip-reason {
+  white-space: normal;
+}
+.tl-tip-table {
+  width: 100%;
+  margin: 8px 0 0;
+  border-collapse: collapse;
+  font-size: var(--chart-fs);
+}
+.tl-tip-table th,
+.tl-tip-table td {
+  padding: 2px 0 2px 10px;
+  text-align: right;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 0;
+  background: none;
+}
+.tl-tip-table thead th {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.tl-tip-table tbody th {
+  padding-left: 0;
+  text-align: left;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tl-tip-table td {
+  color: var(--text-1);
+}
+.tl-tip-unit {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  text-align: right;
+  font-size: var(--chart-fs);
+}
+.tl-battery .tl-toolbar {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ daily bars */
+.daily-chart .chart-figure-title {
+  margin-top: var(--space-4);
+}
+.daily-svg {
+  display: block;
+  overflow: visible;
+}
+.daily-svg text {
+  font-family: var(--font-sans);
+}
+.daily-bar {
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.daily-svg .daily-pct {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.daily-svg .daily-na {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+  font-style: italic;
+}
+.daily-avg line {
+  stroke: var(--series-earlier);
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+}
+.daily-avg text {
+  fill: var(--text-3);
+  font-size: var(--chart-fs);
+}
+.daily-zero {
+  stroke: var(--border-control);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.daily-hit {
+  fill: transparent;
+  cursor: default;
+}
+.daily-hit:hover + .daily-hover,
+.daily-hover {
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ small charts: impact delta, alternative forecast */
+.mini-chart {
+  position: relative;
+  width: 100%;
+}
+.mini-chart svg {
+  display: block;
+  overflow: visible;
+}
+.mini-chart text {
+  font-family: var(--font-sans);
+}
+.impact-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+.impact-headline strong {
+  font-size: var(--fs-2xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.impact-headline span {
+  color: var(--text-2);
+  font-size: var(--chart-fs-sm);
+}
+.stat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.stat-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  font-size: var(--chart-fs);
+  color: var(--text-3);
+}
+.stat-chip strong {
+  color: var(--text-1);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat-chip .chart-key {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ------------------------------------------------------------------ tile sparklines (ObservedTrend, battery) */
+.metric-trend .trend-line,
+.metric-trend .trend-forecast,
+.metric-trend .trend-bridge {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+}
+.metric-trend .trend-line {
+  stroke-width: 2px;
+}
+.metric-trend .trend-forecast {
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+  opacity: 0.6;
+}
+.metric-trend .trend-bridge {
+  stroke-width: 2px;
+  opacity: 0.3;
+}
+.metric-trend .trend-area {
+  fill: currentColor;
+  opacity: 0.12;
+}
+.metric-trend .trend-gap {
+  fill: var(--text-1);
+  opacity: 0.06;
+}
+.metric-trend .trend-now {
+  fill: currentColor;
+  stroke: var(--bg-1);
+  stroke-width: 2px;
+}
+.metric-trend .trend-now-line {
+  stroke: var(--text-3);
+  stroke-width: 1px;
+  opacity: 0.6;
+}
+.metric-trend .trend-cap {
+  stroke: var(--text-2);
+  stroke-width: 1.5px;
+}
+.metric-trend .trend-reserve {
+  stroke: var(--text-3);
+  stroke-width: 1px;
+  opacity: 0.5;
+}
+.trend-caption,
+.metric-trend {
+  font-size: var(--chart-fs);
+}
+.trend-caption .trend-max {
+  display: inline;
+}
+.trend-caption .trend-max::before {
+  content: " · ";
+}
+
+/* ------------------------------------------------------------------ change against an earlier period (Delta) */
+/* Readable text, with only the arrow coloured. Green is good news (less cost, more solar), amber is bad news, blue is
+   neither (more home use is not good or bad by itself). */
+.evidence-delta,
+.evidence-metrics small.evidence-delta {
+  display: block;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.evidence-delta.delta-quiet,
+.evidence-metrics small.delta-quiet {
+  color: var(--text-3);
+}
+.delta-arrow {
+  display: inline-block;
+  margin-right: 5px;
+  font-size: var(--chart-fs);
+}
+.delta-arrow.good {
+  color: var(--success);
+}
+.delta-arrow.bad {
+  color: var(--warn);
+}
+.delta-arrow.neutral {
+  color: var(--info);
+}
+
+/* ------------------------------------------------------------------ #/kit chart showcase */
+.kit-charts {
+  display: grid;
+  gap: var(--space-8);
+}
+.kit-charts h3 {
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-lg);
+}
+.kit-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.kit-tiles .metric {
+  padding: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ accessibility and print */
+@media (forced-colors: active) {
+  .tl-series,
+  .tl-bridge,
+  .tl-earlier {
+    forced-color-adjust: none;
+    stroke: CanvasText !important;
+  }
+  .tl-block rect,
+  .daily-bar {
+    forced-color-adjust: none;
+    fill: CanvasText !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-chip,
+  .daily-bar {
+    transition: none;
+  }
+}

@@ -1,0 +1,808 @@
+/* Today. Phone first; the page is a container so its grids follow the content width, not the window. */
+
+.today {
+  container: today / inline-size;
+  display: grid;
+  gap: var(--space-5);
+}
+.today > .panel,
+.today-side > .panel {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------ Now */
+.now-hero {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--battery) 13%, transparent), transparent 55%),
+    radial-gradient(70% 120% at 100% 100%, color-mix(in srgb, var(--load) 7%, transparent), transparent 60%),
+    var(--bg-1);
+  overflow: hidden;
+}
+.now-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+}
+.now-copy {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.now-eyebrow {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Icon, then the words flowing inline with the (i) after the last word, so a wrapped headline keeps its hint beside it. */
+.now-headline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-2);
+  margin: 0;
+  color: var(--text-1);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+.now-headline-text .hint {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.now-icon {
+  flex-shrink: 0;
+  /* Centre the icon on the first line of text. */
+  margin-top: calc((1lh - 20px) / 2);
+  color: var(--tone);
+}
+.now-target {
+  color: var(--text-2);
+  font-weight: 500;
+  /* Keep the arrow with its percentage when the headline wraps on a phone. */
+  white-space: nowrap;
+}
+.now-battery {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.now-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.now-direction.dir-charging svg {
+  color: var(--battery-text);
+}
+.now-direction.dir-discharging svg {
+  color: var(--load-text);
+}
+.now-prices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.price-chip {
+  font-variant-numeric: tabular-nums;
+}
+.now-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-1);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.now-next strong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.now-next.is-stale {
+  color: var(--warn);
+}
+.now-next-label {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.now-next-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+.now-next-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.now-next-link:hover {
+  text-decoration: underline;
+}
+.now-sentence {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+}
+
+/* Battery ring. */
+.battery-ring {
+  position: relative;
+  flex-shrink: 0;
+}
+.battery-ring svg {
+  display: block;
+}
+.ring-track {
+  fill: none;
+  stroke: var(--border-2);
+}
+.ring-value {
+  fill: none;
+  stroke: var(--battery);
+}
+/* At or near the reserve the level reads amber, like the plan's warnings. */
+.battery-ring.is-low .ring-value {
+  stroke: var(--warn);
+}
+.ring-reserve {
+  stroke: var(--text-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-1);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.ring-label small {
+  margin-left: 1px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.battery-ring.is-stale .ring-value {
+  stroke: var(--text-3);
+}
+.battery-ring.is-stale .ring-label {
+  color: var(--text-3);
+}
+
+/* ------------------------------------------------------------------ Needs you */
+.needs-you {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, var(--bg-1)), var(--bg-1) 55%);
+}
+.needs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.needs-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.needs-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.needs-you ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.needs-row {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 0;
+  border-top: 1px solid var(--border-1);
+}
+.needs-row:first-child {
+  border-top: 0;
+}
+.needs-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.needs-title {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* AI band (only when automatic checks need action). */
+.automation-band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-md);
+  background: var(--warn-surface);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
+.automation-band p {
+  flex: 1;
+  margin: 0;
+  color: var(--text-2);
+}
+.automation-band strong {
+  color: var(--text-1);
+}
+.today-callout {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ Tiles */
+.today-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@container today (min-width: 820px) {
+  .today-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+}
+.today-tiles .stat {
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+}
+.today-tiles .stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.today-tiles .stat-spark {
+  min-height: 0;
+}
+.today-tiles .metric-trend,
+.today-tiles .metric-trend svg {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+/* In a narrow page the tile's label needs the icon's room ("Net earnings" on one line). */
+@container today (max-width: 400px) {
+  .today-tiles .stat-icon {
+    display: none;
+  }
+}
+.today-tiles .trend-caption {
+  display: none;
+}
+.today-tiles .stat-footnote,
+.today-tiles .stat-delta {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+.today-tiles .stat-footnote {
+  color: var(--text-2);
+}
+.today-tiles .stat-foot {
+  margin-top: 0;
+}
+.today-tiles .stat-foot .chip {
+  white-space: normal;
+}
+.stat-earning .stat-value > span {
+  color: var(--success);
+}
+.stat-stale .stat-value > span {
+  color: var(--text-3);
+}
+.paid-earned {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--bg-3);
+}
+.paid-earned .paid {
+  background: color-mix(in srgb, var(--text-2) 70%, transparent);
+}
+.paid-earned .earned {
+  background: var(--success);
+}
+
+/* ------------------------------------------------------------------ Timeline and lower grid */
+/* Section heads keep their link on the heading's row, even on a phone, as "Needs you" does. */
+.today .panel-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.today .panel-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.today .panel-head .text-link,
+.today .panel-head > .chip {
+  flex-shrink: 0;
+}
+/* Centre the link's text on the heading's first line (the link is a 32px target, 44px on touch screens). */
+.today .panel-head .text-link {
+  --head-line: calc(var(--fs-lg) * var(--lh-tight));
+  margin-top: calc((var(--head-line) - 32px) / 2);
+}
+@media (pointer: coarse) {
+  .today .panel-head .text-link {
+    margin-top: calc((var(--head-line) - var(--tap)) / 2);
+  }
+}
+.today-timeline .panel-head {
+  margin-bottom: var(--space-3);
+}
+.today-lower {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+@container today (min-width: 900px) {
+  .today-lower {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+}
+.today-side {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+/* A ghost button whose text lines up with the window titles above it. */
+.coming-more {
+  margin-top: var(--space-3);
+  margin-left: calc(-1 * var(--space-3));
+}
+
+/* Last night. */
+.last-night h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.last-night h2 svg {
+  color: var(--violet);
+}
+.last-night .panel-head {
+  margin-bottom: var(--space-4);
+}
+.night-battery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+.night-battery strong {
+  color: var(--text-1);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+.night-label {
+  min-width: 64px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.night-plan {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.night-plan.short {
+  color: var(--warn);
+}
+.level-bar {
+  position: relative;
+  height: 8px;
+  margin: var(--space-3) 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--bg-3);
+}
+.level-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--battery) 45%, transparent), var(--battery));
+}
+.level-fill.falling {
+  background: linear-gradient(90deg, var(--load), color-mix(in srgb, var(--load) 45%, transparent));
+}
+.level-target {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text-1);
+}
+.night-fact {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.night-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+.night-facts > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.night-facts dt {
+  color: var(--text-3);
+}
+.night-facts dd {
+  margin: 0;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.night-flags {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  color: var(--text-1);
+  list-style: none;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+/* Each flag is its own callout: amber when the night contradicted the plan, blue for a pause Predbat planned. */
+.night-flag {
+  --flag: var(--warn);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--warn-surface);
+}
+.night-flag.tone-info {
+  --flag: var(--info);
+  background: var(--info-surface);
+}
+.night-flag > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--flag);
+}
+.night-flag-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--flag);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.night-flag-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.night-yesterday {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-1);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.night-yesterday strong {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+}
+.night-yesterday strong.good {
+  color: var(--success);
+}
+
+/* AI card. */
+.ai-card .panel-head {
+  margin-bottom: var(--space-4);
+}
+.ai-off {
+  margin: 0 0 var(--space-3);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.ai-off a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ai-top {
+  display: grid;
+  gap: var(--space-2);
+}
+.ai-eyebrow {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ai-finding {
+  display: grid;
+  gap: var(--space-2);
+}
+.ai-finding-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+}
+.ai-finding h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+.ai-finding h3 a {
+  color: var(--text-1);
+  text-decoration: none;
+}
+.ai-finding h3 a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+.ai-finding p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ai-quiet {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.ai-quiet svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--success);
+}
+.ai-strip {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-1);
+}
+.run-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Insights styles its own run dots with a top margin; Today's sit centred on their line. */
+.ai-card .run-dot {
+  margin-top: 0;
+}
+.run-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  box-shadow: inset 0 0 0 1px var(--border-control);
+}
+.run-dot.v-problem {
+  background: var(--warn);
+  box-shadow: none;
+}
+.run-dot.v-opportunity {
+  background: var(--success);
+  box-shadow: none;
+}
+.run-dot.v-finding {
+  background: var(--info);
+  box-shadow: none;
+}
+.run-dot.v-no_change {
+  background: color-mix(in srgb, var(--text-3) 55%, transparent);
+  box-shadow: none;
+}
+.run-dot.v-didnt_finish {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.run-dot.v-running {
+  background: var(--accent);
+  box-shadow: none;
+}
+.ai-strip-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-3);
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.ai-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.ai-legend-item .run-dot {
+  width: 8px;
+  height: 8px;
+}
+/* "Found something" can be amber and green dots together: they overlap slightly, like a small stack. */
+.ai-legend-dots {
+  display: inline-flex;
+}
+.ai-legend-dots .run-dot + .run-dot {
+  margin-left: -3px;
+  outline: 1.5px solid var(--bg-1);
+}
+.today-footnote {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+
+/* ------------------------------------------------------------------ Phone */
+@media (max-width: 700px) {
+  .today {
+    gap: var(--space-4);
+  }
+  .today-side {
+    gap: var(--space-4);
+  }
+  .now-hero {
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .now-top {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+  .now-prices {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .now-headline {
+    font-size: 1.125rem;
+  }
+  .now-next {
+    padding-top: var(--space-3);
+  }
+  .now-sentence {
+    font-size: var(--fs-sm);
+  }
+  .needs-you {
+    padding: var(--space-3) var(--space-4);
+  }
+  .needs-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-3);
+  }
+  .needs-kind {
+    grid-column: 1;
+  }
+  .needs-title {
+    grid-column: 1;
+    grid-row: 2;
+    white-space: normal;
+  }
+  .needs-row .button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .today-tiles .stat {
+    padding: var(--space-3) var(--space-4);
+  }
+  .today-tiles .stat-value > span {
+    font-size: 1.625rem;
+  }
+  .today-tiles .metric-trend,
+  .today-tiles .metric-trend svg {
+    height: 32px;
+  }
+  .paid-earned {
+    margin: 12px 0;
+  }
+}
+/* Small phones (360–400px): a smaller ring (NowHero sizes it 60) and headline so the words keep their room. */
+@media (max-width: 400px) {
+  .now-top {
+    gap: var(--space-3);
+  }
+  .now-headline {
+    font-size: var(--fs-lg);
+  }
+  .now-headline .now-icon {
+    width: 18px;
+    height: 18px;
+    margin-top: calc((1lh - 18px) / 2);
+  }
+  .ring-label {
+    font-size: 1.0625rem;
+  }
+}
+.night-yesterday.alone {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}

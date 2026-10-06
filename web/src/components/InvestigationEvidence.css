@@ -1,0 +1,548 @@
+/* AI text, a check's own page, to-do cards and the sources a check read. Shared by Insights, Today and Reports. */
+
+/* ------------------------------------------------------------------ AI text */
+.investigation-text {
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.investigation-text p {
+  margin: 0 0 0.85em;
+  max-width: 72ch;
+}
+.investigation-text p:last-child {
+  margin-bottom: 0;
+}
+.investigation-text strong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.investigation-text h4 {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+}
+.investigation-text h4:first-child {
+  margin-top: 0;
+}
+.investigation-text ul,
+.investigation-text ol {
+  margin: 0.5em 0 0.9em;
+  padding-left: 1.3em;
+}
+.investigation-text li {
+  padding-left: 0.25em;
+  margin: 0.35em 0;
+}
+.investigation-text li::marker {
+  color: var(--accent-deep);
+}
+.inline-code {
+  padding: 1px 6px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+/* A Predbat code or jargon in plain words: dotted underline, the original in the tooltip. */
+abbr.plan-term,
+abbr.entity-name {
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+abbr.plan-term {
+  color: var(--text-1);
+}
+abbr.plan-term.tone-violet {
+  text-decoration-color: var(--violet);
+}
+abbr.plan-term.tone-amber {
+  text-decoration-color: var(--warn);
+}
+abbr.plan-term.tone-green {
+  text-decoration-color: var(--success);
+}
+abbr.plan-term.tone-blue {
+  text-decoration-color: var(--info);
+}
+abbr.entity-name {
+  color: var(--text-1);
+}
+.investigation-expand.button {
+  color: var(--accent);
+  gap: 6px;
+  padding: 6px 0;
+  margin-top: var(--space-2);
+  min-height: 32px;
+  font-size: var(--fs-sm);
+}
+.investigation-expand.button:hover {
+  background: transparent;
+  color: var(--accent-strong);
+}
+.mono-text {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+details.technical {
+  margin-top: var(--space-3);
+}
+details.technical > summary {
+  cursor: pointer;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  width: fit-content;
+}
+details.technical > summary:hover {
+  color: var(--text-2);
+}
+details.technical[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ A check's page */
+.check-detail {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+/* The page-wide "section + section" margin (styles.css) stacks on this grid's gap into ~56px holes; the gap alone
+   spaces a check. Doubled class to outrank "main section[aria-label] + section[aria-label]". */
+.check-detail.check-detail > section[aria-label] {
+  margin-top: 0;
+}
+/* The one wider break: before what the check left for you. */
+.check-detail.check-detail > section.detail-for-you {
+  margin-top: calc(var(--space-6) - var(--space-4));
+}
+.detail-done {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  min-height: var(--tap);
+  margin-bottom: calc(-1 * var(--space-3));
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.detail-back:hover {
+  color: var(--accent-strong);
+}
+.detail-header {
+  display: grid;
+  gap: var(--space-2);
+}
+.detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.detail-close {
+  margin: -6px -8px 0 auto;
+  width: 36px;
+  padding: 0;
+}
+.detail-header h2 {
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.detail-header h2:focus {
+  outline: none;
+}
+.detail-meta {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.detail-request {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  overflow-wrap: anywhere;
+}
+.detail-request.is-question {
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--accent-deep);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+.detail-summary .investigation-text {
+  font-size: 0.9375rem;
+  color: var(--text-1);
+}
+.detail-section {
+  display: grid;
+  gap: var(--space-3);
+}
+.detail-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.detail-heading svg {
+  color: var(--accent);
+}
+.detail-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+.detail-closed .detail-cards {
+  padding-top: var(--space-3);
+}
+.detail-disclosures {
+  display: grid;
+  gap: var(--space-2);
+}
+.detail-disclosures > .disclosure + .disclosure {
+  margin-top: 0;
+}
+.detail-footnote {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.failure-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.failure-message {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+}
+.failure-next {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.technical-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.technical-list > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+}
+.technical-list dt {
+  color: var(--text-3);
+}
+.technical-list dd {
+  margin: 0;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.watch-list,
+.claim-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.watch-list li {
+  position: relative;
+  padding-left: var(--space-5);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.watch-list li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--accent-deep);
+  border-radius: 50%;
+}
+.claim-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: var(--lh-normal);
+}
+.claim-list li > .chip {
+  flex-shrink: 0;
+}
+.claim-list p + p {
+  margin-top: 2px;
+}
+.investigation-observation-list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.investigation-observation-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.investigation-observation-list .investigation-text {
+  font-size: var(--fs-sm);
+}
+.investigation-observation-number {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.steps-block {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.step-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.step-list li {
+  display: flex;
+  gap: var(--space-3);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  overflow-wrap: anywhere;
+}
+.step-number {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.step-detail {
+  display: block;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------------ Sources */
+.investigation-evidence {
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+.investigation-evidence > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  cursor: pointer;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  list-style: none;
+}
+.investigation-evidence > summary::-webkit-details-marker {
+  display: none;
+}
+.investigation-evidence > summary::after {
+  content: "";
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--text-3);
+  border-bottom: 1.5px solid var(--text-3);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--dur) var(--ease);
+}
+.investigation-evidence[open] > summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+.investigation-evidence[open] > summary {
+  border-bottom: 1px solid var(--border-1);
+}
+.investigation-evidence > :not(summary) {
+  margin: var(--space-3) var(--space-4);
+}
+.source-list {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  list-style: none;
+}
+.source-list > li.is-highlighted .tool-evidence {
+  outline: 1px solid var(--accent-deep);
+  border-radius: var(--radius-sm);
+}
+.tool-evidence > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  list-style: none;
+}
+.tool-evidence > summary::-webkit-details-marker {
+  display: none;
+}
+.tool-evidence > summary svg {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.tool-evidence > summary time {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.source-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tool-evidence[open] {
+  padding-bottom: var(--space-3);
+}
+.tool-evidence[open] > summary {
+  color: var(--text-1);
+}
+.tool-evidence > :not(summary) {
+  margin-left: calc(15px + var(--space-2));
+}
+.source-lines {
+  max-height: 220px;
+  overflow: auto;
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ To-do cards */
+.investigation-next-step {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  overflow-wrap: anywhere;
+}
+.investigation-next-step.is-embedded {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.investigation-next-step.is-closed:not(.is-embedded) {
+  background: transparent;
+}
+.follow-up-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.follow-up-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.investigation-next-step > h3 {
+  margin: var(--space-2) 0 var(--space-2);
+  color: var(--text-1);
+  font-size: var(--fs-lg);
+  line-height: 1.4;
+}
+.investigation-next-step .investigation-summary .investigation-text {
+  font-size: var(--fs-sm);
+}
+.follow-up-details {
+  margin-top: var(--space-3);
+}
+.follow-up-details > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.follow-up-details h4 {
+  margin: var(--space-4) 0 var(--space-1);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+}
+.follow-up-details .investigation-text {
+  font-size: var(--fs-sm);
+}
+.follow-up-details .investigation-evidence {
+  margin-top: var(--space-4);
+}
+.follow-up-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+.investigation-next-step > .recommendation-reply,
+.investigation-next-step > .follow-up-actions {
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 600px) {
+  .investigation-text {
+    font-size: var(--fs-md);
+  }
+  .investigation-next-step:not(.is-embedded) {
+    padding: var(--space-4);
+  }
+  .technical-list > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

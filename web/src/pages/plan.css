@@ -1,0 +1,569 @@
+/* Plan page. Tokens only (tokens.css). */
+
+.plan-page {
+  display: grid;
+  /* One column that never grows past the screen to fit a wide control (Safari sizes selects by their options). */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+.plan-page > .panel,
+.plan-page > section.panel {
+  margin-bottom: 0;
+}
+
+/* Status strip. */
+.plan-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+}
+.plan-status-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+.plan-status-label {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.plan-status-main strong {
+  color: var(--text-1);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+.plan-status-main strong.is-old {
+  color: var(--warn);
+}
+.plan-status-main .muted {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.plan-status-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+.plan-status-facts > div {
+  display: grid;
+  gap: 1px;
+}
+.plan-status-facts dt {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.plan-status-facts dd {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.plan-stale-chip {
+  white-space: normal;
+}
+.plan-status-about {
+  display: block;
+  margin-top: var(--space-2);
+}
+/* The earlier plan on screen: what it is, and the controls to step through plans, together at the top. */
+.plan-selected {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--info-border);
+  border-radius: var(--radius-md);
+  background: var(--info-surface);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+}
+.plan-selected-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.plan-selected-head p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 500;
+}
+.plan-selected-head svg {
+  flex-shrink: 0;
+  color: var(--info);
+}
+.plan-help {
+  margin-top: var(--space-4);
+}
+.plan-help p {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+.plan-help p + p {
+  margin-top: var(--space-2);
+}
+.plan-compare .disclosure-body {
+  padding-top: var(--space-3);
+}
+
+/* Tables: windows that expand to half-hours, sticky day headers. */
+.plan-table-wrap {
+  max-height: 72vh;
+  overflow: auto;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+}
+.plan-table-wrap:focus-visible {
+  outline: var(--focus);
+  outline-offset: 2px;
+}
+/* More columns past the edge (useOverflow sets data-overflow): fade that edge so the scroll is visible. */
+.plan-table-wrap[data-overflow="end"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
+.plan-table-wrap[data-overflow="start"] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent);
+}
+.plan-table-wrap[data-overflow="both"] {
+  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+}
+.plan-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-sm);
+}
+.plan-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.plan-table thead th .hint {
+  vertical-align: middle;
+}
+.plan-table .day-row th {
+  position: sticky;
+  top: 33px;
+  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-1);
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.plan-table td,
+.plan-table tbody th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-1);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+}
+.plan-table tbody th {
+  white-space: nowrap;
+}
+/* styles.css drops the border under every tbody's last row (for td only), which split each day's last row. Keep the line
+   between days; only the table's very last row sits on the wrap's own border. */
+.plan-table tbody tr:last-child > :is(td, th) {
+  border-bottom: 1px solid var(--border-1);
+}
+.plan-table tbody:last-of-type tr:last-child > :is(td, th) {
+  border-bottom: 0;
+}
+.plan-table thead th .th-unit {
+  margin-left: 2px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.plan-table .num {
+  text-align: right;
+}
+.plan-table .tabular,
+.plan-table .when {
+  font-variant-numeric: tabular-nums;
+}
+.plan-table .good {
+  color: var(--success);
+}
+.plan-table .plan-window-row.is-now {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.plan-table .slot-row td,
+.plan-table .slot-row th {
+  background: var(--bg-0);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.plan-table .is-flagged > :first-child {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+.plan-table td .window-note,
+.plan-table td .flag-line {
+  display: flex;
+  max-width: 52ch;
+  margin-top: 4px;
+  /* Tables don't wrap by default (styles.css); notes and flags are sentences, so they do. */
+  white-space: normal;
+}
+.plan-table .window-tag {
+  margin-left: 4px;
+}
+.expand-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 24px;
+  min-height: 24px;
+  margin-right: 4px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.expand-button:hover {
+  background: var(--bg-3);
+  color: var(--text-1);
+}
+.expand-spacer {
+  display: inline-block;
+  width: 28px;
+}
+.cell-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.flag-line {
+  align-items: center;
+  gap: 4px;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+.flag-line svg {
+  flex-shrink: 0;
+}
+.delta-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--success-surface);
+  color: var(--success);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.delta-pill.below {
+  background: var(--warn-surface);
+  color: var(--warn);
+}
+.delta-pill.neutral {
+  background: var(--bg-3);
+  color: var(--text-2);
+}
+.price-cell,
+.price-quiet {
+  display: inline-block;
+}
+.price-quiet .muted {
+  font-weight: 500;
+}
+
+/* Price cells, cheapest (band-0) to dearest (band-4). */
+.price-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.price-pill.band-0 {
+  background: var(--success-surface);
+  color: var(--success);
+}
+.price-pill.band-1 {
+  background: color-mix(in srgb, var(--success-surface) 50%, var(--bg-2));
+  color: color-mix(in srgb, var(--success) 60%, var(--text-1));
+}
+.price-pill.band-2 {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+.price-pill.band-3 {
+  background: color-mix(in srgb, var(--warn-surface) 55%, var(--bg-2));
+  color: color-mix(in srgb, var(--warn) 55%, var(--text-1));
+}
+.price-pill.band-4 {
+  background: var(--warn-surface);
+  color: var(--warn);
+}
+/* Export prices on their own scale, least (sell-0) to best paid (sell-4): neutral to green, never amber. */
+.price-pill.sell {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+.price-pill.sell-3 {
+  background: color-mix(in srgb, var(--success-surface) 50%, var(--bg-2));
+  color: color-mix(in srgb, var(--success) 60%, var(--text-1));
+}
+.price-pill.sell-4 {
+  background: var(--success-surface);
+  color: var(--success);
+}
+
+/* Phone cards. */
+.next-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+.next-cards ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Day groups are spaced by the grid gap and the day heading, not the shared "section + section" margin. */
+.next-cards > section[aria-label] + section[aria-label] {
+  margin-top: 0;
+}
+/* Tablets: two cards a row, so the cards don't stretch across the whole page. */
+@media (min-width: 701px) {
+  .next-cards > section > ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-3);
+  }
+}
+.day-head {
+  position: sticky;
+  top: calc(var(--mobile-header-height) + var(--safe-top));
+  z-index: 1;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-1) 0;
+  background: var(--bg-1);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.next-card {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.next-card.is-now {
+  border-color: var(--accent-border);
+}
+.next-card.is-flagged {
+  border-left: 2px solid var(--warn);
+}
+.next-card-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* Long plan labels and their hint wrap inside the card instead of running past it at 320px. */
+.next-card-line > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.next-card-line .plan-badge {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.next-card-time {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.next-card .window-note,
+.next-card .flag-line {
+  display: flex;
+  margin: 0;
+}
+.next-card .expand-button {
+  justify-self: start;
+  margin: 0;
+  padding: 2px 6px;
+}
+/* Time and plan on the left (wrapping if they must), the price held top right. */
+.next-card-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: start;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.next-card-top > .next-card-line {
+  min-height: 24px;
+}
+.next-card-price {
+  text-align: right;
+}
+.next-card-price .cell-sub {
+  margin-top: 0;
+}
+.next-card-slots li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 4px 0;
+  border-top: 1px solid var(--border-1);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.next-card-slots.happened-slots li {
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  font-variant-numeric: tabular-nums;
+}
+.next-card-slots.happened-slots strong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.next-card-slots.happened-slots li.is-flagged {
+  box-shadow: inset 2px 0 0 var(--warn);
+  padding-left: 6px;
+}
+.next-card-slots .delta-pill {
+  margin-left: 0;
+  justify-self: end;
+}
+
+/* Plan browser: in the earlier-plan banner and in "Browse earlier plans". Controls are the small button height. */
+.plan-browser-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+.plan-browser-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.plan-browser .control-sm {
+  width: auto;
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+}
+.plan-browser select.control-sm {
+  min-width: 11rem;
+  padding-right: 32px;
+  background-position: right 10px center;
+}
+.plan-browser-day {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.plan-browser-note {
+  margin-top: var(--space-2);
+  font-size: var(--fs-xs);
+}
+@media (pointer: coarse) {
+  .plan-browser .control-sm {
+    min-height: var(--tap);
+  }
+}
+
+/* "How this plan's forecast did". */
+.forecast-did {
+  display: grid;
+  gap: var(--space-3);
+}
+.forecast-did-result {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+.forecast-did .availability-note {
+  margin: 0;
+}
+.forecast-did-note {
+  margin-top: var(--space-3);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-relaxed);
+}
+.forecast-did-rules p {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+
+@media (max-width: 700px) {
+  .plan-page {
+    gap: var(--space-4);
+  }
+  .plan-status {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2) var(--space-4);
+  }
+  .plan-status-facts {
+    gap: var(--space-2) var(--space-4);
+  }
+  .plan-status {
+    justify-content: flex-start;
+  }
+  .plan-browser-step {
+    flex: 1 1 100%;
+  }
+  .plan-browser-step > .button {
+    flex: none;
+  }
+  /* Grows from nothing, so Safari's wide intrinsic select never pushes Later off the card. */
+  .plan-browser select.control-sm {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+  }
+}

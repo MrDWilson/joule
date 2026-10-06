@@ -1,0 +1,9 @@
+# Build Joule from this checkout instead of pulling the published image:
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  joule:
+    image: joule:local
+    build:
+      context: .
+      args:
+        VERSION: ${JOULE_VERSION:-1.0.0}

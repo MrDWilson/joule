@@ -1,0 +1,122 @@
+/*
+ * Joule design tokens. Every colour, size, radius and shadow in the app comes from here.
+ *
+ * Text contrast (WCAG AA) on every surface from --bg-0 to --bg-3:
+ *   --text-1 ≥ 14:1, --text-2 ≥ 9:1, --text-3 ≥ 5.4:1. Nothing that carries information uses a lighter grey than --text-3.
+ * Control borders (--border-control) reach 3:1 against the surfaces they sit on (WCAG 1.4.11).
+ * Type scale in rem, with a 12px floor: no readable text is smaller than --fs-xs.
+ */
+/* "Inter Variable" is self-hosted by @fontsource-variable/inter, imported in main.tsx. */
+:root {
+  /* Surfaces, darkest to lightest. */
+  --bg-0: #080d13; /* page */
+  --bg-1: #0d151d; /* sidebar, header, panels */
+  --bg-2: #121c26; /* raised: cards inside panels, inputs, hover */
+  --bg-3: #182431; /* pressed, selected, tooltips */
+  --bg-overlay: rgb(2 6 9 / 0.72);
+  --bg-glass: rgb(10 16 23 / 0.78);
+
+  /* Lines. */
+  --border-1: #1c2834; /* hairline dividers */
+  --border-2: #26343f; /* card outlines */
+  --border-control: #5b6f80; /* inputs, switches, segmented controls: ≥3:1 on every surface */
+
+  /* Text. */
+  --text-1: #e8eff4;
+  --text-2: #b4c3cf;
+  --text-3: #8c9eab;
+  --text-on-accent: #04160f;
+
+  /* Accent, from the gem in the Joule mark. Reserved for the brand, primary actions and focus. */
+  --accent: #55dfb6;
+  --accent-strong: #86ecc8;
+  --accent-deep: #1f9f84;
+  --accent-surface: #10261f;
+  --accent-border: #1f4a3c;
+
+  /* Data hues: one per series, the same everywhere (tiles, charts, legends). */
+  --load: #3987e5;
+  --solar: #c98500;
+  --battery: #199e70;
+  --ev: #9085e9;
+  --export: #6fe0a0;
+  /* Lighter versions of the data hues for text and icons on dark surfaces. */
+  --load-text: #7fb0f0;
+  --solar-text: #e8b45c;
+  --battery-text: #4fd3a2;
+  --ev-text: #b3aaf3;
+
+  /* Meaning. */
+  --success: #4fd3a2;
+  --warn: #e8b45c;
+  --danger: #f07a7a;
+  --info: #7fb0f0;
+  --violet: #b3aaf3;
+  --success-surface: #102920;
+  --warn-surface: #2a2113;
+  --danger-surface: #2e1519;
+  --info-surface: #122236;
+  --violet-surface: #1d1a33;
+  --success-border: #1f5240;
+  --warn-border: #5c4520;
+  --danger-border: #6a2c33;
+  --info-border: #284a73;
+  --violet-border: #3d3566;
+
+  /* Radius. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Spacing: a 4pt scale. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Type scale (rem, so the browser's text-size preference is respected). 1rem = 16px. */
+  --fs-xs: 0.75rem; /* 12px: meta, chips, axis ticks; the floor */
+  --fs-sm: 0.8125rem; /* 13px: secondary copy, buttons, table cells */
+  --fs-md: 0.875rem; /* 14px: body */
+  --fs-lg: 1rem; /* 16px: card titles */
+  --fs-xl: 1.25rem; /* 20px: section headings */
+  --fs-2xl: 1.75rem; /* 28px: page title */
+  --fs-display: 2.5rem; /* 40px: headline figures */
+  --lh-tight: 1.25;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.65;
+  --font-sans:
+    "Inter Variable", Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Elevation. */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 8px 24px rgb(0 0 0 / 0.28);
+  --shadow-3: 0 24px 64px rgb(0 0 0 / 0.45);
+
+  /* Motion. */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+
+  /* Layout. */
+  --sidebar-width: 232px;
+  --header-height: 60px;
+  --mobile-header-height: 52px;
+  --tabbar-height: 56px;
+  --content-max: 1360px;
+  --tap: 44px; /* comfortable touch target */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Focus ring. */
+  --focus: 2px solid var(--accent);
+}

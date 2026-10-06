@@ -1,0 +1,46 @@
+{
+  "name": "joule-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:e2e": "playwright test",
+    "test:unit": "vitest run",
+    "lint": "eslint src",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.3.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.56.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vite": "^7.3.0",
+    "vitest": "^3.2.7"
+  }
+}

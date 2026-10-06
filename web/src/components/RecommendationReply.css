@@ -1,0 +1,321 @@
+/* Replies as a chat: the thread, quick replies, the composer (a bottom sheet on phones) and the outcome dialog. */
+.recommendation-reply {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.chat {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-message {
+  display: grid;
+  gap: 4px;
+  max-width: min(100%, 560px);
+  min-width: 0;
+}
+.chat-user {
+  justify-self: end;
+  justify-items: end;
+}
+.chat-system {
+  justify-self: center;
+  justify-items: center;
+}
+.chat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.chat-meta strong {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.chat-meta .chip {
+  min-height: 20px;
+  padding: 0 6px;
+}
+.chat-bubble {
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.chat-bubble p {
+  margin: 0;
+  white-space: pre-line;
+}
+.chat-bubble p + p {
+  margin-top: 6px;
+}
+.chat-user .chat-bubble {
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-surface);
+  border-color: var(--accent-border);
+}
+.chat-system .chat-bubble {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.chat-action {
+  color: var(--text-2);
+}
+.chat-action strong {
+  color: var(--text-1);
+}
+.chat-memory {
+  margin: 0;
+  color: var(--success);
+  font-size: var(--fs-xs);
+}
+.quick-replies,
+.ask-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-pill);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.suggestion-chip:hover:not(:disabled) {
+  border-color: var(--border-control);
+  color: var(--text-1);
+  background: var(--bg-3);
+}
+.suggestion-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.suggestion-chip.accent {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.reply-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.reply-failed p {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.reply-ack {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* The card's own actions and Reply share one row; the meta text (who suggested it, when) sits on the left. */
+.card-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.card-action-meta {
+  margin-right: auto;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+.card-action-row:has(> .card-action-meta) {
+  justify-content: flex-end;
+}
+
+/* Composer */
+.reply-form {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.reply-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.reply-label {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.reply-field {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border-control);
+  border-radius: 22px;
+  background: var(--bg-2);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.reply-field:focus-within {
+  border-color: var(--accent);
+}
+.reply-field textarea {
+  flex: 1;
+  margin: 0;
+  min-height: 32px;
+  max-height: 160px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  font-size: var(--fs-md);
+  line-height: 1.45;
+}
+.reply-field textarea:focus {
+  outline: none;
+}
+.button.reply-send,
+.button.ask-send {
+  flex-shrink: 0;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50%;
+}
+.reply-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.reply-pending {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.reply-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+
+/* The phone composer: a sheet pinned above the keyboard, with the conversation above the box. */
+.reply-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+}
+.reply-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-overlay);
+}
+.reply-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: var(--space-3);
+  max-height: min(78dvh, 640px);
+  padding: var(--space-4) calc(var(--space-4) + var(--safe-right)) calc(var(--space-4) + var(--safe-bottom))
+    calc(var(--space-4) + var(--safe-left));
+  border-top: 1px solid var(--border-2);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-1);
+  box-shadow: var(--shadow-3);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.reply-sheet-title {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  padding-right: var(--space-8);
+}
+.reply-sheet-thread {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.reply-form.is-sheet .reply-form-head {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+.reply-form.is-sheet .reply-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* Outcome dialog */
+.reply-outcome {
+  display: grid;
+  gap: var(--space-3);
+}
+.reply-outcome p {
+  margin: 0;
+}
+.reply-outcome-text {
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.reply-offer {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--accent-deep);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.reply-saved {
+  color: var(--success);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 600px) {
+  .card-action-row > .card-action-meta {
+    flex-basis: 100%;
+  }
+  .chat-message {
+    max-width: 92%;
+  }
+}

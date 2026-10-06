@@ -1,0 +1,36 @@
+# Weekly dependency updates, grouped so each ecosystem is one pull request.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]

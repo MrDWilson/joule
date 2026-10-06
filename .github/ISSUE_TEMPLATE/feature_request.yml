@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest something Joule could do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or question you have about your battery, plan or energy use. The why matters more than the how.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How you imagine Joule could help, if you have an idea.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today?
+      description: Workarounds, or other tools you use for this.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This is about Joule, not about how Predbat itself plans (that belongs in the Predbat project).
+          required: true
