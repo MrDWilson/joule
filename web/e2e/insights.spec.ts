@@ -171,8 +171,9 @@ test('approving a suggestion applies it with a toast and starts a trial led by t
   await expect(card).toContainText('108%');
   await expect(card).toContainText('Saving: not estimated');
   await expect(card).not.toContainText('/ month');
-  // One header for every suggestion card: icon and kind, then who suggested it; the date on the right.
-  await expect(card.locator('.suggestion-top')).toContainText(/Setting change · Suggested by the demo\s*Today \d\d:\d\d/);
+  // One header for every suggestion card: icon and kind, then who suggested it; the date on the right. The demo made the
+  // suggestion shortly before it started, which is yesterday in the first minutes after midnight.
+  await expect(card.locator('.suggestion-top')).toContainText(/Setting change · Suggested by the demo\s*(Today|Yesterday) \d\d:\d\d/);
   await card.getByRole('button', { name: 'Review' }).click();
   const sheet = page.getByRole('dialog', { name: 'Review this change' });
   await expect(sheet.getByRole('button', { name: 'Apply change' })).toBeEnabled();

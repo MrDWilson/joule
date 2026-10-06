@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fetchFresh, fulfillRewritten } from "./support/routes";
+import { todayAtLeast } from "./support/clock";
 
 /*
  * The Insights polish pass: honest money chips, safe file edits, quick replies that never dismiss, one place to type,
@@ -136,11 +137,13 @@ test("a suggestion that was applied and then undone says so and can be reopened"
     reopened.push(route.request().url());
     return route.fulfill({ json: { ok: true } });
   });
+  // Undone half an hour ago, and still today in London: early in the London day the browser's clock is moved on to 00:32.
+  const now = await todayAtLeast(page, 32);
   await rewriteState(page, (p) => {
     p.state.proposals = p.state.proposals.map((x: Payload) => ({
       ...x,
       status: "Reverted",
-      decidedAt: ago(30),
+      decidedAt: new Date(now() - 30 * 60_000).toISOString(),
       decisionNote: "Done",
       thread: [],
     }));

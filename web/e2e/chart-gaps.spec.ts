@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openPage } from './support/navigation';
 import { fetchFresh, fulfillRewritten } from './support/routes';
+import { londonDate } from './support/clock';
 
 // A route handler still reading a fetched response when the test ends would fail it as the context closes.
 test.afterEach(async ({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
@@ -273,10 +274,13 @@ test('the Data page draws diverging daily bars for a week and the half-hour prof
   await page.goto('/');
   await openPage(page, 'Energy');
   const period = page.getByRole('group', { name: 'Period' });
-  // Today alone: the half-hour profile, not one lonely bar group.
-  await period.getByRole('button', { name: 'Today', exact: true }).click();
+  // A single day: the half-hour profile, not one lonely bar group. Yesterday, because today has no complete reading in the
+  // first minutes after midnight.
+  await period.getByRole('button', { name: 'Yesterday', exact: true }).click();
   await expect(page.locator('figure.tl-day')).toBeVisible();
   await expect(page.locator('figure.chart-daily-energy')).toHaveCount(0);
+  // Today so far is compared with the same time yesterday.
+  await period.getByRole('button', { name: 'Today', exact: true }).click();
   await expect(page.locator('.energy-period-note')).toContainText('Compared with this time yesterday');
   const change = page.locator('.energy-chip .energy-change').first();
   await expect(change).toBeVisible();
@@ -324,7 +328,8 @@ test('daily net cost is paid minus earned with each side priced, and home use ne
   });
   await page.goto('/');
   await openPage(page, 'Energy');
-  const from = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+  // Four days to today, by the London calendar (the UTC date is a day behind in the hour after London midnight).
+  const from = londonDate(Date.now() - 3 * 86400000);
   await page.getByRole('group', { name: 'Period' }).getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByLabel('Energy from date').fill(from);
   const cost = page.locator('figure.chart-daily-cost');

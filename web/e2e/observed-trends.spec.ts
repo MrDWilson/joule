@@ -1,13 +1,20 @@
 import { test, expect } from '@playwright/test';
+import { todayAtLeast } from './support/clock';
 // Tile sparklines: today from midnight, half-hour averages (never a single poll), a forecast tail and an honest peak.
 test.beforeEach(async ({ request }) => {
   const response = await request.post('/api/telemetry/collect', { headers: { 'X-Joule-Request': '1' }, data: {} });
   expect(response.ok(), await response.text()).toBeTruthy();
 });
 
+// The longest fixture is three hours of today: early in the London day the browser's clock is moved on to 04:00.
+let now = () => Date.now();
+test.beforeEach(async ({ page }) => {
+  now = await todayAtLeast(page, 4 * 60);
+});
+
 /** 5-minute solar intervals ending at the last whole half-hour, so each half-hour bin is fully covered. */
 function fixture(values: (number | null)[], status = (v: number | null) => (v === null ? 'reset' : 'observed')) {
-  const end = Math.floor((Date.now() - 60000) / 1800000) * 1800000, start = end - values.length * 300000;
+  const end = Math.floor((now() - 60000) / 1800000) * 1800000, start = end - values.length * 300000;
   return {
     from: new Date(start).toISOString(), to: new Date(end).toISOString(), method: 'Whole observed meter interval average power in kW.', truncated: false, limit: 1000,
     intervals: values.map((value, n) => ({ metric: 'pv', start: new Date(start + n * 300000).toISOString(), end: new Date(start + (n + 1) * 300000).toISOString(), averageKw: value, source: 'HomeAssistant', entityId: 'sensor.owned_pv', status: status(value) })),

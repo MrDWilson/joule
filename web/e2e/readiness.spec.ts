@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import { openPage } from './support/navigation';
+import { todayAtLeast } from './support/clock';
 // Wait for the disposable demo's background history seed before asserting current metrics.
 test.beforeEach(async({request})=>{const response=await request.post('/api/telemetry/collect',{headers:{'X-Joule-Request':'1'},data:{}});expect(response.ok(),await response.text()).toBeTruthy();});
 const nav = openPage;
@@ -44,8 +45,9 @@ test('invalid data period clears previous totals while retaining freshly read se
  await expect(page.getByRole('heading',{name:'Sensors'})).toBeVisible();await expect(page.locator('.sensor-health')).toContainText('Demo readings');
 });
 
+// Its readings start six hours ago, all today: early in the London day the browser's clock is moved on to 07:00.
 test('sparse measured trends preserve isolated meter intervals without bridging gaps',async({page})=>{
- const now=Date.now();await page.route('**/api/telemetry/trends?*',r=>r.fulfill({json:{from:new Date(now-86400000).toISOString(),to:new Date(now).toISOString(),truncated:false,limit:1000,method:'Whole observed meter intervals',intervals:[1,null,2].map((value,n)=>({metric:'pv',start:new Date(now-(6-n)*3600000).toISOString(),end:new Date(now-(6-n)*3600000+1800000).toISOString(),averageKw:value,status:value===null?'gap':'observed',source:'Owned fixture',entityId:'sensor.pv'}))}}));await page.goto('/');const card=page.getByRole('article',{name:'Solar',exact:true});const line=card.locator('.metric-trend path.trend-line');await expect(line).toHaveCount(1);expect((await line.getAttribute('d'))!.match(/M/g)!.length).toBe(2);await expect(card.locator('.metric-trend svg')).toHaveAttribute('data-bridged-gaps','0');
+ const now=(await todayAtLeast(page,7*60))();await page.route('**/api/telemetry/trends?*',r=>r.fulfill({json:{from:new Date(now-86400000).toISOString(),to:new Date(now).toISOString(),truncated:false,limit:1000,method:'Whole observed meter intervals',intervals:[1,null,2].map((value,n)=>({metric:'pv',start:new Date(now-(6-n)*3600000).toISOString(),end:new Date(now-(6-n)*3600000+1800000).toISOString(),averageKw:value,status:value===null?'gap':'observed',source:'Owned fixture',entityId:'sensor.pv'}))}}));await page.goto('/');const card=page.getByRole('article',{name:'Solar',exact:true});const line=card.locator('.metric-trend path.trend-line');await expect(line).toHaveCount(1);expect((await line.getAttribute('d'))!.match(/M/g)!.length).toBe(2);await expect(card.locator('.metric-trend svg')).toHaveAttribute('data-bridged-gaps','0');
 });
 test('daily measurement labels use the configured zone even in a UTC browser',async({browser,request})=>{
  const context=await browser.newContext({timezoneId:'UTC'}),page=await context.newPage();
