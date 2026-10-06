@@ -13,7 +13,13 @@ mkdir -p "$project_dir/.cache"
 run_dir="$(mktemp -d "$project_dir/.cache/e2e.XXXXXX")"
 api_pid=''
 cleanup() {
-  if [[ -n "$api_pid" ]]; then kill "$api_pid" 2>/dev/null || true; wait "$api_pid" 2>/dev/null || true; fi
+  if [[ -n "$api_pid" ]]; then
+    kill "$api_pid" 2>/dev/null || true
+    # A clean stop takes a moment; never let a stuck shutdown hang the run.
+    for _ in {1..60}; do kill -0 "$api_pid" 2>/dev/null || break; sleep .25; done
+    kill -KILL "$api_pid" 2>/dev/null || true
+    wait "$api_pid" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -40,13 +46,21 @@ for spec in "${specs[@]}"; do
   App__Demo="$app_demo" App__AuthMode="$auth_mode" App__AccessKey="$access_key" App__DataDirectory="$run_dir/$name" ASPNETCORE_URLS="$JOULE_API_URL" \
     "$dotnet_bin" src/Joule.Api/bin/Debug/net10.0/Joule.Api.dll --contentRoot "$project_dir/src/Joule.Api" >"$run_dir/$name.log" 2>&1 &
   api_pid=$!
-  ready=0
-  for attempt in {1..100}; do
-    if ! kill -0 "$api_pid" 2>/dev/null; then cat "$run_dir/$name.log" >&2; exit 1; fi
-    if grep -q 'Now listening on:' "$run_dir/$name.log" && curl --silent --fail "$JOULE_API_URL/api/health" >/dev/null; then ready=1; break; fi
-    sleep .2
+  # The demo seeds five weeks of readings before it listens: a second or two on a laptop, longer on a small CI machine.
+  started=$SECONDS ready=0
+  while (( SECONDS - started < ${E2E_API_START_SECONDS:-90} )); do
+    if ! kill -0 "$api_pid" 2>/dev/null; then break; fi
+    if grep -q 'Now listening on:' "$run_dir/$name.log" && curl --silent --fail --max-time 5 "$JOULE_API_URL/api/health" >/dev/null; then ready=1; break; fi
+    sleep .25
   done
-  if [[ "$ready" != 1 ]]; then cat "$run_dir/$name.log" >&2; exit 1; fi
+  if [[ "$ready" != 1 ]]; then
+    if kill -0 "$api_pid" 2>/dev/null; then state="still starting after $((SECONDS - started)) s"; else code=0; wait "$api_pid" || code=$?; api_pid=''; state="exited with code $code"; fi
+    printf 'The API for %s did not become ready (%s). Last log lines (%s):\n' "$name" "$state" "$run_dir/$name.log" >&2
+    tail -n 200 "$run_dir/$name.log" >&2
+    ls -la "$run_dir" "$run_dir/$name" >&2 || true
+    exit 1
+  fi
+  printf 'API for %s ready in %s s\n' "$name" "$((SECONDS - started))"
   (cd web && npx playwright test "e2e/$name.spec.ts")
   cleanup; api_pid=''
 done
