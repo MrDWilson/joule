@@ -11,6 +11,39 @@ public static class DemoData
     public const string Version = "v9.3.5 Bug fixes cloud inverters & Misc";
     /// <summary>The model name on the sample checks' usage records: no AI was called for them.</summary>
     public const string SampleModel = "Sample check (no AI used)";
+    /// <summary>The sample household's Predbat apps.yaml, kept in the demo's own folder so "Apply for me" can be tried for real.
+    /// It lists no export_today sensor: the seeded file edit adds one.</summary>
+    public const string AppsYaml = """
+        # Sample Predbat configuration for the Joule demo. Nothing here talks to a real inverter.
+        pred_bat:
+          module: predbat
+          class: PredBat
+
+          # Home Assistant connection
+          prefix: predbat
+          timezone: Europe/London
+          ha_key: !secret ha_token
+
+          # Inverter
+          inverter_type: GE
+          num_inverters: 1
+          inverter_limit:
+            - 3600
+          battery_rate_max_scaling: 1.0
+
+          # Daily energy counters
+          load_today:
+            - sensor.demo_inverter_load_today
+          import_today:
+            - sensor.demo_inverter_import_today
+          pv_today:
+            - sensor.demo_inverter_pv_today
+
+          # Tariff
+          metric_octopus_import: re:(sensor.(octopus_energy_|)electricity_[0-9a-z]+_[0-9a-z]+_current_rate)
+          octopus_api_key: !secret octopus_api_key
+
+        """;
     /// <summary>What earlier sample checks remembered about the house ("What Joule knows about your home").</summary>
     public static readonly string[] MemoryFacts =
     [

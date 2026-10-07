@@ -17,6 +17,8 @@ public static class SettingKind
     /// <summary>Diagnostics, notifications, chat options and Predbat-maintained values: not tracked.</summary>
     public const string Debug = "debug";
     public static readonly string[] All = [Tunable, Override, Software, Control, Debug];
+    /// <summary>Not a setting: an edit to one of Predbat's configuration files (apps.yaml), shown as a Changes timeline event.</summary>
+    public const string File = "file";
 }
 
 public sealed record SettingCatalogueEntry(string Key, string FriendlyName, string Description, string Section, string Kind, string Risk, bool CommonlyTuned, string Unit, string? Default, string Doc, bool ExpertOnly);

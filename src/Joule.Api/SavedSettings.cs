@@ -27,6 +27,7 @@ public sealed class SavedSettings
         new("Predbat:BaseUrl", "url", false),
         new("Predbat:McpToken", "token", true),
         new("Predbat:WritesEnabled", "bool", false),
+        new("ConfigFiles:AllowEdits", "bool", false),
         new("HomeAssistant:BaseUrl", "url", false),
         new("HomeAssistant:AccessToken", "token", true),
         .. SensorCandidates.EnvNames.Values.Select(name => new SetupField("HomeAssistant:Entities:" + name, "entity", false)),

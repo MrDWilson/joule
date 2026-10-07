@@ -46,6 +46,8 @@ public static class InsightsDecisions
     {
         var change = InvestigationFileChanges.Find(s, investigationId, changeId);
         if (change.Status != "applied") throw new DomainException("This file edit isn't marked as applied.");
+        if (change.Edit is { Check: not ("restored" or "rolled_back") })
+            throw new DomainException("Joule made this edit in the file. Use Restore previous version to undo it.");
         change.Status = "pending"; change.AppliedAt = null;
         ChangeEngine.Log(s, "decision", $"You took back “applied” on the {change.File} edit “{change.Summary}”.");
     }

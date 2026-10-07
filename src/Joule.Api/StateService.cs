@@ -26,7 +26,8 @@ public sealed class StateService
         if (db.HasUncertainWrite()) { current.WriteUncertain = true; ChangeEngine.Log(current, "error", "An unfinished write was found on restart. Review live configuration and reconcile before further changes."); }
         if (archive?.DemoRuntimeMirror == true && !demo) throw new InvalidOperationException("Demo file mirror is prohibited in live mode.");
         if (archive?.Status().Quarantined == true) current.WriteUncertain = true;
-        else if (archive?.DemoRuntimeMirror == true && archive.List().Count==0) { archive.MirrorDemoRuntime(current); current.LastFileVersionId=archive.Capture(current.Revision,"Demo settings file").Id; }
+        // A demo directory from before the sample apps.yaml existed gets a fresh starting version that includes it, quietly.
+        else if (archive?.DemoRuntimeMirror == true && archive.List() is var versions && (versions.Count==0 || versions[^1].Files.Count!=archive.Status().AllowedFiles.Length)) { archive.MirrorDemoRuntime(current); current.LastFileVersionId=archive.Capture(current.Revision,"Demo settings file").Id; }
         // Revisions and trials recorded for Predbat's own controls before settings were classified become timeline events.
         if (ChangeEngine.MigrateSettingKinds(current)) ChangeEngine.Log(current, "configuration", "Predbat's own controls (version updates, manual overrides, mode) are now shown as History events rather than settings trials.");
         db.Save(current); current=DataStore.StateSummary(current);
@@ -228,7 +229,7 @@ public sealed class StateService
             db.ResetDemoData();
             if (archive?.Enabled == true && archive.DemoRuntimeMirror && !archive.Status().Quarantined)
             {
-                archive.MirrorDemoRuntime(fresh);
+                archive.MirrorDemoRuntime(fresh); archive.ResetDemoAppsYaml();
                 fresh.LastFileVersionId = archive.Capture(fresh.Revision, "Demo reset").Id;
             }
             ChangeEngine.Log(fresh, "configuration", "You reset the demo to its starting point.");
@@ -362,6 +363,23 @@ public sealed class StateService
             db.Save(next);current=DataStore.StateSummary(next);
         }
         finally{mutation.Release();}
+    }
+    /// <summary>
+    /// A configuration-file operation (Joule editing apps.yaml, or putting it back) with the state lock held, so it can't interleave with a
+    /// collection or a settings write. Mounted-file changes made outside Joule are recorded first; <paramref name="work"/> then edits the next
+    /// state (and may write files through the archive), and the result is saved and published. If it throws, nothing is published.
+    /// </summary>
+    public async Task FileOperationAsync(Action<AppState> work, CancellationToken ct = default, bool captureExternal = true)
+    {
+        await mutation.WaitAsync(ct);
+        try
+        {
+            var next = JsonDefaults.Clone(current);
+            if (captureExternal) CaptureExternalFiles(next);
+            work(next);
+            db.Save(next); current = DataStore.StateSummary(next);
+        }
+        finally { mutation.Release(); }
     }
     public async Task AutoApplyAsync(CancellationToken ct = default)
     {
