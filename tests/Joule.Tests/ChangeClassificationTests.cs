@@ -389,12 +389,13 @@ public class ChangeClassificationTests : IDisposable
         Assert.All(plan.Slots, x => Assert.Equal(x.ActionKey, x.Action));
     }
 
+    // Every half-hour of a London day: the demo plan must be consistent whatever the time is when it is built.
+    public static IEnumerable<object[]> DemoPlanTimes() => Enumerable.Range(0, 48).SelectMany(n => new[] { new object[] { 0, n }, new object[] { 1, n } });
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public void DemoBatteryLevelsMoveTheWayEachPlanStateSays(int daysAgo)
+    [MemberData(nameof(DemoPlanTimes))]
+    public void DemoBatteryLevelsMoveTheWayEachPlanStateSays(int daysAgo, int halfHour)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(2026, 10, 7, 0, 0, 0, TimeSpan.FromHours(1)).AddMinutes(halfHour * 30 + 7);
         var plan = DemoData.Plan(daysAgo, now);
         // Two whole local days (more for today, which looks at least 48 hours ahead).
         Assert.True(plan.Slots.Count >= 92, $"{plan.Slots.Count} slots");

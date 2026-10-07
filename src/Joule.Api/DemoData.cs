@@ -211,7 +211,8 @@ public static class DemoData
             // Planned levels: from midnight with the forecast; from the slot holding "now", again from the measured level.
             var levels = new double[49]; levels[0] = level;
             var nextRate = DemoHouse.Run(d, 0, levels, rate, forecast: true);
-            var current = now >= midnight && now < DemoHouse.Midnight(d.AddDays(1), zone) ? Math.Clamp((int)Math.Floor((now - midnight).TotalMinutes / 30), 0, 47) : -1;
+            // Only today's plan re-plans from the measured level: an older plan was made before today's readings existed.
+            var current = daysAgo == 0 && now >= midnight && now < DemoHouse.Midnight(d.AddDays(1), zone) ? Math.Clamp((int)Math.Floor((now - midnight).TotalMinutes / 30), 0, 47) : -1;
             if (current >= 0)
             {
                 levels[current] = measured.Levels[current];
