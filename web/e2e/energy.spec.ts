@@ -38,7 +38,8 @@ for (const [width, height] of [
     const how = page.locator("details.energy-how");
     await how.locator(":scope > summary").click();
     await expect(how.locator(".energy-how-list > li")).toHaveCount(5);
-    await expect(how).toContainText("Standing charges aren’t included.");
+    // This live-shaped snapshot predates the standing charge, so the explainer says where to set it.
+    await expect(how).toContainText("Costs leave out the standing charge: set it in Setup › Sensors.");
     await expect(how.locator("details.energy-installers")).not.toHaveAttribute("open", "");
     // The sensors are one line when all is well, and at most two screens with every row open on a phone.
     const sensors = page.locator("section.sensor-health");

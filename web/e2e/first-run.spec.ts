@@ -82,7 +82,7 @@ test("the live checklist finds the meters Predbat sees and saves them after a ch
   // The person can change any suggestion before saving.
   await page.getByLabel("Grid export").selectOption("");
   await page.getByRole("button", { name: "Use these meters (4 changes)" }).click();
-  await expect(page.getByText("4 of 10 meters mapped")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("4 of 11 meters mapped")).toBeVisible({ timeout: 60_000 });
 });
 
 test("a new browser has to sign in with the key once the dashboard is live", async ({ page }) => {

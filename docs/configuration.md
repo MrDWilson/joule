@@ -67,6 +67,7 @@ These settings map your energy meters so Joule can measure what really happened.
 | `HomeAssistant__Entities__Load`, `Pv`, `GridImport`, `GridExport`, `BatteryCharge`, `BatteryDischarge`, `Ev` | (none) | Cumulative energy sensors (kWh, Wh or MWh), not power sensors (W). |
 | `HomeAssistant__Entities__Soc` | (none) | Battery state of charge (%). |
 | `HomeAssistant__Entities__ImportTariff`, `ExportTariff` | (none) | Current import and export rates. |
+| `HomeAssistant__Entities__StandingCharge` | (found automatically) | Optional: the daily standing charge (GBP or p per day). With the Octopus Energy integration Joule finds it on its own from the import rate sensor (`sensor.octopus_energy_electricity_<serial>_<mpan>_current_standing_charge`). Without a sensor, enter the figure in Setup › Sensors. |
 | `HomeAssistant__Entities__IntelligentSlots`, `AlternativeForecast` | (none) | Optional: Octopus Intelligent dispatch slots, and a second load forecast to compare. |
 | `HomeAssistant__BaseUrl`, `HomeAssistant__AccessToken` | (none) | Optional. Without them, mapped sensors are read through Predbat's copy of Home Assistant state. With them, Joule reads Home Assistant directly and falls back to Predbat. |
 | `HomeAssistant__TimeZone` | `Europe/London` | Your household's timezone. "Today", daily reports and AI budgets use it. |

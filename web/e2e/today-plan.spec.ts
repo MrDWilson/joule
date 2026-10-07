@@ -65,6 +65,8 @@ test("net cost is paid minus earned, and a negative net reads as earnings", asyn
       summary.importCostGbp = net + 0.7 + (net < 0 ? 0 : 0);
       summary.exportCreditGbp = 0.7;
       summary.netCostGbp = net;
+      // The energy figures only: the standing charge on top has its own checks (money.spec.ts).
+      summary.standingChargeGbp = null;
       summary.importCostCoverage = 1;
       summary.exportCostCoverage = 1;
       if (net < 0) {

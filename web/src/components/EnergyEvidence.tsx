@@ -670,11 +670,13 @@ export function HomeAssistantSetupHelp({ summary = "For installers" }: { summary
       <p>
         Joule reads the sensors named in its server settings: <code>HomeAssistant__BaseUrl</code> and{" "}
         <code>HomeAssistant__AccessToken</code>, plus one <code>HomeAssistant__Entities__…</code> line per meter (Load,
-        Pv, GridImport, GridExport, BatteryCharge, BatteryDischarge, Ev, Soc, ImportTariff, ExportTariff).
+        Pv, GridImport, GridExport, BatteryCharge, BatteryDischarge, Ev, Soc, ImportTariff, ExportTariff, and optionally
+        StandingCharge).
       </p>
       <p>
-        Energy meters must report kWh, Wh or MWh, the battery level a percentage and prices pence per kWh. Without a
-        Home Assistant token, Joule reads the same sensors through Predbat.
+        Energy meters must report kWh, Wh or MWh, the battery level a percentage and prices pence per kWh. The standing
+        charge is found on its own from an Octopus Energy import rate sensor. Without a Home Assistant token, Joule
+        reads the same sensors through Predbat.
       </p>
     </Disclosure>
   );

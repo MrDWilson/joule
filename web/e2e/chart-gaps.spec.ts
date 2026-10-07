@@ -93,7 +93,8 @@ test('Today keeps to four legend chips and four series, compares with nothing by
   await page.goto('/');
   const chart = today(page);
   await expect(chart.locator('svg.tl-svg')).toBeVisible();
-  // Calm by default: at most four chips, at most four things drawn, no earlier-period overlay.
+  // Calm by default: at most four chips, at most four things drawn, no earlier-period overlay. (This history has no grid
+  // readings; with them Today adds a Grid lane and chip, five at most: money.spec.ts.)
   expect(await chart.locator('.chart-chips .chart-chip').count()).toBeLessThanOrEqual(4);
   expect((await series(chart)).length).toBeLessThanOrEqual(4);
   await expect(chart.getByRole('group', { name: 'Compare home use with' }).getByRole('button', { name: 'Nothing' })).toHaveAttribute('aria-pressed', 'true');
@@ -323,6 +324,8 @@ test('daily net cost is paid minus earned with each side priced, and home use ne
       netCostGbp: 2.12,
       importCostCoverage: 1,
       exportCostCoverage: 1,
+      // The energy figures only: the standing charge on top has its own checks (money.spec.ts).
+      standingChargeGbp: null,
     }));
     await fulfillRewritten(route, response, rewritten);
   });
