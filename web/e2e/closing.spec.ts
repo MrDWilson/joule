@@ -100,7 +100,10 @@ test('after an answer, a quick reply closes it as not needed', async ({ page }) 
   await card.getByRole('textbox', { name: 'Your reply' }).fill('Why do I need this?');
   await card.getByRole('button', { name: 'Send reply' }).click();
   await expect(card.getByRole('list', { name: 'Replies' }).getByText('Answer', { exact: true }).last()).toBeVisible();
+  // The question isn't the reason the next check reads: the note is just "Not needed".
+  const sent = page.waitForRequest((r) => r.method() === 'POST' && /\/dismiss$/.test(r.url()));
   await card.getByRole('group', { name: 'Quick replies' }).getByRole('button', { name: 'Not needed: close it' }).click();
+  expect((await sent).postDataJSON()).toMatchObject({ note: 'Not needed', outcome: 'not_needed' });
   await expect(toast(page, /^Closed as not needed\./)).toBeVisible();
   await expect(page.getByRole('article', { name: TODO })).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo' }).click();

@@ -77,8 +77,8 @@ public sealed class OwnTrafficTests
         var result = AiDataRepairs.Apply(s, null);
 
         Investigation I(string id) => s.Investigations.Single(i => i.Id == id);
-        // Two findings, the first one's to-do and file edit, and one to-do on a real finding.
-        Assert.Equal(5, result.OwnTrafficClosed);
+        // Two findings, the first one's to-do and file edit, the second one's suggestion, one to-do and one suggestion on a real finding.
+        Assert.Equal(7, result.OwnTrafficClosed);
         foreach (var id in new[] { "own-1", "own-2" })
         {
             Assert.NotNull(I(id).DismissedAt); Assert.Equal("own_traffic", I(id).ClosedReason);
@@ -94,7 +94,11 @@ public sealed class OwnTrafficTests
         Assert.Null(I("real-2").DismissedAt); Assert.Equal("open", I("real-2").NextSteps[0].Status);
         Assert.Equal(("That's Joule itself.", null), (I("decided-1").DecisionNote, I("decided-1").ClosedReason));
         Assert.Null(I("quiet-1").DismissedAt);
-        Assert.Contains(s.Activities, a => a.Message.StartsWith("Closed 5 items about Joule's own sign-in to Predbat."));
+        Proposal P(string id) => s.Proposals.Single(p => p.Id == id);
+        Assert.Equal(("Denied", JouleOwnTraffic.ClosedReason), (P("p-own-finding").Status, P("p-own-finding").ClosedReason));
+        Assert.Equal(("Denied", JouleOwnTraffic.ClosedReason), (P("p-own-title").Status, P("p-own-title").ClosedReason));
+        Assert.Equal("Pending", P("p-real").Status);
+        Assert.Contains(s.Activities, a => a.Message.StartsWith("Closed 7 items about Joule's own sign-in to Predbat."));
         Assert.Contains(AiDataRepairs.OwnTraffic, s.AiRepairs);
         Assert.Equal(0, AiDataRepairs.Apply(s, null).Total); // runs once
 

@@ -108,6 +108,29 @@ public sealed class ClosingTests : IDisposable
         Assert.Equal("Pending", p.Status); Assert.Null(p.ClosedReason);
     }
 
+    [Fact]
+    public void ADismissedSuggestionCarriesAReasonSoTheSameChangeIsNotRaisedAgain()
+    {
+        var s = DemoData.Create();
+        var p = s.Proposals.First(x => x.Status == "Pending");
+        RecommendationDecisions.DeclineProposal(s, p.Id, null);
+        Assert.Equal(("Denied", RecommendationDecisions.DismissedByUser), (p.Status, p.ClosedReason));
+    }
+
+    [Fact]
+    public void ApprovingTheLastOpenSuggestionFromACheckClosesItsFindings()
+    {
+        var s = DemoData.Create(); s.Mode = "Recommend";
+        var p = s.Proposals.First(x => x.Status == "Pending");
+        var finding = Finding("f-approve"); finding.Id = "f-approve";
+        s.Investigations.Add(finding);
+        foreach (var other in s.Proposals.Where(x => x.InvestigationId == "f-approve")) other.InvestigationId = "";
+        p.InvestigationId = "f-approve";
+        ChangeEngine.Approve(s, p.Id, false);
+        Assert.Equal("Applied", p.Status);
+        Assert.Equal("resolved", finding.ClosedReason); Assert.NotNull(finding.DismissedAt);
+    }
+
     // ---- Closing a whole finding ----
 
     [Fact]
@@ -184,6 +207,32 @@ public sealed class ClosingTests : IDisposable
         services.Http.Dispose();
     }
 
+    [Theory]
+    [InlineData("Don't close it, I'll do it at the weekend")]
+    [InlineData("Please don't forget it, I will sort it later")]
+    [InlineData("Don't ignore this one")]
+    [InlineData("So it's not needed?")]
+    [InlineData("Not needed?")]
+    public async Task AReplyThatMightMeanKeepItNeverClosesTheItem(string note)
+    {
+        using var db = new DataStore(directory);
+        // The model agrees with the user (as the prompt asks for "I'll do it later") without retiring it; a question gets accept + retire
+        // from a careless model. Neither closes the item.
+        var provider = new Provider((_, _) => Verdict("accept", "Fine.", retire: note.EndsWith('?')));
+        var services = await ReplyServices(db, provider);
+        await services.State.MutateAsync(s => s.Investigations.Add(Finding("f1", Step("s1", "Move the CT clamp"))));
+
+        var outcome = await services.Replies.ReplyAsync(new("followup", "f1", "s1"), note, CancellationToken.None);
+
+        Assert.False(outcome.Retired); Assert.False(outcome.FindingClosed);
+        // A question is answered (and the answer stands alone); an agreement says the item stays.
+        if (note.EndsWith('?')) Assert.Equal("answer", outcome.Verdict);
+        else Assert.EndsWith("It stays on your list.", outcome.Reply);
+        var stored = services.State.Read().Investigations.Single(i => i.Id == "f1");
+        Assert.Equal("open", stored.NextSteps[0].Status); Assert.Null(stored.DismissedAt);
+        services.Http.Dispose();
+    }
+
     [Fact]
     public async Task ReplyingNotNeededOnTheFindingClosesItAsNotNeeded()
     {
@@ -207,6 +256,17 @@ public sealed class ClosingTests : IDisposable
     [InlineData("Is it not needed?", false)]
     [InlineData("Why is this needed", false)]
     [InlineData("I'll do it tomorrow", false)]
+    [InlineData("Nope, leave it as it is", true)]
+    [InlineData("Don’t bother", true)]
+    [InlineData("Don't close it, I'll do it at the weekend", false)]
+    [InlineData("Please don't forget it, I will sort it later", false)]
+    [InlineData("Don't ignore this one", false)]
+    [InlineData("Never skip this", false)]
+    [InlineData("It is not unnecessary", false)]
+    [InlineData("Leave it open for now", false)]
+    [InlineData("Keep it, I want to try", false)]
+    [InlineData("So it's not needed?", false)]
+    [InlineData("Not needed?", false)]
     public void RecognisesNotNeeded(string note, bool expected) => Assert.Equal(expected, RecommendationReplyService.SaysNotNeeded(note));
 
     [Fact]

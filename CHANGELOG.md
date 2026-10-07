@@ -2,6 +2,13 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **Closing things:** every suggestion, to-do, file edit and finding now has **Not needed** and **Dismiss** (with an optional reason) beside its main action, on Today, Insights, Suggestions and the check itself, with an **Undo** toast and a **Show closed** link to bring things back. Closing the last open item from a check closes the check too. When you reply "nah, not needed" and the AI agrees, the item closes and the reply says so; a question or "I'll do it later" keeps it open. Closed items are not raised again for 30 days.
+- **Joule's own traffic:** Predbat log lines caused by Joule's own sign-in (such as "Not enough segments" or "legacy bearer token") are no longer reported as problems, and open findings about them are closed once on upgrade.
+
 ## 1.0.0 (2026-10-07)
 
 The first public release, under the Joule name.

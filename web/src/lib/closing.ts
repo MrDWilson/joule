@@ -71,3 +71,18 @@ export const kindWord: Record<ClosableKind, string> = {
   file: "file edit",
   finding: "finding",
 };
+
+const SAYS_NOT_NEEDED =
+  /\b(nah|nope|not needed|no need|not necessary|unnecessary|leave it|not worth|don'?t bother|no thanks|not interested)\b/i;
+const NEGATED =
+  /\b(don'?t|do not|never|not|won'?t|keep it|leave it open|later)\b.*\b(close|dismiss|forget|ignore|skip|drop)\b/i;
+
+/**
+ * The note sent with "Not needed: close it" after a conversation: your last reply when it says so ("Nah, leave it"), otherwise just
+ * "Not needed". A question ("Why do I need this?") is never used as the reason the next check reads.
+ */
+export function notNeededNote(lastReply: string): string {
+  const text = lastReply.replace(/[\u2018\u2019]/g, "'").trim();
+  if (!text || /\?\s*$/.test(text) || NEGATED.test(text) || !SAYS_NOT_NEEDED.test(text)) return "Not needed";
+  return text;
+}

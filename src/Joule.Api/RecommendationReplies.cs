@@ -123,7 +123,8 @@ public static class RecommendationDecisions
     {
         ChangeEngine.Deny(s, id, note);
         var p = s.Proposals.First(x => x.Id == id);
-        p.ClosedReason = outcome == NotNeeded ? NotNeededReason : null;
+        // Every close carries a reason, so the same-direction suppression in the next check applies even without a note.
+        p.ClosedReason = Reason(outcome);
         if (s.Investigations.FirstOrDefault(i => i.Id == p.InvestigationId) is { } source) CloseFindingIfDone(s, source, p.DecidedAt ?? DateTimeOffset.UtcNow);
     }
 
@@ -274,8 +275,28 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
     public static bool IsQuestion(string note) => note.TrimEnd().EndsWith('?') || note.Split(['.', '!', '\n'], StringSplitOptions.RemoveEmptyEntries).Any(s => QuestionStart.IsMatch(s) && s.TrimEnd().EndsWith('?'));
 
     static readonly Regex NotNeededWords = new(@"\b(nah|nope|not needed|no need|not necessary|unnecessary|leave it|leave that|leave this|ignore (it|this|that)|don't bother|dont bother|not worth (it|the|doing|bothering)|skip (it|this|that)|forget (it|about it)|no thanks|no thank you|close (it|this)|dismiss (it|this)|drop (it|this)|not interested|won't do (it|this)|not doing (it|this))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    /// <summary>"Nah, leave it": the user is saying the item isn't needed. A question ("is it not needed?") is still a question.</summary>
-    public static bool SaysNotNeeded(string note) => NotNeededWords.IsMatch(note) && !QuestionStart.IsMatch(note);
+    /// <summary>A negation just before the phrase turns it round: "don't close it", "please don't forget it", "never ignore this".</summary>
+    static readonly Regex Negated = new(@"\b(don't|dont|do not|never|not|won't|wont|shouldn't|mustn't|can't|cannot)\s+(\w+\s+){0,2}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>Words that mean the user still wants it: "I'll do it at the weekend", "keep it", "leave it open", "later".</summary>
+    static readonly Regex KeepOpen = new(@"\b(leave (it|this|that) open|keep (it|this|that)|(i'll|ill|i will|we'll|we will|i'm going to|i am going to|going to) (do|sort|look|get|check|fix|deal|try|make|change|move|handle)|later|at the weekend|tomorrow|tonight|next week|soon|still (want|need))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>
+    /// "Nah, leave it": the user is saying the item isn't needed. Anything that might mean the opposite keeps it open: a question ("is
+    /// it not needed?", "not needed?"), a negated phrase ("don't close it") or a plan to do it ("I'll sort it later").
+    /// </summary>
+    public static bool SaysNotNeeded(string raw)
+    {
+        var note = raw.Replace('\u2019', '\'').Replace('\u2018', '\'');
+        if (IsQuestion(note) || QuestionStart.IsMatch(note) || KeepOpen.IsMatch(note)) return false;
+        var matched = false;
+        foreach (Match m in NotNeededWords.Matches(note))
+        {
+            var before = note[..m.Index];
+            var clause = before[(before.LastIndexOfAny([',', ';', '.', '!', '?', '\n', ':']) + 1)..];
+            if (Negated.IsMatch(clause)) return false;
+            matched = true;
+        }
+        return matched;
+    }
 
     public async Task<ReplyOutcome> ReplyAsync(ReplyTarget target, string? rawNote, CancellationToken ct)
     {
@@ -310,9 +331,10 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
                 }
             }
             // A question is answered, never resolved by dismissal; an answer that still asks the user to do something keeps the item open.
-            var notNeeded = SaysNotNeeded(note);
-            if (evaluation is { Verdict: "accept" } && IsQuestion(note) && !notNeeded) evaluation = evaluation with { Verdict = "answer", Retire = false, Memory = null };
-            // "Nah, leave it" and the AI agrees: the item closes, whatever the model said about retiring it.
+            var question = IsQuestion(note);
+            var notNeeded = !question && SaysNotNeeded(note);
+            if (evaluation is { Verdict: "accept" } && question) evaluation = evaluation with { Verdict = "answer", Retire = false, Memory = null };
+            // "Nah, leave it" and the AI agrees: the item closes, whatever the model said about retiring it. Never for a question.
             if (evaluation is { Verdict: "accept", Action: null } && notNeeded) evaluation = evaluation with { Retire = true };
             if (evaluation is { Retire: true, Action: { Length: > 0 } }) evaluation = evaluation with { Retire = false };
             var now = DateTimeOffset.UtcNow;

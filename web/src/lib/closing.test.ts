@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closeBody, closePaths, closedMessage, inboxClosePaths } from "./closing";
+import { closeBody, closePaths, closedMessage, inboxClosePaths, notNeededNote } from "./closing";
 import { closedItems, closedStatus, findingClosedStatus } from "./insights";
 import type { Investigation, Proposal } from "../types";
 
@@ -109,5 +109,17 @@ describe("closing words", () => {
       ],
     });
     expect(items.map((i) => [i.kind, i.key, i.status])).toEqual([["finding", "i-a", "Not needed"]]);
+  });
+});
+
+describe("notNeededNote", () => {
+  it("keeps your last reply only when it says the item isn't needed", () => {
+    expect(notNeededNote("Nah, leave it as it is")).toBe("Nah, leave it as it is");
+    expect(notNeededNote("Not worth it for 2p")).toBe("Not worth it for 2p");
+    expect(notNeededNote("Why do I need this?")).toBe("Not needed");
+    expect(notNeededNote("So it's not needed?")).toBe("Not needed");
+    expect(notNeededNote("Don't close it, I'll do it later")).toBe("Not needed");
+    expect(notNeededNote("Move it to the loft")).toBe("Not needed");
+    expect(notNeededNote("")).toBe("Not needed");
   });
 });

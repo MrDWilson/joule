@@ -19,7 +19,7 @@ import { useMediaQuery, breakpoints } from "../lib/useMediaQuery";
 import { dayTime } from "../lib/time";
 import { providerLabel } from "../lib/labels";
 import { useCloseItem } from "./CloseActions";
-import type { ClosableKind } from "../lib/closing";
+import { notNeededNote, type ClosableKind } from "../lib/closing";
 import "./RecommendationReply.css";
 
 /*
@@ -408,12 +408,12 @@ export function RecommendationReply({
               {verdict === "clarify" ? "Answer Joule" : "Ask something else"}
             </button>
           )}
-          {/* Talked it through and it isn't worth doing: close it here, with your last reply as the note. */}
+          {/* Talked it through and it isn't worth doing: close it here. Your last reply is the note only when it says so. */}
           {reopenPath && (
             <button
               type="button"
               className="suggestion-chip"
-              onClick={() => void dismiss(lastUserNote || "Not needed", "not_needed")}
+              onClick={() => void dismiss(notNeededNote(lastUserNote), "not_needed")}
             >
               {target === "check" ? "Not needed: close this finding" : "Not needed: close it"}
             </button>

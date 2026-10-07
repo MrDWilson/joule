@@ -50,8 +50,9 @@ public static class JouleOwnTraffic
     }
 
     /// <summary>
-    /// One-off repair: open findings, to-dos and file edits about Joule's own MCP or API sign-in are closed with a plain note. Nothing
-    /// the user decided is touched. Returns how many were closed.
+    /// One-off repair: open findings (with everything still open from them, setting suggestions included), to-dos, file edits and
+    /// suggestions about Joule's own MCP or API sign-in are closed with a plain note. Nothing the user decided is touched. Returns how
+    /// many were closed.
     /// </summary>
     public static int CloseExisting(AppState s, DateTimeOffset now)
     {
@@ -63,14 +64,15 @@ public static class JouleOwnTraffic
                 i.DismissedAt = now; i.ClosedReason = RecommendationDecisions.OwnTraffic;
                 i.Thread.Add(new ReplyMessage { At = now, Role = "system", Text = ClosedNotice });
                 count++;
-                foreach (var step in i.NextSteps.Where(x => x.Status == "open")) { step.Status = "closed"; step.ClosedAt = now; step.ClosedReason = ClosedReason; count++; }
-                foreach (var change in i.FileChanges.Where(InvestigationFileChanges.IsOpen)) { change.Status = "retired"; change.ClosedAt = now; change.ClosedReason = ClosedReason; count++; }
+                count += RecommendationDecisions.CloseItemsWith(s, i, now, ClosedReason);
             }
             foreach (var step in i.NextSteps.Where(x => x.Status == "open" && IsAbout(x)))
             { step.Status = "closed"; step.ClosedAt = now; step.ClosedReason = ClosedReason; step.Thread.Add(new ReplyMessage { At = now, Role = "system", Text = ClosedNotice }); count++; }
             foreach (var change in i.FileChanges.Where(x => x.Status == "pending" && IsAbout(x)))
             { change.Status = "retired"; change.ClosedAt = now; change.ClosedReason = ClosedReason; change.Thread.Add(new ReplyMessage { At = now, Role = "system", Text = ClosedNotice }); count++; }
         }
+        foreach (var p in s.Proposals.Where(x => x.Status == "Pending" && IsAbout(x)))
+        { p.Status = "Denied"; p.DecidedAt = now; p.ClosedReason = ClosedReason; count++; }
         return count;
     }
 

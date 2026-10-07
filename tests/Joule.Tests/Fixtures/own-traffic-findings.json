@@ -51,5 +51,9 @@
       "title": "Nothing new since the last check", "summary": "Nothing new; MCP token warnings are Joule's own.", "evidence": ["e"], "nextSteps": [], "fileChanges": []
     }
   ],
-  "proposals": []
+  "proposals": [
+    { "id": "p-own-finding", "investigationId": "own-2", "status": "Pending", "title": "Check Predbat's web API settings", "summary": "Look at the API settings Predbat uses.", "changes": [{ "key": "api_mode", "before": "on", "after": "off" }] },
+    { "id": "p-own-title", "investigationId": "real-1", "status": "Pending", "title": "Set mcp_secret so the MCP token authenticates", "summary": "Predbat rejects the MCP token.", "changes": [{ "key": "mcp_secret", "before": "", "after": "set" }] },
+    { "id": "p-real", "investigationId": "real-1", "status": "Pending", "title": "Lower the charge rate limit to 3 kW", "summary": "The battery charged at 1.7 kW against a 5 kW plan.", "changes": [{ "key": "charge_rate", "before": "5000", "after": "3000" }] }
+  ]
 }
