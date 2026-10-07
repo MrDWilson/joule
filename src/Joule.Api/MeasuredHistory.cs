@@ -19,6 +19,9 @@ public record MeasuredHistorySlot(DateTimeOffset Time, int DurationMinutes, doub
     public double? Home { get; init; }
     public double? HomeEstimate { get; init; }
     public string HomeStatus { get; init; } = "missing";
+    /// <summary>Grid import and export in the slot (kWh, including timing-estimated energy); null when not measured.</summary>
+    public double? GridImport { get; init; }
+    public double? GridExport { get; init; }
 }
 public record MeasuredHistory(DateTimeOffset From, DateTimeOffset To, int SlotMinutes, List<MeasuredHistorySlot> Slots, string Method)
 {
@@ -42,7 +45,8 @@ public partial class DataStore
         var now = Clock.GetUtcNow();
         lock (gate)
         {
-            var intervals = LoadIntervals(from, to, ["load", "pv", "ev"]);
+            var intervals = LoadIntervals(from, to, ["load", "pv", "ev", "grid_import", "grid_export"]);
+            var gridIn = intervals.Where(x => x.Metric == "grid_import").ToList(); var gridOut = intervals.Where(x => x.Metric == "grid_export").ToList();
             var load = intervals.Where(x => x.Metric == "load").ToList(); var pv = intervals.Where(x => x.Metric == "pv").ToList(); var ev = intervals.Where(x => x.Metric == "ev").ToList();
             var includesEv = ev.Count > 0 ? LoadIncludesEv() : false;
             var slots = new List<MeasuredHistorySlot>();
@@ -58,7 +62,8 @@ public partial class DataStore
                 {
                     LoadStatus = l.Status, PvStatus = p.Status, LoadEstimate = l.Value, PvEstimate = p.Value,
                     Ev = e.Measured, EvEstimate = e.Value, EvStatus = e.Status,
-                    Home = homeMeasured, HomeEstimate = homeEstimate, HomeStatus = homeStatus
+                    Home = homeMeasured, HomeEstimate = homeEstimate, HomeStatus = homeStatus,
+                    GridImport = Allocate(gridIn, start, end).Value, GridExport = Allocate(gridOut, start, end).Value
                 });
             }
             return new(from, to, slotMinutes, slots, "Measured meter energy per whole slot: contiguous cumulative-counter intervals covering the slot, prorated at the slot edges assuming uniform use within each meter interval. Load/Pv/Ev/Home are slot-precise; *Estimate also includes spread intervals (energy proved by the counter, timing estimated) and is shown as ≈. Gaps and unfinished slots are null, never zero; idle means the sensor reported unknown where that is a known zero.")

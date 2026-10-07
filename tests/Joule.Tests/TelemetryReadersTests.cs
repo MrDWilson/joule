@@ -47,6 +47,28 @@ public sealed class TelemetryReadersTests : IDisposable
     }
 
     [Fact]
+    public void ElapsedSlotsAndHistoryCarryGridImportAndExport()
+    {
+        using var db = new DataStore(path);
+        db.SavePlan(Plan(At, 3));
+        var samples = new List<TelemetrySample>();
+        // First half-hour: 0.1 kWh imported every five minutes; second: 0.05 kWh exported every five minutes.
+        for (var i = 0; i <= 12; i++)
+        {
+            samples.Add(M("grid_import", At.AddMinutes(5 * i), 20 + .1 * Math.Min(i, 6)));
+            samples.Add(M("grid_export", At.AddMinutes(5 * i), 3 + .05 * Math.Max(0, i - 6)));
+        }
+        db.SaveTelemetry(samples);
+        var plan = db.GetPlan()!.Slots;
+        Assert.Equal(.6, plan[0].GridImportActual!.Value, 6); Assert.Equal(0, plan[0].GridExportActual!.Value, 6);
+        Assert.Equal(0, plan[1].GridImportActual!.Value, 6); Assert.Equal(.3, plan[1].GridExportActual!.Value, 6);
+        // The third slot has no readings yet: nothing, never zero.
+        Assert.Null(plan[2].GridImportActual);
+        var history = db.ReadMeasuredHistory(At, At.AddMinutes(60), 30).Slots;
+        Assert.Equal(.6, history[0].GridImport!.Value, 6); Assert.Equal(.3, history[1].GridExport!.Value, 6);
+    }
+
+    [Fact]
     public void LoadIncludesEvIsDetectedFromHistory()
     {
         DataStore Store(string suffix, bool included)

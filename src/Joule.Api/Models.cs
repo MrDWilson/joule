@@ -158,6 +158,9 @@ public record PlanSlot(DateTimeOffset Time, double LoadForecast, double? LoadAct
 {
     /// <summary>Predbat's raw state code ("Exp", "Chrg", "FrzExp", "Demand"), or the legacy stored value for older plans.</summary>
     public string? RawAction { get; init; }
+    /// <summary>Measured grid import and export in an elapsed slot (kWh, including timing-estimated energy); null when not measured.</summary>
+    public double? GridImportActual { get; init; }
+    public double? GridExportActual { get; init; }
     /// <summary>Canonical action for the slot as a whole: demand | charge | freeze-charge | hold-charge | no-charge | export | freeze-export | hold-export | charge-export | unknown.</summary>
     public string? ActionKey { get; init; }
     /// <summary>Glossary entry id: usually the key, or a variant that shares it ("hold-for-car", "hold-for-iboost").</summary>
