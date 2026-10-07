@@ -13,7 +13,14 @@ public static class PredbatMcpRegistration
         => services.AddSingleton<IPredbatMcpClient>(_=>new PredbatMcpClient(configuration));
 }
 
-/// <summary>Bounded read-only MCP over Predbat's legacy JSON HTTP and Streamable HTTP JSON/SSE.</summary>
+/// <summary>
+/// Bounded read-only MCP over Predbat's legacy JSON HTTP and Streamable HTTP JSON/SSE.
+/// Sign-in: Predbat's MCP server (web_mcp.py) is an OAuth 2.1 authorization server. Joule exchanges the configured mcp_secret
+/// for a signed access token (client_credentials at /oauth/token, scope mcp:read, resource = this server) and sends that token,
+/// so Predbat checks a signature instead of trying to decode the raw secret as a token, which it logs as a failure on every
+/// request ("MCP: Token … failed: Not enough segments"). Only a Predbat without the token endpoint (404/405, an unsupported
+/// grant or a server error) is sent the secret itself, as before; Joule asks for a token again every few hours.
+/// </summary>
 public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDisposable
 {
     // Retain bounded sanitized evidence for archival/paging. Prompt pages have a
@@ -33,6 +40,16 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     readonly TimeSpan timeout;
     readonly SemaphoreSlim gate=new(1,1);
     readonly string? configurationError;
+    readonly Uri? tokenEndpoint;
+    readonly TimeProvider clock;
+    /// <summary>How long a Predbat without the token endpoint is sent the secret directly before Joule asks for a token again.</summary>
+    internal static readonly TimeSpan LegacyRecheck=TimeSpan.FromHours(6);
+    const string ClientId="joule";
+    string? accessToken;
+    DateTimeOffset accessTokenRefresh;
+    DateTimeOffset legacyUntil=DateTimeOffset.MinValue;
+    bool defaultAudience;
+    string? signIn;
     McpDiscovery status;
     string? session;
     string? protocol;
@@ -40,9 +57,9 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     bool initialized;
     int disposeStarted;
     public PredbatMcpClient(IConfiguration configuration) : this(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect=false,MaxResponseHeadersLength=16,ConnectTimeout=TimeSpan.FromSeconds(5) }) { Timeout=Timeout.InfiniteTimeSpan },configuration) {}
-    internal PredbatMcpClient(HttpClient http,IConfiguration configuration)
+    internal PredbatMcpClient(HttpClient http,IConfiguration configuration,TimeProvider? clock=null)
     {
-        this.http=http; token=configuration["Predbat:McpToken"]?.Trim(); secrets=PredbatMcpSafety.Secrets(configuration);
+        this.http=http; this.clock=clock??TimeProvider.System; token=configuration["Predbat:McpToken"]?.Trim(); secrets=PredbatMcpSafety.Secrets(configuration);
         timeout=TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Predbat:McpTimeoutSeconds",20),1,60));
         if(!string.IsNullOrWhiteSpace(token)) {
             if(token.Any(c=>c<'!'||c>'~')) configurationError="MCP credential configuration is invalid.";
@@ -50,11 +67,17 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
                 var url=configuration["Predbat:McpUrl"];
                 if(string.IsNullOrWhiteSpace(url) && Uri.TryCreate(configuration["Predbat:BaseUrl"],UriKind.Absolute,out var baseUri))
                     url=new UriBuilder(baseUri) { Port=8199,Path="/mcp",Query="",Fragment="",UserName="",Password="" }.Uri.AbsoluteUri;
-                if(Uri.TryCreate(url,UriKind.Absolute,out var parsed)&&parsed.Scheme is "http" or "https"&&string.IsNullOrEmpty(parsed.UserInfo)&&string.IsNullOrEmpty(parsed.Query)&&string.IsNullOrEmpty(parsed.Fragment)) endpoint=parsed;
+                if(Uri.TryCreate(url,UriKind.Absolute,out var parsed)&&parsed.Scheme is "http" or "https"&&string.IsNullOrEmpty(parsed.UserInfo)&&string.IsNullOrEmpty(parsed.Query)&&string.IsNullOrEmpty(parsed.Fragment)) { endpoint=parsed; tokenEndpoint=TokenEndpoint(parsed); }
                 else configurationError="MCP endpoint configuration is invalid; use HTTP(S) without credentials, query or fragment.";
             }
         }
         status=new(Configured,false,null,[],configurationError);
+    }
+    /// <summary>Predbat serves /oauth/token next to /mcp: http://predbat:8199/mcp → http://predbat:8199/oauth/token (a proxy prefix is kept).</summary>
+    internal static Uri TokenEndpoint(Uri mcp)
+    {
+        var path=mcp.AbsolutePath.TrimEnd('/'); var parent=path[..(path.LastIndexOf('/')+1)];
+        return new UriBuilder(mcp) { Path=(parent.StartsWith('/')?parent:"/"+parent)+"oauth/token",Query="",Fragment="" }.Uri;
     }
     public bool Configured => !string.IsNullOrWhiteSpace(token);
     public McpDiscovery Status { get { var s=Volatile.Read(ref status); return s with { Tools=s.Tools.Select(t=>t with { InputSchema=t.InputSchema.Clone() }).ToList() }; } }
@@ -135,7 +158,7 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     }
     HttpRequestMessage Request(HttpMethod method,object? body=null)
     {
-        var request=new HttpRequestMessage(method,endpoint); request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);
+        var request=new HttpRequestMessage(method,endpoint);
         request.Headers.Accept.Add(new("application/json")); request.Headers.Accept.Add(new("text/event-stream"));
         if(session is not null) request.Headers.Add("MCP-Session-Id",session);
         if(protocol is not null) request.Headers.Add("MCP-Protocol-Version",protocol);
@@ -144,8 +167,8 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     }
     async Task<JsonElement> Rpc(string method,object parameters,CancellationToken ct)
     {
-        var id=Interlocked.Increment(ref requestId); using var request=Request(HttpMethod.Post,new { jsonrpc="2.0",id,method,@params=parameters });
-        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
+        var id=Interlocked.Increment(ref requestId);
+        using var response=await Send(()=>Request(HttpMethod.Post,new { jsonrpc="2.0",id,method,@params=parameters }),ct);
         CheckHttp(response);
         if(method=="initialize"&&response.Headers.TryGetValues("MCP-Session-Id",out var sessions)) {
             var candidate=sessions.SingleOrDefault(); if(candidate is null||candidate.Length>1024||candidate.Any(c=>c<'!'||c>'~')) throw new McpProtocolException("MCP session header is invalid."); session=candidate;
@@ -177,12 +200,70 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     }
     async Task SendNotification(string method,CancellationToken ct)
     {
-        using var request=Request(HttpMethod.Post,new { jsonrpc="2.0",method }); using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct); CheckHttp(response);
+        using var response=await Send(()=>Request(HttpMethod.Post,new { jsonrpc="2.0",method }),ct); CheckHttp(response);
         // Predbat 9.3.3 replies 200 with id:null to initialized; compliant servers reply 202.
+    }
+    /// <summary>
+    /// Sends an MCP request with Joule's credential. A token Predbat refuses (401) is replaced once: the second token names no
+    /// resource, so it carries Predbat's default audience, which Predbat accepts whatever Host header a proxy passes on.
+    /// </summary>
+    async Task<HttpResponseMessage> Send(Func<HttpRequestMessage> build,CancellationToken ct)
+    {
+        for(var attempt=0;;attempt++) {
+            var (credential,oauth)=await Credential(ct);
+            var request=build(); request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",credential);
+            var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
+            if(response.StatusCode!=HttpStatusCode.Unauthorized||!oauth||attempt>0) return response;
+            response.Dispose(); request.Dispose(); accessToken=null; defaultAudience=true;
+        }
+    }
+    /// <summary>The bearer value for the next request: a current access token, a new one from Predbat, or the secret itself when this Predbat has no token endpoint.</summary>
+    async Task<(string Value,bool OAuth)> Credential(CancellationToken ct)
+    {
+        var now=clock.GetUtcNow();
+        if(accessToken is not null&&now<accessTokenRefresh) return (accessToken,true);
+        accessToken=null;
+        if(now<legacyUntil||tokenEndpoint is null) { signIn="secret"; return (token!,false); }
+        var form=new List<KeyValuePair<string,string>> { new("grant_type","client_credentials"),new("client_id",ClientId),new("client_secret",token!),new("scope","mcp:read") };
+        // RFC 8707: the token is for this MCP server. Predbat compares it with http://{Host} of each request.
+        if(!defaultAudience) form.Add(new("resource","http://"+endpoint!.Authority));
+        using var request=new HttpRequestMessage(HttpMethod.Post,tokenEndpoint) { Content=new FormUrlEncodedContent(form) };
+        request.Headers.Accept.Add(new("application/json"));
+        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
+        if(response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new McpProtocolException("Predbat rejected the MCP secret. Check that Predbat__McpToken matches mcp_secret in Predbat's apps.yaml.");
+        if(response.IsSuccessStatusCode&&await ReadToken(response,ct) is var (value,lifetime)) {
+            accessToken=value; signIn="token";
+            // Renew early: a tenth of the lifetime (at most an hour) before it ends.
+            accessTokenRefresh=now+lifetime-TimeSpan.FromTicks(Math.Min(lifetime.Ticks/10,TimeSpan.FromHours(1).Ticks));
+            return (value,true);
+        }
+        // No token endpoint (an older Predbat), an unsupported grant, or Predbat can't sign tokens: send the secret as before.
+        legacyUntil=now+LegacyRecheck; signIn="secret";
+        return (token!,false);
+    }
+    static async Task<(string Value,TimeSpan Lifetime)?> ReadToken(HttpResponseMessage response,CancellationToken ct)
+    {
+        if(response.Content.Headers.ContentLength>64*1024) return null;
+        try {
+            await using var raw=await response.Content.ReadAsStreamAsync(ct); await using var limited=new LimitedStream(raw,64*1024);
+            using var json=await JsonDocument.ParseAsync(limited,new JsonDocumentOptions { MaxDepth=8 },ct);
+            var root=json.RootElement;
+            if(root.ValueKind!=JsonValueKind.Object||!root.TryGetProperty("access_token",out var tokenValue)||tokenValue.ValueKind!=JsonValueKind.String) return null;
+            var value=tokenValue.GetString()!;
+            // A JWT: three base64url parts. Anything else would have Predbat log a failed decode again.
+            if(value.Length is < 16 or > 8192||value.Split('.').Length!=3||value.Any(c=>!(char.IsAsciiLetterOrDigit(c)||c is '-' or '_' or '.'))) return null;
+            if(root.TryGetProperty("token_type",out var type)&&!string.Equals(type.ValueKind==JsonValueKind.String?type.GetString():null,"Bearer",StringComparison.OrdinalIgnoreCase)) return null;
+            var seconds=root.TryGetProperty("expires_in",out var expires)&&expires.ValueKind==JsonValueKind.Number&&expires.TryGetDouble(out var s)&&double.IsFinite(s)?s:3600;
+            return (value,TimeSpan.FromSeconds(Math.Clamp(seconds,60,30*86400)));
+        } catch(Exception e) when(e is JsonException or DecoderFallbackException or ResponseLimitException) { return null; }
     }
     void CheckHttp(HttpResponseMessage response)
     {
         if(response.StatusCode==HttpStatusCode.NotFound&&session is not null) throw new SessionExpiredException();
+        if(response.StatusCode==HttpStatusCode.Unauthorized) throw new McpProtocolException(signIn=="token"
+            ? "Predbat refused Joule's MCP access token. Check that Predbat__McpToken matches mcp_secret in Predbat's apps.yaml."
+            : "Predbat rejected the MCP secret. Check that Predbat__McpToken matches mcp_secret in Predbat's apps.yaml.");
         if(!response.IsSuccessStatusCode) throw new McpProtocolException($"MCP HTTP request failed ({(int)response.StatusCode}).");
     }
     bool ValidateArguments(string name,JsonElement args,out string? error)
@@ -257,7 +338,7 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
         return false;
     }
     static McpReadResult Failure(string error,bool truncated=false) => new(false,JsonSerializer.Serialize(new { truncated,error }),truncated,error);
-    void SetStatus(bool connected,List<McpToolDefinition> tools,string? error) => Volatile.Write(ref status,new(Configured,connected,DateTimeOffset.UtcNow,tools,error));
+    void SetStatus(bool connected,List<McpToolDefinition> tools,string? error) => Volatile.Write(ref status,new(Configured,connected,DateTimeOffset.UtcNow,tools,error,connected?signIn:null));
     static string SafeError(Exception error) => error switch {
         McpProtocolException => error.Message,
         HttpRequestException { InnerException: SocketException { SocketErrorCode: SocketError.ConnectionRefused } } =>
@@ -270,7 +351,7 @@ public sealed class PredbatMcpClient : IPredbatMcpClient, IAsyncDisposable, IDis
     };
     async Task ResetSession(CancellationToken ct) { await CloseSession(ct); initialized=false; protocol=null; }
     async Task CleanupAfterFailure() { using var cleanup=new CancellationTokenSource(TimeSpan.FromSeconds(1)); await ResetSession(cleanup.Token); }
-    async Task CloseSession(CancellationToken ct) { var previous=session; session=null; if(previous is null) return; try { using var request=Request(HttpMethod.Delete); request.Headers.Add("MCP-Session-Id",previous); using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct); } catch(Exception e) when(e is HttpRequestException or OperationCanceledException or ObjectDisposedException) {} }
+    async Task CloseSession(CancellationToken ct) { var previous=session; session=null; if(previous is null) return; try { using var request=Request(HttpMethod.Delete); request.Headers.Add("MCP-Session-Id",previous); request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",accessToken??token); using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct); } catch(Exception e) when(e is HttpRequestException or OperationCanceledException or ObjectDisposedException) {} }
     void ThrowIfDisposed() { if(Volatile.Read(ref disposeStarted)!=0) throw new InvalidOperationException("MCP client is disposed."); }
     public async ValueTask DisposeAsync()
     {
