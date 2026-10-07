@@ -85,7 +85,8 @@ test('a temporary telemetry failure preserves the known configured timezone',asy
  const st=await(await request.get('/api/telemetry/status')).json();st.timeZone='Pacific/Auckland';let fail=false;
  await page.route('**/api/telemetry/status',r=>fail?r.fulfill({status:503,json:{error:'Owned timezone outage'}}):r.fulfill({json:st}));
  await page.clock.install();await page.goto('/');await expect(page.getByText(/Predbat plans next \(Pacific\/Auckland time\)$/)).toBeVisible();
- fail=true;await page.clock.fastForward(11000);await expect(page.getByRole('alert')).toContainText('Owned timezone outage');await expect(page.getByText(/Predbat plans next \(Pacific\/Auckland time\)$/)).toBeVisible();
+ // Telemetry status is re-read on a new collection or a manual refresh, not on a fixed timer, so ask for it explicitly.
+ fail=true;await page.clock.fastForward(11000);await page.getByRole('button',{name:'Refresh now'}).click();await expect(page.getByRole('alert')).toContainText('Owned timezone outage');await expect(page.getByText(/Predbat plans next \(Pacific\/Auckland time\)$/)).toBeVisible();
 });
 
 test('an older authentication challenge cannot hide a newer valid workspace',async({page,request})=>{
