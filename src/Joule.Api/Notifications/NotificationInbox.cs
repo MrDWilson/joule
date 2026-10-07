@@ -45,8 +45,12 @@ public partial class AppState
 /// <summary>Something that should be in the inbox now. Push is false for things that only belong in the bell (reports, minor findings).</summary>
 public sealed record InboxCandidate(string Key, string Event, string Label, string Title, string? Detail, string Link, string Tone, DateTimeOffset At, bool Push = true);
 
-/// <summary>What the inbox needs from outside AppState to tell whether Predbat, Home Assistant or a sensor has gone quiet.</summary>
-public sealed record InboxEnvironment(bool Demo, bool PredbatConfigured, TelemetryStatus? Telemetry, int OfflineMinutes);
+/// <summary>
+/// What the inbox needs from outside AppState to tell whether Predbat, Home Assistant or a sensor has gone quiet. Started is when
+/// this process started: silence is measured from the later of the last answer and that, so time Joule itself was off (a reboot,
+/// an upgrade) never counts as Predbat or Home Assistant being offline.
+/// </summary>
+public sealed record InboxEnvironment(bool Demo, bool PredbatConfigured, TelemetryStatus? Telemetry, int OfflineMinutes, DateTimeOffset? Started = null);
 
 /// <summary>
 /// The notifications inbox. Items are made from the state by <see cref="Collect"/> (what needs you, findings, checks that keep
@@ -147,27 +151,28 @@ public static class NotificationInbox
     {
         if (env.Demo) yield break;
         var limit = TimeSpan.FromMinutes(Math.Clamp(env.OfflineMinutes, 5, 1440));
-        if (env.PredbatConfigured && s.LastCollection is { } last && now - last >= limit)
+        var started = env.Started ?? DateTimeOffset.MinValue;
+        var minutes = (int)limit.TotalMinutes;
+        // The detail stays the same for the whole outage (the bell shows how long ago from At), so a long outage doesn't rewrite the inbox every tick.
+        if (env.PredbatConfigured && Later(s.LastCollection, started) is { } last && now - last >= limit)
             yield return new($"offline:predbat:{last.ToUnixTimeSeconds()}", Offline, "Offline", "Joule can't reach Predbat",
-                $"No answer since {Since(last, now)}.", "#/setup", "warn", last + limit);
+                $"No answer for {minutes} minutes or more.", "#/setup", "warn", last + limit);
         if (env.Telemetry is { Configured: true, Demo: false } t)
         {
-            if (t.LastCollection is { } read && now - read >= limit)
-                yield return new($"offline:ha:{read.ToUnixTimeSeconds()}", Offline, "Offline", "Joule can't read your sensors",
-                    $"No readings since {Since(read, now)}.", "#/setup/sensors", "warn", read + limit);
+            // After a restart the last reading is only known once one succeeds; a Home Assistant that fails from the start counts from then.
+            var read = Later(t.LastCollection, started) ?? (t.Error is not null && env.Started is { } since ? since : null);
+            if (read is { } quiet && now - quiet >= limit)
+                yield return new($"offline:ha:{quiet.ToUnixTimeSeconds()}", Offline, "Offline", "Joule can't read your sensors",
+                    $"No readings for {minutes} minutes or more.", "#/setup/sensors", "warn", quiet + limit);
             else
-                foreach (var issue in t.Issues.Where(x => x.Metric != "all" && x.Since is { } since && now - since >= limit))
+                foreach (var issue in t.Issues.Where(x => x.Metric != "all" && x.Since is { } since && now - Max(since, started) >= limit))
                     yield return new($"offline:sensor:{issue.Metric}:{issue.Since!.Value.ToUnixTimeSeconds()}", Offline, "Offline",
-                        $"{metricLabels.GetValueOrDefault(issue.Metric, issue.Metric)} sensor isn't reporting", Text(issue.Message, null), "#/setup/sensors", "warn", issue.Since.Value + limit);
+                        $"{metricLabels.GetValueOrDefault(issue.Metric, issue.Metric)} sensor isn't reporting", Text(issue.Message, null), "#/setup/sensors", "warn", Max(issue.Since.Value, started) + limit);
         }
     }
 
-    static string Since(DateTimeOffset at, DateTimeOffset now)
-    {
-        var span = now - at;
-        var ago = span.TotalMinutes < 90 ? $"{Math.Round(span.TotalMinutes)} min" : span.TotalHours < 48 ? $"{span.TotalHours.ToString("0.#", CultureInfo.InvariantCulture)} h" : $"{Math.Round(span.TotalDays)} days";
-        return $"{ago} ago";
-    }
+    static DateTimeOffset? Later(DateTimeOffset? last, DateTimeOffset started) => last is { } at ? Max(at, started) : null;
+    static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b) => a > b ? a : b;
 
     /// <summary>
     /// Merges what belongs in the inbox now into it. Returns the items added (the caller pushes them, except on the very first pass).

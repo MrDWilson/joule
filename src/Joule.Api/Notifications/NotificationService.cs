@@ -72,7 +72,14 @@ public sealed class NotificationService
         Func<InboxEnvironment> environment, Func<HomeAssistantTarget?> homeAssistant, string timeZone, ILogger? log = null, Func<string?, string?>? clean = null)
     {
         // Text from AI checks is masked for configured secrets before it leaves Joule, as it is for the browser.
-        this.clean = clean ?? (t => t);
+        // The channels' own tokens and webhook addresses are masked too: they can change in Setup at any time, so they're read each time.
+        var masker = clean ?? (t => t);
+        this.clean = t =>
+        {
+            var text = masker(t);
+            var secrets = settings.SecretValues();
+            return text is null || secrets.Length == 0 ? text : PredbatMcpSafety.CleanText(text, secrets);
+        };
         this.state = state; this.settings = settings; this.http = http; this.path = path; this.clock = clock; this.environment = environment;
         this.homeAssistant = homeAssistant; this.log = log;
         try { zone = TimeZoneInfo.FindSystemTimeZoneById(timeZone); } catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException) { zone = TimeZoneInfo.Utc; }
@@ -138,7 +145,8 @@ public sealed class NotificationService
     async Task<List<(InboxItem Item, bool Push)>> SyncInboxAsync(DateTimeOffset now, CancellationToken ct)
     {
         var env = environment();
-        var copy = state.Read(false);
+        // The raw state, as MutateAsync below sees it: keys built from text masked for the browser would never match.
+        var copy = state.ReadRaw();
         var before = JsonSerializer.Serialize(copy.Inbox, JsonDefaults.Options);
         var synced = copy.InboxSyncedAt is not null;
         NotificationInbox.Sync(copy, NotificationInbox.Collect(copy, now, env), now, true);
@@ -161,7 +169,7 @@ public sealed class NotificationService
         var date = local.ToString("yyyy-MM-dd");
         var wanting = channels.Where(c => c.Events.Contains(PushCatalogue.Summary) && book.Summaries.GetValueOrDefault(c.Info.Id) != date).ToList();
         if (wanting.Count == 0) return;
-        var (title, body) = SummaryText(state.Read(false), now);
+        var (title, body) = SummaryText(state.ReadRaw(), now);
         body = clean(body) ?? "";
         foreach (var c in wanting)
         {
@@ -171,7 +179,7 @@ public sealed class NotificationService
         Save();
     }
 
-    /// <summary>The daily summary: what needs you, what was found in the last day, anything offline and yesterday's report line.</summary>
+    /// <summary>The daily summary: what needs you, what was found in the last day, anything offline and the latest report's line (from the last 36 hours).</summary>
     public static (string Title, string Body) SummaryText(AppState s, DateTimeOffset now)
     {
         NotificationInbox.Present(s, now);
@@ -239,7 +247,7 @@ public sealed class NotificationService
         {
             var message = Combine(batch, settings);
             PushResult result;
-            try { using var request = PushChannels.Build(channel, message, homeAssistant()); result = await PushChannels.SendAsync(http(), request, channel.Info.Name, ct); }
+            try { using var request = PushChannels.Build(channel, message, homeAssistant()); result = await PushChannels.SendAsync(http(), request, channel.Info.Name, ct, PushChannels.ShowsReply(channel.Info)); }
             catch (DomainException e) { result = new(false, e.Message, false); }
             lock (book)
             {
@@ -258,7 +266,7 @@ public sealed class NotificationService
         }
     }
 
-    AppState Presented(DateTimeOffset now) { var s = state.Read(false); NotificationInbox.Present(s, now); return s; }
+    AppState Presented(DateTimeOffset now) { var s = state.ReadRaw(); NotificationInbox.Present(s, now); return s; }
 
     /// <summary>One message for everything due on a channel at once: the item itself, or a short list.</summary>
     public static PushMessage Combine(IReadOnlyList<PushDelivery> batch, PushSettings settings)
@@ -286,7 +294,7 @@ public sealed class NotificationService
         var link = settings.Link("#/setup/notifications");
         var message = new PushMessage("Joule · Test", $"{info.Name} works. Joule will send the events you chose here." + (link is null ? " Set App__PublicUrl to add a link back to Joule." : ""), link, "test");
         PushResult result;
-        try { using var request = PushChannels.Build(channel, message, homeAssistant()); result = await PushChannels.SendAsync(http(), request, info.Name, ct); }
+        try { using var request = PushChannels.Build(channel, message, homeAssistant()); result = await PushChannels.SendAsync(http(), request, info.Name, ct, PushChannels.ShowsReply(info)); }
         catch (DomainException e) { result = new(false, e.Message, false); }
         await gate.WaitAsync(ct);
         try

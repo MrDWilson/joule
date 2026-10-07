@@ -40,7 +40,7 @@ public class PushChannelTests : IDisposable
     {
         var handler = new FakePushHandler(answer);
         using var request = PushChannels.Build(channel, Message, ha);
-        var result = await PushChannels.SendAsync(new HttpClient(handler), request, channel.Info.Name, default);
+        var result = await PushChannels.SendAsync(new HttpClient(handler), request, channel.Info.Name, default, PushChannels.ShowsReply(channel.Info));
         var (sent, body) = Assert.Single(handler.Sent);
         return (sent, body, result);
     }
@@ -145,6 +145,19 @@ public class PushChannelTests : IDisposable
         Assert.Equal("joule", json.RootElement.GetProperty("source").GetString());
         Assert.Equal("needs_you", json.RootElement.GetProperty("event").GetString());
         Assert.Equal(Message.Url, json.RootElement.GetProperty("url").GetString());
+    }
+
+    [Theory]
+    [InlineData("Webhook", "Notifications:Webhook:Url")]
+    [InlineData("Chat", "Notifications:Chat:WebhookUrl")]
+    public async Task AnyAddressChannelsNeverEchoTheServersReply(string id, string key)
+    {
+        // These post to any address you give, so the Test button mustn't become a way to read another server's answers.
+        var (_, _, result) = await Send(Channel(id, new() { [key] = "https://example.com/hook" }),
+            _ => new(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":"internal detail from the far side"}""") });
+        Assert.False(result.Ok);
+        Assert.Contains("HTTP 400", result.Error);
+        Assert.DoesNotContain("far side", result.Error);
     }
 
     [Theory]

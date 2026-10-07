@@ -38,12 +38,13 @@ public sealed class StateService
         var result=DataStore.StateSummary(current);
         ChangeEngine.PresentForRead(result);
         if(includeEvidence) db.HydrateInvestigationEvidence(result);
+        // The inbox's keys come from the stored text, so decide what is still open before that text is masked for the browser.
+        NotificationInbox.Present(result, DateTimeOffset.UtcNow);
         foreach(var investigation in result.Investigations) investigationReadSanitizer.SanitizeCopy(investigation);
         foreach(var proposal in result.Proposals) investigationReadSanitizer.SanitizeCopy(proposal);
         foreach(var revision in result.Revisions) investigationReadSanitizer.SanitizeCopy(revision);
         result.AnalysisError = investigationReadSanitizer.Clean(result.AnalysisError);
         result.Activities = result.Activities.Select(a => a with { Message = investigationReadSanitizer.Clean(a.Message)! }).ToList();
-        NotificationInbox.Present(result, DateTimeOffset.UtcNow);
         foreach(var item in result.Inbox){item.Title=investigationReadSanitizer.Clean(item.Title)!;item.Detail=investigationReadSanitizer.Clean(item.Detail);}
         foreach(var e in result.Experiments)
         {
@@ -61,6 +62,9 @@ public sealed class StateService
         }
         return result;
     }
+    /// <summary>A copy of the stored state with nothing masked or presented, for server-side work that must see the text as saved
+    /// (the notifications inbox keys items by it). Never send this to the browser.</summary>
+    public AppState ReadRaw() => DataStore.StateSummary(current);
     /// <summary>Cheap read of one current setting value (no state copy), e.g. Predbat's reported version.</summary>
     public string? SettingValue(string key) => current.Settings.FirstOrDefault(x => x.Key == key)?.Value;
     public Investigation? ReadInvestigation(string id)

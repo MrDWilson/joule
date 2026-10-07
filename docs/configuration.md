@@ -81,12 +81,12 @@ The bell at the top of every page lists what needs you: each suggestion, file ed
 
 **Setup › Notifications** can send the same things to your phone. Each channel has an on switch, a **Test** button, its own choice of events and optional quiet hours. Each notification goes to each channel once; messages due during quiet hours wait until they end and are then sent only if the thing still needs you (the daily summary is never held); at most `Notifications__MaxPerHour` messages an hour go to a channel, and anything over that is sent later as one combined message; a failed send is tried again after 1, 5 and 30 minutes. **Sent recently** in the same page is the delivery log. Things already waiting when notifications were first switched on (after an upgrade) are listed in the bell but never sent.
 
-These settings are saved like Setup's others and apply straight away. Secrets (tokens, keys and webhook addresses) are never sent back to the browser. Each can also be set in the environment, which wins.
+These settings are saved like Setup's others and apply straight away. Secrets (tokens, keys and webhook addresses) are never sent back to the browser, and are masked if they ever appear in a message's text. A saved secret can be replaced or removed in Setup. Each can also be set in the environment, which wins. For the Discord/Slack-style and JSON webhook channels, a failed send says only how the server answered (for example HTTP 400), never the text of its reply.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `App__PublicUrl` | (none) | The address you open Joule at from your phone, such as `https://joule.example.com`. Notifications then link straight to the item. |
-| `Notifications__OfflineMinutes` | `30` | How long Predbat, Home Assistant or a sensor must be silent before it counts as offline (5 to 1440). |
+| `Notifications__OfflineMinutes` | `30` | How long Predbat, Home Assistant or a sensor must be silent before it counts as offline (5 to 1440). Silence is counted from no earlier than Joule's own start, so time Joule was stopped (a reboot, an upgrade) never counts. |
 | `Notifications__SummaryTime` | `08:00` | When the daily summary goes, in `HomeAssistant__TimeZone`, for channels that choose it. |
 | `Notifications__MaxPerHour` | `6` | The most messages an hour per channel (1 to 60). |
 | `Notifications__<Channel>__Enabled` | `false` | Turns a channel on: `Ntfy`, `Pushover`, `HomeAssistant`, `Telegram`, `Chat` or `Webhook`. |

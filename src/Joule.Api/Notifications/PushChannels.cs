@@ -118,7 +118,13 @@ public static class PushChannels
     }
 
     /// <summary>Sends one request and says how it went, in words safe to show and store.</summary>
-    public static async Task<PushResult> SendAsync(HttpClient http, HttpRequestMessage request, string channelName, CancellationToken ct)
+    /// <summary>
+    /// Whether a refusal's own words are shown. Not for the two channels that post to any address you give (Discord/Slack-style and
+    /// the JSON webhook): Joule says only how it answered, so the Test button can't be used to read another server's replies.
+    /// </summary>
+    public static bool ShowsReply(PushChannelInfo info) => info.Id is not ("Chat" or "Webhook");
+
+    public static async Task<PushResult> SendAsync(HttpClient http, HttpRequestMessage request, string channelName, CancellationToken ct, bool showReply = true)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(20));
@@ -132,7 +138,7 @@ public static class PushChannels
                 return PushResult.Sent;
             }
             var code = (int)response.StatusCode;
-            var said = await ReadError(response, deadline.Token);
+            var said = showReply ? await ReadError(response, deadline.Token) : null;
             var retry = code is 408 or 429 || code >= 500;
             var reason = response.StatusCode switch
             {

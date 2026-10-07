@@ -142,6 +142,31 @@ public class NotificationInboxTests
     }
 
     [Fact]
+    public void SilenceIsCountedFromNoEarlierThanJoulesOwnStart()
+    {
+        var s = new AppState { DataSource = "Live", LastCollection = Now.AddHours(-2) };
+        // Up ten minutes: the two hours before were Joule being off, not Predbat.
+        Assert.Empty(NotificationInbox.Collect(s, Now, new InboxEnvironment(false, true, null, 30, Now.AddMinutes(-10))));
+        var c = Assert.Single(NotificationInbox.Collect(s, Now, new InboxEnvironment(false, true, null, 30, Now.AddMinutes(-40))));
+        Assert.Equal($"offline:predbat:{Now.AddMinutes(-40).ToUnixTimeSeconds()}", c.Key);
+        Assert.Equal("No answer for 30 minutes or more.", c.Detail);
+        // The wording stays the same as the outage goes on.
+        Assert.Equal(c, Assert.Single(NotificationInbox.Collect(s, Now.AddMinutes(20), new InboxEnvironment(false, true, null, 30, Now.AddMinutes(-40)))));
+    }
+
+    [Fact]
+    public void HomeAssistantFailingSinceStartIsReportedOnceTheLimitPasses()
+    {
+        // After a restart nothing has been read yet; Home Assistant has failed every time since.
+        var telemetry = new TelemetryStatus(false, true, "Europe/London", null, "Home Assistant refused the token.", [], [], 15, []);
+        Assert.Empty(NotificationInbox.Collect(new AppState(), Now, new InboxEnvironment(false, false, telemetry, 30, Now.AddMinutes(-10))));
+        var c = Assert.Single(NotificationInbox.Collect(new AppState(), Now, new InboxEnvironment(false, false, telemetry, 30, Now.AddMinutes(-35))));
+        Assert.Equal("Joule can't read your sensors", c.Title);
+        // Without an error (still starting up) nothing is said.
+        Assert.Empty(NotificationInbox.Collect(new AppState(), Now, new InboxEnvironment(false, false, telemetry with { Error = null }, 30, Now.AddMinutes(-35))));
+    }
+
+    [Fact]
     public void ASensorThatStopsReportingIsNamedInWords()
     {
         var telemetry = new TelemetryStatus(false, true, "Europe/London", Now, null, [], [], 15, []) { Issues = [new("grid_import", "offline for 45 min", Now.AddMinutes(-45))] };

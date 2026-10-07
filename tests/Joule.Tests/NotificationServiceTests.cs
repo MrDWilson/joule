@@ -19,9 +19,16 @@ public class NotificationServiceTests : IDisposable
         public Task ApplyAsync(List<Change> changes, List<Setting> settings, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
+    /// <summary>Counts state writes, so a tick with nothing new can be shown to write nothing.</summary>
+    sealed class CountingStore(string directory) : DataStore(directory)
+    {
+        public int Saves;
+        public override void Save(AppState state) { Interlocked.Increment(ref Saves); base.Save(state); }
+    }
+
     sealed class Rig : IDisposable
     {
-        public required DataStore Db { get; init; }
+        public required CountingStore Db { get; init; }
         public required StateService State { get; init; }
         public required NotificationService Service { get; init; }
         public required ManualClock Clock { get; init; }
@@ -32,14 +39,14 @@ public class NotificationServiceTests : IDisposable
         public void Dispose() => Db.Dispose();
     }
 
-    Rig Make(Dictionary<string, string?> values, Func<HttpRequestMessage, HttpResponseMessage>? answer = null, DateTimeOffset? start = null, InboxEnvironment? env = null)
+    Rig Make(Dictionary<string, string?> values, Func<HttpRequestMessage, HttpResponseMessage>? answer = null, DateTimeOffset? start = null, InboxEnvironment? env = null, bool live = false)
     {
         var builder = new ConfigurationBuilder();
         var saved = SavedSettings.Attach(builder, builder.Build(), directory);
         saved.Save(new Dictionary<string, string?>(values) { ["Notifications:Ntfy:Enabled"] = values.GetValueOrDefault("Notifications:Ntfy:Enabled") ?? "true", ["Notifications:Ntfy:Topic"] = "joule-test" });
         var clock = new ManualClock(start ?? DateTimeOffset.UtcNow);
-        var db = new DataStore(Path.Combine(directory, "db"));
-        var state = new StateService(db, new NoPredbat(), true);
+        var db = new CountingStore(Path.Combine(directory, "db"));
+        var state = new StateService(db, new NoPredbat(), !live);
         var handler = new FakePushHandler(answer);
         var service = new NotificationService(state, new PushSettings(saved, builder.Build()), () => new HttpClient(handler), Path.Combine(directory, "notifications.json"), clock,
             () => env ?? new InboxEnvironment(true, true, null, 30), () => null, "Europe/London");
@@ -66,6 +73,70 @@ public class NotificationServiceTests : IDisposable
         var log = rig.Service.Log();
         Assert.Equal("sent", log[0].Status);
         Assert.Equal("ntfy", log[0].ChannelName);
+    }
+
+    [Fact]
+    public async Task TextMaskedForTheBrowserStillMatchesItsNotificationAndQuietTicksWriteNothing()
+    {
+        // The browser's copy masks credential-looking text, but the inbox keys its items by the text as stored. A key built from the
+        // masked copy never matched: a pending edit showed as done, and every tick rewrote the state.
+        using var rig = Make([]);
+        await rig.Tick();
+        await rig.State.MutateAsync(s => s.Investigations.Add(new Investigation
+        {
+            Id = "masked", At = rig.Clock.GetUtcNow(), Status = "Completed", Verdict = "problem", Severity = "warning", Title = "Solcast key",
+            FileChanges = [new ConfigFileChange { Id = "fc-masked", File = "apps.yaml", Summary = "Set the Solcast key in apps.yaml", Location = "top", Snippet = "solcast_api_key: 'made-up-123'", Reason = "r" }],
+            NextSteps = [new InvestigationNextStep { Id = "ns-masked", Title = "Open https://example.com/status?token=made-up-123 and check it" }],
+        }));
+        await rig.Tick();
+        var read = rig.State.Read(false);
+        Assert.DoesNotContain("made-up-123", read.Investigations.Single(i => i.Id == "masked").FileChanges[0].Snippet);
+        var edit = Assert.Single(read.Inbox, i => i.Title == "Set the Solcast key in apps.yaml");
+        var todo = Assert.Single(read.Inbox, i => i.Label == "To-do" && i.Title.StartsWith("Open "));
+        Assert.True(edit.Open);
+        Assert.True(todo.Open);
+        Assert.Null(edit.ResolvedAt);
+        var saves = rig.Db.Saves;
+        await rig.Tick();
+        await rig.Tick();
+        Assert.Equal(saves, rig.Db.Saves);
+        Assert.Equal(read.Inbox.Count, rig.State.Read(false).Inbox.Count);
+    }
+
+    [Fact]
+    public async Task ARestartAfterDowntimeIsNotReportedAsPredbatOffline()
+    {
+        // Joule was stopped for two hours (a reboot, an upgrade). The last collection on disk is old, but that silence was Joule's own.
+        var start = DateTimeOffset.UtcNow;
+        using var rig = Make([], start: start, env: new InboxEnvironment(false, true, null, 30, start), live: true);
+        await rig.State.MutateAsync(s => { s.LastCollection = start.AddHours(-2); s.InboxSyncedAt = start.AddHours(-3); });
+        await rig.Tick();
+        Assert.Empty(rig.Handler.Sent);
+        Assert.Empty(rig.Service.Log());
+        Assert.DoesNotContain(rig.State.Read(false).Inbox, i => i.Event == NotificationInbox.Offline);
+        // Predbat still hasn't answered half an hour after Joule started: now it is news.
+        rig.Clock.Now = start.AddMinutes(31);
+        await rig.Tick();
+        var body = Assert.Single(rig.Bodies());
+        Assert.Equal("Joule · Offline", body.GetProperty("title").GetString());
+        Assert.StartsWith("Joule can't reach Predbat", body.GetProperty("message").GetString());
+        // The outage's wording doesn't change minute by minute, so it doesn't rewrite the state every tick.
+        var saves = rig.Db.Saves;
+        rig.Clock.Now = start.AddMinutes(45);
+        await rig.Tick();
+        Assert.Equal(saves, rig.Db.Saves);
+    }
+
+    [Fact]
+    public async Task ChannelSecretsAreMaskedInWhatIsSent()
+    {
+        using var rig = Make(new() { ["Notifications:Ntfy:Token"] = "tk_madeup_secret" });
+        await rig.Tick();
+        await AddProposal(rig.State, "Paste tk_madeup_secret somewhere");
+        await rig.Tick();
+        var message = Assert.Single(rig.Bodies()).GetProperty("message").GetString();
+        Assert.DoesNotContain("tk_madeup_secret", message);
+        Assert.Contains("[redacted]", message);
     }
 
     [Fact]

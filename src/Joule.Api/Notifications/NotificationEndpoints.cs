@@ -107,13 +107,16 @@ public static class NotificationServiceRegistration
             var options = sp.GetService<HomeAssistantOptions>();
             var settings = sp.GetRequiredService<PushSettings>();
             var sanitizer = new InvestigationReadSanitizer(configuration);
+            var clock = sp.GetRequiredService<TimeProvider>();
+            // Offline alerts count silence from no earlier than this, so time Joule itself was stopped never reads as Predbat being down.
+            var started = clock.GetUtcNow();
             return new NotificationService(sp.GetRequiredService<StateService>(), settings, () => factory.CreateClient("notify"),
-                Path.Combine(dataDirectory, demo ? "demo-notifications.json" : "notifications.json"), sp.GetRequiredService<TimeProvider>(),
+                Path.Combine(dataDirectory, demo ? "demo-notifications.json" : "notifications.json"), clock,
                 () =>
                 {
                     TelemetryStatus? telemetry = null;
                     try { telemetry = sp.GetService<TelemetryCollectionService>()?.Status(); } catch (Exception e) when (e is not OperationCanceledException) { }
-                    return new InboxEnvironment(demo, sp.GetRequiredService<IPredbatClient>().Configured, telemetry, settings.OfflineMinutes);
+                    return new InboxEnvironment(demo, sp.GetRequiredService<IPredbatClient>().Configured, telemetry, settings.OfflineMinutes, started);
                 },
                 () => options is { BaseUri: { } uri, AccessToken: { Length: > 0 } token } ? new HomeAssistantTarget(uri, token) : null,
                 options?.TimeZone ?? "Europe/London", sp.GetRequiredService<ILogger<NotificationService>>(), sanitizer.Clean);

@@ -34,7 +34,7 @@ public static class PushCatalogue
         new(NotificationInbox.Problem, "A problem found", "An AI check found a problem or an opportunity worth your attention."),
         new(NotificationInbox.Unfinished, "Checks keep not finishing", "AI checks didn't finish twice or more in a row."),
         new(NotificationInbox.Offline, "Something offline", "Predbat, Home Assistant or a sensor hasn't answered for a while."),
-        new(Summary, "Daily summary", "One message a day: what needs you, what was found and yesterday's figures."),
+        new(Summary, "Daily summary", "One message a day: what needs you, what was found, anything offline and the latest report."),
     ];
     public static readonly string DefaultEvents = string.Join(",", Events.Where(e => e.Id != Summary).Select(e => e.Id));
 
@@ -152,6 +152,8 @@ public sealed class PushSettings(SavedSettings saved, IConfiguration configurati
         return new(info, Get(info.EnabledKey) == "true", events, QuietHours.TryParse(Get(info.QuietKey), out var q) && q.Start != q.End ? q : null, Get);
     }
     public IEnumerable<PushChannelSettings> Channels() => PushCatalogue.Channels.Select(Channel);
+    /// <summary>The notification secrets as they are now (tokens, keys, webhook addresses), to mask in anything Joule sends.</summary>
+    public string[] SecretValues() => PushCatalogue.Channels.SelectMany(c => c.Fields).Where(f => f.Secret).Select(f => Get(f.Key)).OfType<string>().Where(v => v.Length >= 4).Distinct().ToArray();
     /// <summary>A deep link into Joule for a hash route, when App__PublicUrl is set.</summary>
     public string? Link(string? hash) => PublicUrl is { } root ? root + "/" + (string.IsNullOrEmpty(hash) ? "" : hash.StartsWith('#') ? hash : "#" + hash) : null;
 }
