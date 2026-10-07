@@ -610,6 +610,96 @@ summary:hover {
   color: var(--text-3);
   font-size: var(--fs-xs);
 }
+/* The bell's inbox: a header with its two actions, rows with a dismiss button, and a way to get them on a phone. */
+.notifications-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.notifications-head h2 {
+  margin: 0;
+}
+.notifications-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-right: calc(-1 * var(--space-2));
+}
+.notification-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.notification-list li a {
+  margin-right: 0;
+}
+.notification-list li.unread a {
+  position: relative;
+}
+/* Unread: a dot in the margin and a brighter title; read items keep their place in quieter text. */
+.notification-list li.unread a::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: calc(var(--space-3) + 7px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.notification-list li:not(.unread) .notification-head strong {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.notification-list li.handled svg {
+  color: var(--text-3);
+}
+.notification-list li.handled .notification-kind {
+  border-color: var(--border-2);
+  background: transparent;
+  color: var(--text-3);
+}
+.notification-dismiss {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: var(--space-2) calc(-1 * var(--space-2)) 0 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.notification-dismiss:hover,
+.notification-dismiss:focus-visible {
+  background: var(--bg-3);
+  color: var(--text-1);
+}
+@media (pointer: coarse) {
+  .notification-dismiss {
+    width: var(--tap);
+    height: var(--tap);
+    margin-top: 0;
+  }
+}
+.notifications-empty {
+  margin: var(--space-2) 0;
+  color: var(--text-3);
+}
+.notifications-phone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-1);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
 
 main {
   display: block;

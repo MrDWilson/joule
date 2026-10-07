@@ -336,6 +336,8 @@ export interface State {
   lastFileVersionId: string | null;
   reports: EnergyReport[];
   notifications: Notification[];
+  /** The bell's notifications, server-side so read and dismissed stick (NotificationInbox.cs). Absent on older servers. */
+  inbox?: InboxItem[];
   reportPreferences: ReportPreferences;
   /** Changes to Predbat's own controls, oldest first. */
   settingEvents?: SettingEvent[];
@@ -653,4 +655,29 @@ export interface Health {
   status: "ok";
   version: string;
   build: string | null;
+}
+
+/**
+ * One notification in the bell (server: src/Joule.Api/Notifications/NotificationInbox.cs). Made once per thing (key) and never
+ * re-created, so reading or dismissing it sticks. `open` is false once the thing is handled (approved, turned down, back online):
+ * only open, unread, undismissed items count in the badge.
+ */
+export interface InboxItem {
+  id: string;
+  key: string;
+  /** needs_you, problem, unfinished, offline or report. */
+  event: string;
+  /** The chip: Suggestion, To-do, File edit, Trial to decide, Found something, Didn't finish, Offline, Report. */
+  label: string;
+  /** May hold AI or server text: render through <PlainText>. */
+  title: string;
+  detail: string | null;
+  /** A hash route, e.g. "#/insights/inv/abc". */
+  link: string;
+  tone: "accent" | "warn";
+  at: string;
+  readAt: string | null;
+  dismissedAt: string | null;
+  resolvedAt: string | null;
+  open: boolean;
 }

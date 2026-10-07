@@ -105,6 +105,7 @@ public static class SetupConfigEndpoints
     static bool HasAccessKey(SavedSettings saved, IReadOnlyDictionary<string, string?> values) =>
         values.TryGetValue("App:AccessKey", out var key) ? !string.IsNullOrWhiteSpace(key) : saved.External.Contains("App:AccessKey") || saved.Saved.ContainsKey("App:AccessKey");
 
+    internal static string? LockReasonFor(SavedSettings saved, AppAuthOptions auth) => LockReason(saved, auth);
     static string? LockReason(SavedSettings saved, AppAuthOptions auth) =>
         auth.Demo && saved.External.Contains("App:Demo") && !auth.KeyRequired
             ? "Demo mode is fixed by App__Demo in Joule's environment, so this page can't switch it. Remove that line (or set App__Demo=false) and restart Joule."
@@ -115,7 +116,7 @@ public static class SetupConfigEndpoints
     /// there they are allowed only when the demo isn't pinned by App__Demo (a fresh install), so a public demo can't be taken over.
     /// </summary>
     /// The dashboard's request header is always required here, even without sign-in, so no other page can drive these endpoints.
-    static void EnsureCanSave(SavedSettings saved, AppAuthOptions auth, HttpRequest request)
+    internal static void EnsureCanSave(SavedSettings saved, AppAuthOptions auth, HttpRequest request)
     {
         if (LockReason(saved, auth) is { } reason) throw new DomainException(reason, 403);
         if (!WebSecurity.HasRequestHeader(request)) throw new DomainException("A same-origin dashboard request is required.", 403);
@@ -128,7 +129,7 @@ public static class SetupConfigEndpoints
         {
             var source = saved.Source(f.Key);
             var value = source == "environment" ? saved.Effective.GetValueOrDefault(f.Key) : current.GetValueOrDefault(f.Key);
-            var pending = source != "environment" && current.GetValueOrDefault(f.Key) != saved.Effective.GetValueOrDefault(f.Key);
+            var pending = !f.Live && source != "environment" && current.GetValueOrDefault(f.Key) != saved.Effective.GetValueOrDefault(f.Key);
             return new SetupConfigField(f.Key, f.EnvVar, f.Kind, f.Secret, f.Secret ? null : f.Key == "Predbat:BaseUrl" || f.Kind == "url" ? SetupEndpoints.SafeAddress(value) ?? value : value,
                 !string.IsNullOrEmpty(value), source, pending);
         }).ToList();

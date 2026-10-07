@@ -9,7 +9,7 @@ namespace Joule;
 /// survives.</summary>
 public static class PredbatMcpSafety
 {
-    static readonly Regex Sensitive = new("(?:^key$|_key|api.?key|access.?key|private.?key|password|secret|token|authorization|credential|username|email|account_number|mpan|site_id|plant_id|hub_serial)", RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100));
+    static readonly Regex Sensitive = new("(?:^key$|_key|api.?key|access.?key|private.?key|password|secret|token|authorization|credential|username|user.?key|webhook.?url|email|account_number|mpan|site_id|plant_id|hub_serial)", RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100));
     static readonly Regex CredentialText = new("""Bearer\s+\S+|https?://[^\s"'<>]*(?:@|\?)[^\s"'<>]*|\b[\w.-]{0,128}(?:password|secret|token|api.?key|access.?key|private.?key|authorization|username)[\w.-]{0,128}["']?\s*[:=](?!\s*!secret\b)\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\r\n,}]+)""",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100));
     internal static bool SensitiveKey(string key) => Sensitive.IsMatch(key);
     internal static string[] Secrets(IConfiguration? config) => config?.AsEnumerable().Where(x=>!string.IsNullOrEmpty(x.Value)&&SensitiveKey(x.Key)).SelectMany(x=>new[] { x.Value!,x.Value!.Trim() }).Where(x=>x.Length>0).Distinct().ToArray() ?? [];

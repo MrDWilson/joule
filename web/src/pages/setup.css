@@ -1552,3 +1552,160 @@ button.setting-line:focus-visible {
 .standing-history li + li {
   margin-top: 2px;
 }
+
+/* ------------------------------------------------------------------ Notifications (Setup › Notifications) */
+.push-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: 760px;
+}
+.push-lead {
+  margin-bottom: var(--space-4);
+}
+.push-heading {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: var(--fs-md);
+}
+.push-card-title {
+  font-size: var(--fs-md);
+}
+.push-card {
+  padding: var(--space-4) var(--space-5);
+}
+.push-channel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.push-channel-head h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+}
+.push-channel-head p {
+  margin-top: var(--space-1);
+  font-size: var(--fs-sm);
+}
+.push-channel-head .switch {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.push-problem {
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.push-channel .disclosure {
+  margin-top: var(--space-3);
+}
+.push-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.push-form > .button,
+.push-form .setup-actions,
+.push-form .push-remove {
+  align-self: flex-start;
+}
+.push-form .field {
+  margin: var(--space-2) 0 0;
+}
+.push-form .form-note {
+  margin: var(--space-1) 0 0;
+}
+.push-form input[type="text"],
+.push-form input[type="password"],
+.push-form input[type="number"],
+.push-form select {
+  width: 100%;
+}
+.push-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 var(--space-4);
+}
+.push-grid .push-wide {
+  grid-column: 1 / -1;
+}
+.push-events,
+.push-quiet {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.push-events legend,
+.push-quiet legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.push-event {
+  margin: var(--space-2) 0;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.push-event-detail {
+  display: block;
+  font-size: var(--fs-xs);
+}
+.push-window {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.push-window .field {
+  margin: 0;
+}
+.push-service select {
+  flex: 1 1 240px;
+  margin-top: 0;
+}
+.push-log {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+.push-log li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-1);
+  font-size: var(--fs-sm);
+}
+.push-log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.push-log-head strong {
+  min-width: 0;
+  color: var(--text-1);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.push-log-detail {
+  font-size: var(--fs-xs);
+}
+.push-log-error {
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .push-card {
+    padding: var(--space-4);
+  }
+  .push-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

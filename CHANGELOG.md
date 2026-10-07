@@ -10,6 +10,7 @@ All notable changes to Joule are listed here. Versions follow [semantic versioni
 - **Standing charge:** Joule reads the Octopus Energy integration's standing charge sensor on the same meter as your import rate by itself, or you can map any sensor (`HomeAssistant__Entities__StandingCharge`) or type a figure in pence per day in Setup › Sensors. Each day keeps its own rate. Net cost on Today, the Energy page, reports and AI reviews includes it as its own line ("Standing charge £0.21 · £0.54/day"); a switch in Setup leaves it out of the headline.
 - **API:** the energy summary gains `standingChargeGbp`, `standingChargePencePerDay`, `standingChargeSource`, `standingChargeAssumed`, `standingChargeIncluded` and `netCostWithStandingChargeGbp` (`netCostGbp` stays energy only, so trials compare like with like). Plan slots gain `gridImportActual`/`gridExportActual` and history slots `gridImport`/`gridExport`. New `GET`/`POST /api/telemetry/standing-charge`.
 - **Meters found from Predbat:** Joule reads Predbat's `apps.yaml` (through MCP, Predbat's web interface or a mounted copy) and its entity list, and maps every Home Assistant meter it is sure of by itself, rechecking every few hours. Setup shows "Found automatically from Predbat" with **Change**, asks only when there is a real choice (one sensor per inverter, close name matches), and **Not mapped** keeps a meter unmapped for good. `HomeAssistant__Entities__*` settings are now optional overrides and always win. A `metric_standing_charge` given as a number in `apps.yaml` is used as the standing charge when there is no sensor and no figure of your own.
+- **Notifications on your phone:** Setup › Notifications sends what needs you, new problems, checks that keep not finishing, things offline and an optional daily summary through ntfy, Pushover, Home Assistant (the companion app), Telegram, Discord or Slack, or your own JSON webhook. Each channel has its own events, quiet hours and a Test button; messages are limited per hour, combined when several are due, retried when a send fails and listed in a delivery log. Links open the item in Joule when `App__PublicUrl` is set.
 
 ### Changed
 
@@ -19,6 +20,7 @@ All notable changes to Joule are listed here. Versions follow [semantic versioni
 
 ### Fixes
 
+- **The notifications bell can be cleared.** Its count was worked out afresh on every page load with nothing remembered on the server, so "Needs you" always counted as new. The bell is now an inbox kept by Joule: open an item to mark it read, dismiss it, or mark all as read and clear all, and it stays that way across browsers and restarts. Anything you handle elsewhere drops out of the count at once.
 - **Battery ring:** the short tick beside the ring (it marked the reserve) and the round cap at 12 o'clock are gone. The ring shows only the level; "Reserve 4%" is written under it and turns amber when the battery is close to it.
 
 ### Upgrading

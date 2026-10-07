@@ -39,6 +39,7 @@ while (true)
     builder.Services.AddHttpClient("ai", c => c.Timeout = TimeSpan.FromMinutes(15));
     builder.Services.AddHttpClient("auth", c => c.Timeout = TimeSpan.FromSeconds(30));
     builder.Services.AddHttpClient("docs", c => c.Timeout = TimeSpan.FromSeconds(15));
+    builder.Services.AddHttpClient("notify", c => c.Timeout = TimeSpan.FromSeconds(30)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton(sp => new DataStore(Path.Combine(dataDirectory, demo ? "demo" : "live"), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger("Joule.Storage")));
     builder.Services.AddSingleton<IPredbatClient>(sp => new PredbatClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("predbat"), builder.Configuration));
@@ -59,6 +60,7 @@ while (true)
     builder.Services.AddSingleton(authOptions);
     builder.Services.AddSingleton(savedSettings);
     builder.Services.AddSingleton(sp => new SessionCookies(authOptions));
+    builder.Services.AddNotifications(builder.Configuration, dataDirectory, demo);
     builder.Services.AddSingleton<AccessKeyThrottle>();
     builder.Services.AddJouleCompression();
     var app = builder.Build();
@@ -146,6 +148,7 @@ while (true)
     app.MapChangeEndpoints();
     app.MapSetupEndpoints();
     app.MapSetupConfigEndpoints(inContainer);
+    app.MapNotificationEndpoints();
     // Unknown API paths answer with JSON, never the SPA page (which would be a confusing 200 for API clients). Both
     // fallbacks are GET/HEAD only so a wrong method on a real route still gets 405 rather than a fallback.
     var readMethods = new HttpMethodMetadata(["GET", "HEAD"]);
