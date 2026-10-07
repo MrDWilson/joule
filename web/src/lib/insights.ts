@@ -493,6 +493,14 @@ export function waitingToConfirm(state: Pick<State, "investigations">) {
 export type ClosedItem =
   | { kind: "proposal"; key: string; at: string; proposal: Proposal; status: string; lastAi: ReplyMessage | null }
   | {
+      kind: "finding";
+      key: string;
+      at: string;
+      investigation: Investigation;
+      status: string;
+      lastAi: ReplyMessage | null;
+    }
+  | {
       kind: "file";
       key: string;
       at: string;
@@ -517,17 +525,21 @@ const closedByReply = (thread?: ReplyMessage[]) => lastAi(thread)?.verdict === "
 
 /** Why a suggestion, to-do or file edit closed, in plain words. */
 export function closedStatus(
-  kind: ClosedItem["kind"],
+  kind: Exclude<ClosedItem["kind"], "finding">,
   status: string,
   thread: ReplyMessage[] | undefined,
   reason?: string | null,
   note?: string | null,
 ): string {
+  if (/joule's own connection/i.test(reason ?? "")) return "About Joule's own connection, not your system";
   if (closedByReply(thread)) return "Closed after your reply";
+  if (/^not needed$/i.test(reason ?? "")) return "Not needed";
+  if (/^done by (user|you)$/i.test(reason ?? "")) return "Done";
   if (kind !== "proposal" && /^done\.?$/i.test(note ?? "")) return "Done";
   const s = status.toLowerCase();
-  // A to-do closed by its Done button carries no note (a dismiss you write always has one).
+  // An older to-do closed by its Done button carries no note (a dismiss you write always has one).
   if (kind === "todo" && !note?.trim() && /^dismissed by user$/i.test(reason ?? "")) return "Done";
+  if (/findings dismissed/i.test(reason ?? "")) return "Closed with its findings";
   if (kind === "proposal") {
     if (s === "applied") return "Applied";
     // Applied, then put back (by you from Trials, or by Joule's automatic undo): never left reading "Applied".
@@ -538,13 +550,31 @@ export function closedStatus(
     return status;
   }
   if (s === "verified") return "Checked: it took effect";
-  if (/dismissed by user/i.test(reason ?? "") || s === "dismissed") return "You dismissed this";
-  if (/findings dismissed/i.test(reason ?? "")) return "Closed with its findings";
+  if (/dismissed by (user|you)/i.test(reason ?? "") || s === "dismissed") return "You dismissed this";
   if (/no longer carried forward/i.test(reason ?? "") || s === "retired") return "No longer needed";
   return "Closed";
 }
 
-/** Proposals, to-dos and file edits that are no longer waiting for you, newest first. */
+/** True when a check's findings closed: dismissed or not needed by you, resolved, or closed by Joule. */
+export const isClosedFinding = (i: Pick<Investigation, "dismissedAt">) => !!i.dismissedAt;
+
+/** How a check's findings closed, in plain words. */
+export function findingClosedStatus(i: Pick<Investigation, "closedReason" | "thread">): string {
+  switch (i.closedReason) {
+    case "not_needed":
+      return closedByReply(i.thread) ? "Closed after your reply" : "Not needed";
+    case "resolved":
+      return "Nothing left to do";
+    case "repeat":
+      return "Not raised again";
+    case "own_traffic":
+      return "About Joule's own connection, not your system";
+    default:
+      return closedByReply(i.thread) ? "Closed after your reply" : "You dismissed this";
+  }
+}
+
+/** Proposals, to-dos, file edits and findings that are no longer waiting for you, newest first. */
 export function closedItems(state: Pick<State, "proposals" | "investigations">): ClosedItem[] {
   const items: ClosedItem[] = [];
   for (const p of state.proposals)
@@ -554,8 +584,19 @@ export function closedItems(state: Pick<State, "proposals" | "investigations">):
         key: `p-${p.id}`,
         at: p.decidedAt ?? p.createdAt,
         proposal: p,
-        status: closedStatus("proposal", p.status, p.thread),
+        status: closedStatus("proposal", p.status, p.thread, p.closedReason),
         lastAi: lastAi(p.thread),
+      });
+  // Findings you closed (or that closed when nothing was left): a repeat Joule held back is not shown.
+  for (const investigation of state.investigations)
+    if (investigation.dismissedAt && investigation.closedReason !== "repeat")
+      items.push({
+        kind: "finding",
+        key: `i-${investigation.id}`,
+        at: investigation.dismissedAt,
+        investigation,
+        status: findingClosedStatus(investigation),
+        lastAi: lastAi(investigation.thread),
       });
   const seen = new Set<string>();
   for (const investigation of [...state.investigations].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))) {

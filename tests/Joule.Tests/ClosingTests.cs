@@ -64,7 +64,7 @@ public sealed class ClosingTests : IDisposable
         Assert.Null(newer.DismissedAt);
 
         RecommendationDecisions.DismissFollowUp(s, "new", "s-other", null, "done");
-        Assert.Equal("Done by user", newer.NextSteps[1].ClosedReason);
+        Assert.Equal("Done by you", newer.NextSteps[1].ClosedReason);
         Assert.Equal("resolved", newer.ClosedReason);
         Assert.Contains(s.Activities, a => a.Message.Contains("is waiting for you any more"));
 

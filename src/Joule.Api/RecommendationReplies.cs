@@ -75,7 +75,7 @@ public static class RecommendationDecisions
 {
     public const int SuppressionDays = 30, NoteLimit = 1000;
     public const string Dismissed = "dismissed", NotNeeded = "not_needed", Done = "done";
-    public const string DismissedByUser = "Dismissed by user", NotNeededReason = "Not needed", DoneByUser = "Done by user", WithFindings = "Findings dismissed by user";
+    public const string DismissedByUser = "Dismissed by you", NotNeededReason = "Not needed", DoneByUser = "Done by you", WithFindings = "Findings dismissed by user";
     /// <summary>Finding close reasons besides dismissed and not_needed: resolved (the user closed the last thing from it; it may be
     /// raised again), repeat (the same finding the user closed recently) and own_traffic (about Joule's own connection).</summary>
     public const string Resolved = "resolved", Repeat = "repeat", OwnTraffic = "own_traffic";

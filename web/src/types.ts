@@ -96,6 +96,8 @@ export interface ReplyOutcome {
   notice: string | null;
   provider: string;
   thread: ReplyMessage[];
+  /** True when closing this item left nothing open from its check, so the check closed too. */
+  findingClosed?: boolean;
 }
 /** A Predbat configuration file edit the user reviews and applies by hand; the app never writes the file. */
 export type ConfigFileChangeStatus = "pending" | "applied" | "verified" | "dismissed" | "retired";
@@ -135,6 +137,8 @@ export interface Proposal {
   evidenceReferences: string[];
   decisionNote?: string | null;
   decidedAt?: string | null;
+  /** "Not needed", or "Findings dismissed by user" when it closed with its check's findings. */
+  closedReason?: string | null;
   thread?: ReplyMessage[];
   // Insights: fields the server already sends.
   /** A £/month range when one could honestly be estimated (currently always null). */
@@ -159,6 +163,7 @@ export interface CalibrationSeries {
 /** finding: neutral (the AI gave no verdict and the server couldn't tell). Checks that didn't finish have no verdict (null). */
 export type InvestigationVerdict = "problem" | "opportunity" | "no_change" | "finding";
 export type InvestigationNextStepStatus = "open" | "closed";
+export type FindingClosedReason = "dismissed" | "not_needed" | "resolved" | "repeat" | "own_traffic";
 export interface InvestigationNextStep {
   /** Absent on records written before follow-ups could be dismissed. */
   id?: string;
@@ -205,9 +210,12 @@ export interface Investigation {
   /** Null for checks that didn't finish (status Failed or Interrupted) and while Running; absent on old records (show "Finding"). */
   verdict?: InvestigationVerdict | null;
   fileChanges?: ConfigFileChange[];
-  /** Set when the user dismissed the findings as a whole. */
+  /** Set when the findings closed as a whole. */
   dismissedAt?: string | null;
   decisionNote?: string | null;
+  /** How they closed: dismissed (also older records with no reason), not_needed, resolved (you closed the last thing from
+   * them), repeat (the same finding you closed recently) or own_traffic (about Joule's own connection to Predbat). */
+  closedReason?: FindingClosedReason | null;
   thread?: ReplyMessage[];
   // AI quality (stream D): plain fields, failure details, repeats and labelled steps.
   /** At most 80 characters of plain English for list rows. */

@@ -69,6 +69,7 @@ public sealed class AiDataRepairTests : IDisposable
         var change = new ConfigFileChange { Id = "old-file", File = "apps.yaml", Summary = "Add export_today", Location = "pred_bat", Snippet = "  export_today: sensor.x", Reason = "r" };
         OldUnavailablePath(change.Thread, "Where does this go?", at); host.FileChanges.Add(change);
         RecommendationDecisions.DismissFollowUp(state, host.Id, step.Id, "I can't fix the source.");
+        step.ClosedReason = "Dismissed by user"; // the old path's wording
         RecommendationDecisions.DismissFileChange(state, host.Id, change.Id, "Where does this go?");
         var finding = state.Investigations.First(i => i.Status == "Completed" && i.DismissedAt is null && i.Id != host.Id);
         var findingStep = new InvestigationNextStep { Id = "finding-step", Title = "Ask the installer about the CT clamp", Rationale = "r", SuggestedAction = "a", Verification = "v", Uncertainty = "u" };
