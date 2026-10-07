@@ -2,6 +2,18 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Features
+
+- **Grid import, front and centre:** Today has a Grid tile (bought since midnight, what it cost and the average price per kWh, what was sold and earned, a bar per half-hour and yesterday by the same time). Today's timeline has a Grid lane (bought above the line, sold below), and the Energy page has a "Grid each day" chart.
+- **Standing charge:** Joule reads the Octopus Energy integration's standing charge sensor on the same meter as your import rate by itself, or you can map any sensor (`HomeAssistant__Entities__StandingCharge`) or type a figure in pence per day in Setup › Sensors. Each day keeps its own rate. Net cost on Today, the Energy page, reports and AI reviews includes it as its own line ("Standing charge £0.21 · £0.54/day"); a switch in Setup leaves it out of the headline.
+- **API:** the energy summary gains `standingChargeGbp`, `standingChargePencePerDay`, `standingChargeSource`, `standingChargeAssumed`, `standingChargeIncluded` and `netCostWithStandingChargeGbp` (`netCostGbp` stays energy only, so trials compare like with like). Plan slots gain `gridImportActual`/`gridExportActual` and history slots `gridImport`/`gridExport`. New `GET`/`POST /api/telemetry/standing-charge`.
+
+### Fixes
+
+- **Battery ring:** the short tick beside the ring (it marked the reserve) and the round cap at 12 o'clock are gone. The ring shows only the level; "Reserve 4%" is written under it and turns amber when the battery is close to it.
+
 ## 1.0.0 (2026-10-07)
 
 The first public release, under the Joule name.
