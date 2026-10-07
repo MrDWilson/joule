@@ -130,9 +130,9 @@ public sealed class InvestigationScheduler(StateService state, AnalysisService a
         catch (Exception e) when (e is not OperationCanceledException) { return new(false, []); }
     }
 
-    /// <summary>Warning and error lines from Predbat's log text.</summary>
+    /// <summary>Warning and error lines from Predbat's log text, without the ones Joule's own MCP or API sign-in caused.</summary>
     public static List<string> WarningLines(string text) =>
-        text.Split('\n').Select(l => Regex.Replace(l.Trim(), @"^[a-z_]{1,24}:\s+(?=\S)", "")).Where(l => Regex.IsMatch(l, @"\b(warn(ing)?|error)\b", RegexOptions.IgnoreCase) && l.Length > 8).Take(200).ToList();
+        text.Split('\n').Select(l => Regex.Replace(l.Trim(), @"^[a-z_]{1,24}:\s+(?=\S)", "")).Where(l => Regex.IsMatch(l, @"\b(warn(ing)?|error)\b", RegexOptions.IgnoreCase) && l.Length > 8 && !JouleOwnTraffic.IsOwnLogLine(l)).Take(200).ToList();
 
     /// <summary>A log line without its timestamp and numbers, so the same warning repeated with new values counts once.</summary>
     public static string Normalise(string line) => Regex.Replace(Regex.Replace(line, @"^\S*\d{4}-\d{2}-\d{2}[ T][\d:.,]+\S*\s*", ""), @"\d+(\.\d+)?", "#").Trim().ToLowerInvariant();

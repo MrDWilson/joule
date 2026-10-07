@@ -1,0 +1,55 @@
+{
+  "investigations": [
+    {
+      "id": "own-1", "at": "2026-10-06T02:14:00+00:00", "status": "Completed", "verdict": "problem", "provider": "ChatGpt",
+      "title": "Predbat rejects MCP tokens: “Not enough segments” 14 times overnight",
+      "headline": "Predbat's log shows repeated MCP token failures",
+      "summary": "Between 00:10 and 06:00 Predbat logged “MCP: Token … failed: Not enough segments” 14 times. Check the token configured for the MCP server.",
+      "evidence": ["MCP: Token eyJ… failed: Not enough segments at 00:10, 00:40 and 01:10."],
+      "nextSteps": [
+        { "id": "own-1-step", "status": "open", "title": "Check the MCP token in Predbat's configuration", "rationale": "Predbat rejects the token as malformed.", "suggestedAction": "Re-issue the MCP token and update Joule.", "verification": "No more token failures.", "uncertainty": "Which client sends it.", "evidenceReferences": ["configuration"] }
+      ],
+      "fileChanges": [
+        { "id": "own-1-file", "status": "pending", "file": "apps.yaml", "summary": "Set an MCP secret so token authentication stops failing", "location": "pred_bat", "snippet": "  mcp_secret: !secret predbat_mcp", "reason": "Predbat logs MCP token failures: Not enough segments." }
+      ]
+    },
+    {
+      "id": "own-2", "at": "2026-10-06T08:30:00+00:00", "status": "Completed", "verdict": "problem", "provider": "ChatGpt",
+      "title": "Predbat warns “Authenticated via legacy bearer token” on every request",
+      "summary": "Each read logs a legacy bearer token warning.",
+      "evidence": ["Authenticated via legacy bearer token, 120 times today."],
+      "nextSteps": [], "fileChanges": []
+    },
+    {
+      "id": "real-1", "at": "2026-10-06T09:00:00+00:00", "status": "Completed", "verdict": "problem", "provider": "ChatGpt",
+      "title": "Battery charged at 1.7 kW against a 5 kW plan",
+      "summary": "The overnight charge ran at about 1.7 kW. Predbat's log, read through MCP, shows each charge window starting on time.",
+      "evidence": ["Battery power averaged 1.7 kW between 23:30 and 05:30."],
+      "nextSteps": [
+        { "id": "real-1-step", "status": "open", "title": "Ask the installer about the charge rate limit", "rationale": "The inverter caps charging.", "suggestedAction": "Ask whether the charge rate is capped.", "verification": "Charging reaches 5 kW.", "uncertainty": "The cap may be in the app.", "evidenceReferences": ["configuration"] },
+        { "id": "real-1-own", "status": "open", "title": "Re-issue Joule's MCP token", "rationale": "Some reads failed with a token error.", "suggestedAction": "Create a new MCP token for Joule.", "verification": "No token errors.", "uncertainty": "None.", "evidenceReferences": ["configuration"] }
+      ],
+      "fileChanges": []
+    },
+    {
+      "id": "decided-1", "at": "2026-10-05T10:00:00+00:00", "status": "Completed", "verdict": "problem", "provider": "ChatGpt",
+      "title": "MCP token failures in Predbat's log", "summary": "Not enough segments.", "evidence": ["e"],
+      "dismissedAt": "2026-10-05T12:00:00+00:00", "decisionNote": "That's Joule itself.", "nextSteps": [], "fileChanges": []
+    },
+    {
+      "id": "real-2", "at": "2026-10-06T10:00:00+00:00", "status": "Completed", "verdict": "problem", "provider": "ChatGpt",
+      "title": "Predbat's Home Assistant token expired, so the plan stopped updating at 04:00",
+      "summary": "Predbat logged 401 errors from Home Assistant after 04:00 and the plan stopped refreshing.",
+      "evidence": ["Home Assistant returned 401 to Predbat from 04:02."],
+      "nextSteps": [
+        { "id": "real-2-step", "status": "open", "title": "Create a new long-lived Home Assistant token for Predbat", "rationale": "Home Assistant rejects Predbat's token.", "suggestedAction": "Create a token in your Home Assistant profile and put it in Predbat's configuration.", "verification": "The plan refreshes again.", "uncertainty": "None.", "evidenceReferences": ["configuration"] }
+      ],
+      "fileChanges": []
+    },
+    {
+      "id": "quiet-1", "at": "2026-10-06T11:00:00+00:00", "status": "Completed", "verdict": "no_change", "provider": "ChatGpt",
+      "title": "Nothing new since the last check", "summary": "Nothing new; MCP token warnings are Joule's own.", "evidence": ["e"], "nextSteps": [], "fileChanges": []
+    }
+  ],
+  "proposals": []
+}

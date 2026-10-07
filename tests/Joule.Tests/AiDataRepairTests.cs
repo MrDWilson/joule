@@ -45,7 +45,7 @@ public sealed class AiDataRepairTests : IDisposable
         Assert.All(state.Investigations.Where(i => i.Status == "Failed"), i => { Assert.Null(i.Verdict); Assert.NotNull(i.FailureKind); Assert.Equal("Check didn't finish", i.Title); });
         Assert.Equal(before, JsonSerializer.Serialize(state.Proposals, JsonDefaults.Options));
         Assert.Equal("Denied", state.Proposals.Single(p => p.Id.StartsWith("2a1898ee")).Status); // the user's own denial is untouched
-        Assert.Equal([AiDataRepairs.ReopenUnavailableReplies, AiDataRepairs.FailedVerdicts], state.AiRepairs);
+        Assert.Equal([AiDataRepairs.ReopenUnavailableReplies, AiDataRepairs.FailedVerdicts, AiDataRepairs.OwnTraffic], state.AiRepairs);
         Assert.Equal(0, AiDataRepairs.Apply(state, null).Total); // runs once
     }
 

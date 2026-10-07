@@ -499,6 +499,14 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
             stepDetails.Add(new(now, "server", "Checked the export prices: the export paid, so it isn't reported as a problem", $"server: arbitrage guard {paid.ArbitragePence:0.0}p over {paid.ExportSlots} slot(s)"));
             i.StepDetails = stepDetails.ToList();
         }
+        // Predbat logs Joule's own MCP and API requests; a finding about those is never the household's problem.
+        if (JouleOwnTraffic.Filter(i, result.Proposals) is { Count: > 0 } ownTraffic)
+        {
+            var line = $"server: not raised, about Joule's own connection to Predbat: {string.Join("; ", ownTraffic)}";
+            i.Steps.Add(line);
+            stepDetails.Add(new(now, "server", "Left out what was about Joule's own sign-in to Predbat, not your system", line));
+            i.StepDetails = stepDetails.ToList();
+        }
         if (i.Verdict == "no_change")
         {
             var since = request.Scheduled ? s.LastAnalysis : request.From;
@@ -520,7 +528,19 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
         if (i.Verdict is not "no_change")
         {
             i.Fingerprint = InvestigationQuality.Fingerprint(i, result.Proposals, s.Settings.Select(x => x.Key).ToHashSet(StringComparer.Ordinal));
-            if (s.Investigations.Where(x => x.Id != id && x.Fingerprint == i.Fingerprint && x.Status == "Completed" && x.RepeatOf is null && x.DismissedAt is null && x.Verdict is not "no_change" && x.At >= now.AddDays(-7))
+            // The same finding the user closed in the last 30 days is not raised again: it is recorded, closed, with its items.
+            var suppressedSince = now.AddDays(-RecommendationDecisions.SuppressionDays);
+            if (s.Investigations.Where(x => x.Id != id && x.Fingerprint == i.Fingerprint && x.Status == "Completed" && RecommendationDecisions.ClosedByUser(x) && x.DismissedAt >= suppressedSince)
+                .OrderByDescending(x => x.DismissedAt).FirstOrDefault() is { } closedByYou)
+            {
+                i.RepeatOf = closedByYou.Id; i.Severity = "info"; i.DismissedAt = now; i.ClosedReason = RecommendationDecisions.Repeat;
+                i.NextSteps.Clear(); i.FileChanges.Clear(); result.Proposals.Clear();
+                var line = $"server: finding not raised; you closed the same finding on {closedByYou.DismissedAt:yyyy-MM-dd}";
+                i.Steps.Add(line);
+                stepDetails.Add(new(now, "server", "Not raised again: you closed the same finding recently", line));
+                i.StepDetails = stepDetails.ToList();
+            }
+            else if (s.Investigations.Where(x => x.Id != id && x.Fingerprint == i.Fingerprint && x.Status == "Completed" && x.RepeatOf is null && x.DismissedAt is null && x.Verdict is not "no_change" && x.At >= now.AddDays(-7))
                 .OrderByDescending(x => x.At).FirstOrDefault() is { } original)
             {
                 original.Occurrences++; original.LastSeenAt = now;
@@ -641,7 +661,10 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
         var investigation = new Investigation { Title = Text(root, "title", 140), Summary = Text(root, "summary", 1200), Provider = provider, Request = request ?? new(), Category = category, Confidence = "Unverified", Evidence = Evidence(root), Steps = steps, ToolEvidence = tools, EvidenceReferences = References(root), NextSteps = InvestigationNextSteps.Parse(root, tools), FileChanges = InvestigationFileChanges.Parse(root) };
         // A follow-up the user dismissed recently is not raised again under the same title.
         var declinedCutoff = DateTimeOffset.UtcNow.AddDays(-RecommendationDecisions.SuppressionDays);
-        var declinedTitles = snapshot.Investigations.SelectMany(i => i.NextSteps).Where(x => x.DecidedAt >= declinedCutoff).Select(x => TitleKey(x.Title)).ToHashSet(StringComparer.Ordinal);
+        // Closed with findings the user closed, or as Joule's own traffic, counts as declined too.
+        var declinedTitles = snapshot.Investigations.SelectMany(i => i.NextSteps)
+            .Where(x => x.DecidedAt >= declinedCutoff || (x.ClosedReason is RecommendationDecisions.WithFindings or JouleOwnTraffic.ClosedReason && x.ClosedAt >= declinedCutoff))
+            .Select(x => TitleKey(x.Title)).ToHashSet(StringComparer.Ordinal);
         foreach (var repeated in investigation.NextSteps.Where(x => declinedTitles.Contains(TitleKey(x.Title))).ToList())
         { investigation.NextSteps.Remove(repeated); steps.Add($"server: follow-up \u201c{Cut(repeated.Title, 100)}\u201d not raised; you dismissed it in the last {RecommendationDecisions.SuppressionDays} days"); }
         // No default "problem": a missing verdict is inferred (no_change when nothing is raised and the title says so, otherwise a neutral finding).
@@ -680,7 +703,7 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
             }
             // The user declined a change in this direction with a reason: drop it quietly instead of failing the
             // finish, unless the same historical query now returns materially different results.
-            if (snapshot.Proposals.FirstOrDefault(x => x.Status == "Denied" && !string.IsNullOrWhiteSpace(x.DecisionNote) && x.DecidedAt >= declinedCutoff && SameDirection(x.Changes, proposal.Changes) && !FreshEvidence(x)) is { } declined)
+            if (snapshot.Proposals.FirstOrDefault(x => x.Status == "Denied" && (!string.IsNullOrWhiteSpace(x.DecisionNote) || x.ClosedReason != null) && x.DecidedAt >= declinedCutoff && SameDirection(x.Changes, proposal.Changes) && !FreshEvidence(x)) is { } declined)
             {
                 steps.Add($"server: proposal \u201c{Cut(proposal.Title, 100)}\u201d not raised; you declined the same change on {declined.DecidedAt:yyyy-MM-dd} with a note and no materially changed evidence was retrieved");
                 continue;
@@ -940,7 +963,7 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
             .Select(p => (At: p.DecidedAt!.Value, Text: $"setting change \u201c{Cut(p.Title, 120)}\u201d ({string.Join(", ", p.Changes.Select(c => $"{c.Key} {c.Before}→{c.After}"))}) denied{Note(p.DecisionNote)}")).ToList();
         foreach (var i in s.Investigations)
         {
-            if (i.DismissedAt is { } dismissed && dismissed >= cutoff) entries.Add((dismissed, $"finding \u201c{Cut(i.Title, 120)}\u201d disputed{Note(i.DecisionNote)}"));
+            if (i.DismissedAt is { } dismissed && dismissed >= cutoff && RecommendationDecisions.ClosedByUser(i)) entries.Add((dismissed, $"finding \u201c{Cut(i.Title, 120)}\u201d: {RecommendationDecisions.FindingClosedText(i)}{Note(i.DecisionNote)}"));
             entries.AddRange(i.NextSteps.Where(x => x.DecidedAt >= cutoff).Select(x => (x.DecidedAt!.Value, $"follow-up \u201c{Cut(x.Title, 120)}\u201d dismissed{Note(x.DecisionNote)}")));
             entries.AddRange(i.FileChanges.Where(x => x.Status == "dismissed" && x.DecidedAt >= cutoff).Select(x => (x.DecidedAt!.Value, $"{x.File} change \u201c{Cut(x.Summary, 120)}\u201d dismissed{Note(x.DecisionNote)}")));
         }
@@ -1084,7 +1107,7 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
             if (!string.IsNullOrWhiteSpace(i.Request.Question)) text.Append("  question: ").AppendLine(Cut(i.Request.Question, 160));
             text.Append("  summary: ").AppendLine(Cut(i.Summary, 500));
             if (i.NextSteps.Count > 0) text.Append("  to-dos: ").AppendLine(string.Join("; ", i.NextSteps.Select(n => n.Title)));
-            if (i.DismissedAt != null) text.Append("  the user disputed this finding").AppendLine(string.IsNullOrWhiteSpace(i.DecisionNote) ? "" : $": {Cut(i.DecisionNote, 300)}");
+            if (i.DismissedAt != null) text.Append("  ").Append(RecommendationDecisions.FindingClosedText(i)).AppendLine(string.IsNullOrWhiteSpace(i.DecisionNote) ? "" : $": {Cut(i.DecisionNote, 300)}");
             else if (i.Thread.LastOrDefault(m => m.Role == "user") is { } reply) text.Append("  the user replied: ").AppendLine(Cut(reply.Text, 300));
             var proposals = s.Proposals.Where(p => p.InvestigationId == i.Id).ToList();
             if (proposals.Count > 0) text.Append("  suggestions: ").AppendLine(string.Join("; ", proposals.Select(p => $"{p.Title} [{p.Status}]")));
@@ -1117,7 +1140,7 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
         string Section(string name, object value, int limit) => "\n" + name + " (untrusted data):\n" + InvestigationContext.Excerpt(
             InvestigationContext.Text(SafeModelText(JsonSerializer.Serialize(value, CompactOptions))).Content, limit);
         string TextSection(string name, string text, int limit) => "\n## " + name + " (untrusted data)\n" + InvestigationContext.Excerpt(SafeModelText(text), limit);
-        return Instructions + "\n" + FinishFieldLimits + "\nTelemetry SQL columns: " + JsonSerializer.Serialize(TelemetrySchema.Tables, CompactOptions)
+        return Instructions + "\n" + JouleOwnTraffic.Rule + "\n" + FinishFieldLimits + "\nTelemetry SQL columns: " + JsonSerializer.Serialize(TelemetrySchema.Tables, CompactOptions)
             + Section("Run", new { utcNow = now, localNow = Local(now, zone), hostTimeZone = zone.Id, request = new { request.Question, request.From, request.To, request.Scheduled, request.Trigger }, mode = s.Mode, s.Revision, s.LastAnalysis, s.DataSource, predbatLastCollection = s.LastCollection, predbatCollectionError = s.CollectionError, mcpConnected }, 4000)
             + TextSection("Household objective", $"{HouseholdObjective.Label(s.HouseholdObjective)}: {HouseholdObjective.Describe(s.HouseholdObjective)}", 400)
             + TextSection("Money (net cost is the figure to quote)", Guarded(() => MoneyBrief(zone, now)), 1500)
