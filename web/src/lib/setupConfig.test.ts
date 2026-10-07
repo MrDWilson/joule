@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   field,
+  foundFromLabel,
   fromEnvironment,
   generateAccessKey,
+  meterChanges,
   normaliseAddress,
   saveAndRestart,
+  type MeterSuggestion,
   type SetupConfig,
 } from "./setupConfig";
 
@@ -91,5 +94,67 @@ describe("setup config", () => {
         : new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } }),
     );
     await expect(saveAndRestart({}, { intervalMs: 1, timeoutMs: 20 })).rejects.toThrow(/docker compose logs joule/);
+  });
+});
+
+describe("meter choices", () => {
+  const meter = (
+    metric: string,
+    key: string,
+    current: string | null,
+    extra: Partial<MeterSuggestion> = {},
+  ): MeterSuggestion => ({
+    metric,
+    key,
+    envVar: key.replace(/:/g, "__"),
+    current,
+    entity: current,
+    from: null,
+    state: null,
+    unit: null,
+    alternatives: [],
+    ...extra,
+  });
+  const meters = [
+    meter("load", "HomeAssistant:Entities:Load", "sensor.load_today", { auto: true }),
+    meter("pv", "HomeAssistant:Entities:Pv", "sensor.pv_today"),
+    meter("ev", "HomeAssistant:Entities:Ev", null, { entity: "sensor.zappi_session" }),
+    meter("soc", "HomeAssistant:Entities:Soc", null, { entity: null, declined: true }),
+    meter("grid_import", "HomeAssistant:Entities:GridImport", "sensor.from_env"),
+  ];
+  const env = (key: string) => key === "HomeAssistant:Entities:GridImport";
+
+  it("changes nothing while every choice matches what is in use", () => {
+    const choice = {
+      "HomeAssistant:Entities:Load": "sensor.load_today",
+      "HomeAssistant:Entities:Pv": "sensor.pv_today",
+    };
+    expect(meterChanges(meters, choice, env)).toEqual({});
+  });
+
+  it("saves none when a sensor in use is set to Not mapped, so Joule doesn't find it again", () => {
+    const choice = {
+      "HomeAssistant:Entities:Load": "",
+      "HomeAssistant:Entities:Pv": "",
+      "HomeAssistant:Entities:GridImport": "",
+    };
+    expect(meterChanges(meters, choice, env)).toEqual({
+      "HomeAssistant:Entities:Load": "none",
+      "HomeAssistant:Entities:Pv": "none",
+    });
+  });
+
+  it("saves a picked sensor, including for a meter left unmapped before, and leaves meters without a choice alone", () => {
+    const choice = { "HomeAssistant:Entities:Ev": "sensor.zappi_session", "HomeAssistant:Entities:Soc": "sensor.soc" };
+    expect(meterChanges(meters, choice, env)).toEqual({
+      "HomeAssistant:Entities:Ev": "sensor.zappi_session",
+      "HomeAssistant:Entities:Soc": "sensor.soc",
+    });
+  });
+
+  it("says where an automatic sensor came from in words", () => {
+    expect(foundFromLabel("load_today in apps.yaml")).toBe("Found automatically in Predbat's apps.yaml (load_today)");
+    expect(foundFromLabel("name and unit match")).toBe("Found automatically among Predbat's sensors");
+    expect(foundFromLabel(null)).toBe("Found automatically from Predbat");
   });
 });

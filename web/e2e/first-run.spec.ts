@@ -33,6 +33,8 @@ test.beforeAll(async () => {
   predbatUrl = `http://127.0.0.1:${(predbat.address() as AddressInfo).port}`;
 });
 test.afterAll(async () => {
+  // Joule keeps its connections to Predbat open between reads; close them rather than wait for them to idle out.
+  predbat.closeAllConnections();
   await new Promise((resolve) => predbat.close(resolve));
 });
 
@@ -68,21 +70,43 @@ test("a fresh install is the demo, and Setup connects it to Predbat without touc
   // Joule restarts in-process, the page reloads signed in, and the live checklist takes over.
   await expect(page.getByRole("heading", { name: "Get Joule running" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/^Read (just now|\d+ min)/).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("button", { name: /^Status: Setup 1\/6/ })).toBeVisible();
+  // Predbat is read and its meters were found on the first reading, with nothing configured: only the AI is left to do.
+  await expect(page.getByRole("button", { name: /^Status: Setup 2\/6/ })).toBeVisible({ timeout: 30_000 });
 });
 
-test("the live checklist finds the meters Predbat sees and saves them after a check", async ({ page }) => {
+test("the live checklist finds the meters from Predbat by itself, and any of them can be changed", async ({ page }) => {
   await page.goto("/");
   await page.evaluate((key) => sessionStorage.setItem("joule-access", key), accessKey);
   await page.goto("/#/setup");
   await page.reload();
-  await expect(page.getByText(/Suggested by name and unit/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByLabel("Home use · needed")).toHaveValue("sensor.inverter_xx0000_load_energy_today_kwh");
-  await expect(page.getByLabel("Battery level")).toHaveValue("sensor.inverter_xx0000_soc");
-  // The person can change any suggestion before saving.
-  await page.getByLabel("Grid export").selectOption("");
-  await page.getByRole("button", { name: "Use these meters (4 changes)" }).click();
-  await expect(page.getByText("4 of 10 meters mapped")).toBeVisible({ timeout: 60_000 });
+  // Nothing was configured: Joule found the five meters Predbat's sensors make clear, on its first reading.
+  const summary = page.getByText("5 of 11 meters mapped · 5 found automatically");
+  await expect(summary).toBeVisible({ timeout: 30_000 });
+  await summary.click();
+  const meters = page.locator(".check-step").filter({ hasText: "Map your Home Assistant meters" }).locator("li.meter");
+  const home = meters.filter({ hasText: "Home use" });
+  await expect(home).toContainText("sensor.inverter_xx0000_load_energy_today_kwh");
+  await expect(home).toContainText("Found automatically from Predbat");
+  await expect(meters.filter({ hasText: "Battery level" })).toContainText("sensor.inverter_xx0000_soc");
+
+  // Change opens the choices at that meter. Not mapped keeps Joule from finding it again.
+  await page.getByRole("button", { name: "Change Grid export" }).click();
+  const exportChoice = page.getByLabel("Grid export");
+  await expect(exportChoice).toBeFocused();
+  await expect(exportChoice).toHaveValue("sensor.inverter_xx0000_export_energy_today_kwh");
+  await exportChoice.selectOption("");
+  await expect(page.getByText("Joule won't look for this one again")).toBeVisible();
+  await page.getByRole("button", { name: "Use these meters (1 change)" }).click();
+  const after = page.getByText("4 of 11 meters mapped · 4 found automatically");
+  await expect(after).toBeVisible({ timeout: 60_000 });
+  await after.click();
+  await expect(
+    page
+      .locator(".check-step")
+      .filter({ hasText: "Map your Home Assistant meters" })
+      .locator("li.meter")
+      .filter({ hasText: "Grid export" }),
+  ).toContainText("Left unmapped");
 });
 
 test("a new browser has to sign in with the key once the dashboard is live", async ({ page }) => {
