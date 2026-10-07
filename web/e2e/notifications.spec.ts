@@ -31,7 +31,9 @@ test("Setup › Notifications is read-only in a public demo", async ({ page }) =
 
 /** A scripted /api/push/* that behaves like the server: saving updates the fields, secrets never come back. */
 async function scriptedPush(page: Page) {
-  const view: Json = await (await page.request.get("/api/push/settings", { headers: { "X-Joule-Request": "1" } })).json();
+  const view: Json = await (
+    await page.request.get("/api/push/settings", { headers: { "X-Joule-Request": "1" } })
+  ).json();
   view.canSave = true;
   view.locked = null;
   const posts: Json[] = [];
@@ -42,7 +44,8 @@ async function scriptedPush(page: Page) {
         ...view.general,
         ...view.channels.flatMap((c: Json) => [c.enabledField, c.eventsField, c.quietField, ...c.fields]),
       ])
-        if (f.key === key) Object.assign(f, { value: f.secret ? null : value, set: !!value, source: value ? "saved" : null });
+        if (f.key === key)
+          Object.assign(f, { value: f.secret ? null : value, set: !!value, source: value ? "saved" : null });
     }
     for (const c of view.channels) {
       c.enabled = c.enabledField.value === "true";
@@ -110,6 +113,11 @@ for (const width of [1440, 390]) {
     await toggle.click();
     await expect(ntfy.getByText("On", { exact: true })).toBeVisible();
     expect(posts.at(-1)).toEqual({ "Notifications:Ntfy:Enabled": "true" });
+    // A saved token can be removed, not only replaced.
+    await ntfy.getByRole("button", { name: "Remove saved access token" }).click();
+    await expect(ntfy.getByLabel("Access token (optional)")).not.toHaveAttribute("placeholder", /Saved/);
+    expect(posts.at(-1)).toEqual({ "Notifications:Ntfy:Token": null });
+    await expect(ntfy.getByRole("button", { name: "Remove saved access token" })).toHaveCount(0);
     await expect(page.locator(".push-log")).toContainText("Test · ntfy");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(
       0,

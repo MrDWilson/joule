@@ -91,24 +91,40 @@ function TextField({
   onChange,
   type = "text",
   disabled,
+  onRemove,
 }: {
   field: PushField;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   disabled?: boolean;
+  /** For a secret saved in Setup: forget it. */
+  onRemove?: () => void;
 }) {
   const id = useId();
   if (field.source === "environment") return <EnvironmentNote envVar={field.envVar} />;
   if (field.secret)
     return (
-      <SecretInput
-        label={field.label}
-        value={value}
-        onChange={onChange}
-        note={field.note ?? undefined}
-        placeholder={field.set ? "Saved · type a new one to replace it" : (field.placeholder ?? undefined)}
-      />
+      <>
+        <SecretInput
+          label={field.label}
+          value={value}
+          onChange={onChange}
+          note={field.note ?? undefined}
+          placeholder={field.set ? "Saved · type a new one to replace it" : (field.placeholder ?? undefined)}
+        />
+        {field.set && field.source === "saved" && onRemove && (
+          <span className="push-remove">
+            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRemove}>
+              Remove saved{" "}
+              {field.label
+                .replace(/ \(optional\)$/, "")
+                .replace(/^Your /, "")
+                .toLowerCase()}
+            </Button>
+          </span>
+        )}
+      </>
     );
   return (
     <>
@@ -234,6 +250,7 @@ function ChannelCard({
   const [test, setTest] = useState<{ busy: boolean; ok?: boolean; message?: string }>({ busy: false });
   const save = useSave(onSaved);
   const toggle = useSave(onSaved);
+  const remove = useSave(onSaved);
 
   const changes: Record<string, string | null> = {};
   for (const f of c.fields) {
@@ -287,9 +304,9 @@ function ChannelCard({
         <p className="push-problem muted">{c.problem}</p>
       )}
       {c.ready && !c.enabled && !env && <p className="push-problem muted">Ready. Turn it on with the switch.</p>}
-      {toggle.error && (
+      {(toggle.error || remove.error) && (
         <p className="sheet-warning" role="alert">
-          {toggle.error}
+          {toggle.error || remove.error}
         </p>
       )}
       <Disclosure summary="Settings" defaultOpen={false}>
@@ -315,8 +332,9 @@ function ChannelCard({
                 key={f.key}
                 field={f}
                 value={values[f.key] ?? ""}
-                disabled={!canSave}
+                disabled={!canSave || remove.busy}
                 onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))}
+                onRemove={() => void remove.run({ [f.key]: null })}
               />
             ),
           )}

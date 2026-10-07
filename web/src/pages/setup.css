@@ -1547,7 +1547,8 @@ button.setting-line:focus-visible {
   gap: var(--space-2);
 }
 .push-form > .button,
-.push-form .setup-actions {
+.push-form .setup-actions,
+.push-form .push-remove {
   align-self: flex-start;
 }
 .push-form .field {
