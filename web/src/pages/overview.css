@@ -148,6 +148,12 @@
   line-height: var(--lh-normal);
 }
 
+/* The net cost tile's second line: the standing charge in the figure. */
+.stat-delta-line {
+  display: block;
+  color: var(--text-3);
+}
+
 /* Battery ring. */
 .battery-ring {
   display: flex;

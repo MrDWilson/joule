@@ -63,6 +63,32 @@ export interface EnergySummary {
   gridEnergyUnknown?: boolean;
   estimatedCostGbp?: number;
   costGaps?: CostGap[];
+  /** The standing charge for the window (£), prorated by the share of each day covered up to now. Never part of netCostGbp. */
+  standingChargeGbp?: number | null;
+  /** The rate on the window's last day, pence per day. */
+  standingChargePencePerDay?: number | null;
+  /** "sensor" (Home Assistant) or "manual" (typed into Setup). */
+  standingChargeSource?: string | null;
+  /** An early day took the first rate Joule recorded. */
+  standingChargeAssumed?: boolean;
+  /** The owner's choice: the headline net cost includes the standing charge. */
+  standingChargeIncluded?: boolean;
+  netCostWithStandingChargeGbp?: number | null;
+}
+
+/** GET /api/telemetry/standing-charge. */
+export interface StandingChargeSettings {
+  includeInNet: boolean;
+  manualPencePerDay: number | null;
+  /** The Home Assistant sensor Joule reads; origin "octopus" when worked out from the Octopus import rate sensor. */
+  entity: string | null;
+  entityOrigin: "configured" | "octopus" | null;
+  sensorPencePerDay: number | null;
+  sensorAt: string | null;
+  sensorStatus: string | null;
+  todayPencePerDay: number | null;
+  todaySource: string | null;
+  recent: { day: string; pencePerDay: number; source: string; entityId: string | null; recordedAt: string }[];
 }
 export interface LatestReading {
   value: number | null;

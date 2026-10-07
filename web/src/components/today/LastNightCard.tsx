@@ -3,6 +3,7 @@ import { Hint } from "../Hint";
 import { gbp, kwh, number, percent, pence } from "../../lib/format";
 import { clock } from "../../lib/time";
 import type { EnergySummary } from "../../completion-types";
+import { headlineNet, standingCharge } from "../../lib/energy";
 import { windowWhen } from "../plan/windows";
 import type { LastNight, NightFlag } from "./model";
 
@@ -40,12 +41,7 @@ export function LastNightCard({
   now: number;
   timeZone?: string;
 }) {
-  const yNet = yesterday
-    ? (yesterday.netCostGbp ??
-      (yesterday.importCostGbp != null || yesterday.exportCreditGbp != null
-        ? (yesterday.importCostGbp ?? 0) - (yesterday.exportCreditGbp ?? 0)
-        : null))
-    : null;
+  const yNet = headlineNet(yesterday);
   if (!night && yNet == null) return null;
   const reached = night?.peak && night.socEnd != null && night.peak.value - night.socEnd >= 3 ? night.peak : null;
   return (
@@ -146,6 +142,7 @@ export function LastNightCard({
           </strong>
           <span className="muted">
             paid {gbp(yesterday.importCostGbp)} · earned {gbp(yesterday.exportCreditGbp)}
+            {standingCharge(yesterday)?.included ? ` · standing ${standingCharge(yesterday)!.text}` : ""}
           </span>
         </p>
       )}

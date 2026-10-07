@@ -8,6 +8,7 @@ import type { Investigation, Usage } from "../../types";
 import { gbp, kw, kwh, number, percent } from "../../lib/format";
 import { clock, localDate } from "../../lib/time";
 import { metricLabel } from "../../lib/labels";
+import { standingCharge, type StandingChargeView } from "../../lib/energy";
 import { investigationVerdict, type VerdictView } from "../InvestigationText";
 import { slotAction } from "../../lib/planActions";
 import { dayWord, type ActionView, type PlanSlotLike, type PlanWindow } from "../plan/windows";
@@ -253,13 +254,18 @@ export interface CostView {
   breakdown: string;
   /** Which meter is short and when, when a side is below 95%. */
   note: string | null;
+  /** Today's standing charge so far, whether or not it is in `value`. */
+  standing: StandingChargeView | null;
 }
-/** Net cost = what you paid for imports minus what you earned from exports, each with its own coverage. */
+/**
+ * Net cost = what you paid for imports minus what you earned from exports, each with its own coverage, plus the standing
+ * charge so far when the owner includes it (the default once Joule knows it).
+ */
 export function costView(summary: SummaryDetail | null | undefined, timeZone?: string): CostView | null {
   if (!summary) return null;
   const paid = finite(summary.importCostGbp) ? summary.importCostGbp : null;
   const earned = finite(summary.exportCreditGbp) ? summary.exportCreditGbp : null;
-  const net = finite(summary.netCostGbp)
+  const energy = finite(summary.netCostGbp)
     ? summary.netCostGbp
     : paid != null || earned != null
       ? (paid ?? 0) - (earned ?? 0)
@@ -267,6 +273,8 @@ export function costView(summary: SummaryDetail | null | undefined, timeZone?: s
         finite(summary.observedNetCostGbp)
         ? summary.observedNetCostGbp
         : null;
+  const standing = standingCharge(summary);
+  const net = energy != null && standing?.included ? energy + standing.amount : energy;
   const importCover = summary.importCostCoverage ?? summary.costCoverageFraction ?? 0;
   const exportCover = summary.exportCostCoverage ?? summary.costCoverageFraction ?? 0;
   const approx =
@@ -290,6 +298,7 @@ export function costView(summary: SummaryDetail | null | undefined, timeZone?: s
     earned,
     breakdown: `Paid ${gbp(paid)} · Earned ${gbp(earned)}`,
     note: short.length ? short.join("; ") : null,
+    standing,
   };
 }
 
@@ -501,8 +510,11 @@ export function soFarSentence({
   if (cost && cost.value !== "—") {
     const value = cost.value.replace("≈ ", "≈");
     const money = cost.earning ? `Up ${value} today` : `Net cost ${value} so far`;
+    const standing = cost.standing?.included ? `, standing charge ${cost.standing.text}` : "";
     const detail =
-      cost.paid != null || cost.earned != null ? ` (paid ${gbp(cost.paid)}, earned ${gbp(cost.earned)})` : "";
+      cost.paid != null || cost.earned != null
+        ? ` (paid ${gbp(cost.paid)}, earned ${gbp(cost.earned)}${standing})`
+        : "";
     parts.push(`${money}${detail}`);
   }
   const endedToday =

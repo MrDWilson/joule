@@ -91,8 +91,12 @@ export function TodayTiles({
           <>
             {cost?.earning ? "Net earnings" : "Net cost"}
             <Hint label="How is net cost worked out?">
-              What you paid for electricity from the grid today, minus what you were paid for exporting. Standing
-              charges aren’t included.
+              What you paid for electricity from the grid today, minus what you were paid for exporting
+              {cost?.standing
+                ? cost.standing.included
+                  ? `, plus the standing charge (${cost.standing.rate}) for the part of today so far.`
+                  : `. The standing charge (${cost.standing.rate}) is left out, as chosen in Setup › Sensors.`
+                : ". Joule doesn’t know your standing charge yet: add it in Setup › Sensors."}
             </Hint>
           </>
         }
@@ -100,7 +104,18 @@ export function TodayTiles({
         icon={<Wallet />}
         accent={cost?.earning ? "export" : "neutral"}
         sparkline={cost ? <PaidEarnedBar paid={cost.paid} earned={cost.earned} /> : undefined}
-        delta={cost ? cost.breakdown : undefined}
+        delta={
+          cost ? (
+            <>
+              {cost.breakdown}
+              {cost.standing?.included && (
+                <span className="stat-delta-line">
+                  Standing charge {cost.standing.text} · {cost.standing.rate}
+                </span>
+              )}
+            </>
+          ) : undefined
+        }
         footnote={costDelta}
         status={cost?.note ? <Chip tone="warn">{cost.note}</Chip> : undefined}
       />

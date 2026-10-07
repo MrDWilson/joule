@@ -11,6 +11,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Api, EnergySummary } from "../../completion-types";
 import { gbp, kwh, percent } from "../../lib/format";
+import { headlineNet, standingCharge } from "../../lib/energy";
 import { ChartFigure, ChartTable, FloatingTip, LegendChips, TipRow, useHiddenSeries, useWidth, type Chip } from "./kit";
 import { barPath } from "./paths";
 import { divergingTicks, fittedTicks, linear, tickText } from "./scale";
@@ -47,6 +48,9 @@ interface DayRow {
   costCoverage: number;
   paid: number | null;
   earned: number | null;
+  /** The day's standing charge (£) and whether it is in `cost`. */
+  standing: number | null;
+  standingIncluded: boolean;
 }
 
 /**
@@ -68,7 +72,8 @@ function homeOf(d: EnergySummary, load: DayValue, ev: DayValue, loadIncludesEv: 
  */
 function netCostOf(d: EnergySummary): { cost: number | null; coverage: number } {
   if (d.netCostGbp === undefined) return { cost: d.observedNetCostGbp, coverage: d.costCoverageFraction };
-  return { cost: d.netCostGbp, coverage: Math.min(d.importCostCoverage ?? 0, d.exportCostCoverage ?? 0) };
+  // With the standing charge when the owner includes it, as the headline figure does.
+  return { cost: headlineNet(d), coverage: Math.min(d.importCostCoverage ?? 0, d.exportCostCoverage ?? 0) };
 }
 
 /** One day's figures, with home use excluding the car only when the load meter includes it. */
@@ -90,6 +95,8 @@ export function dayRow(d: EnergySummary, timeZone: string, loadIncludesEv = true
     costCoverage: net.coverage,
     paid: d.importCostGbp,
     earned: d.exportCreditGbp,
+    standing: standingCharge(d)?.amount ?? null,
+    standingIncluded: !!standingCharge(d)?.included,
   };
 }
 
@@ -567,6 +574,13 @@ function CostBars({ rows }: { rows: DayRow[] }) {
               />
               <TipRow color="transparent" name="Paid for imports" value={gbp(r.paid)} />
               <TipRow color="transparent" name="Earned from exports" value={gbp(r.earned)} />
+              {r.standing != null && (
+                <TipRow
+                  color="transparent"
+                  name={r.standingIncluded ? "Standing charge" : "Standing charge (not counted)"}
+                  value={gbp(r.standing)}
+                />
+              )}
               {r.costCoverage < 0.98 && (
                 <p className="chart-tip-note">{`${percent(r.costCoverage, { fraction: true, round: "floor" })} of the day priced`}</p>
               )}

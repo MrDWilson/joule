@@ -156,6 +156,17 @@ describe("costView", () => {
     expect(c).toMatchObject({ value: "£1.05", label: "Net cost today", approx: false, earning: false, note: null });
     expect(c.breakdown).toBe("Paid £1.83 · Earned £0.77");
   });
+  it("adds today's standing charge so far when it is included, and keeps paid and earned as measured", () => {
+    const standing = { standingChargeGbp: 0.27, standingChargePencePerDay: 53.68, standingChargeIncluded: true };
+    const c = costView({ ...live, ...standing }, TZ)!;
+    expect(c.value).toBe("£1.32");
+    expect(c.breakdown).toBe("Paid £1.83 · Earned £0.77");
+    expect(c.standing).toMatchObject({ text: "£0.27", rate: "£0.54/day", included: true });
+    expect(soFarSentence({ cost: c, night: null, needs: 0 })).toBe(
+      "Net cost £1.32 so far (paid £1.83, earned £0.77, standing charge £0.27) · nothing needs you",
+    );
+    expect(costView({ ...live, ...standing, standingChargeIncluded: false }, TZ)!.value).toBe("£1.05");
+  });
   it("reads a negative net as earnings, in plain pounds", () => {
     const c = costView({ ...live, importCostGbp: 0.4, exportCreditGbp: 4.65, netCostGbp: -4.25 }, TZ)!;
     expect(c).toMatchObject({ value: "£4.25", label: "Net earnings today", earning: true });

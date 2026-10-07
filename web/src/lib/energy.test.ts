@@ -14,6 +14,9 @@ import {
   reportTitle,
   sensorHeadline,
   sensorRows,
+  headlineNet,
+  standingCharge,
+  standingChargeNote,
 } from "./energy";
 
 const London = { timeZone: "Europe/London", now: Date.parse("2026-10-05T09:55:00Z") };
@@ -87,6 +90,39 @@ describe("netCost", () => {
     delete old.netCostGbp;
     expect(netCost(old, London).text).toBe("£1.10");
     expect(netCost(null).text).toBe("—");
+  });
+});
+
+describe("standing charge", () => {
+  const withStanding = (extra: Partial<EnergySummary> = {}) =>
+    liveMorning({
+      standingChargeGbp: 0.2236,
+      standingChargePencePerDay: 53.68,
+      standingChargeSource: "sensor",
+      standingChargeIncluded: true,
+      ...extra,
+    });
+  it("is in the headline net cost by default, with its own line and daily rate", () => {
+    const n = netCost(withStanding(), London);
+    expect(n.text).toBe("£1.33");
+    expect(n.paid).toBe("£1.80");
+    expect(n.standing).toMatchObject({ text: "£0.22", rate: "£0.54/day", included: true, source: "sensor" });
+    expect(headlineNet(withStanding())).toBeCloseTo(1.1037 + 0.2236, 6);
+    expect(standingChargeNote(withStanding())).toBe("Costs include the standing charge (£0.54/day).");
+  });
+  it("stays out of the headline when the owner leaves it out, but is still named", () => {
+    const s = withStanding({ standingChargeIncluded: false });
+    expect(netCost(s, London).text).toBe("£1.10");
+    expect(netCost(s, London).standing?.included).toBe(false);
+    expect(headlineNet(s)).toBeCloseTo(1.1037, 6);
+    expect(standingChargeNote(s)).toBe(
+      "Costs leave out the standing charge (£0.54/day), as chosen in Setup › Sensors.",
+    );
+  });
+  it("is absent when Joule doesn't know the rate", () => {
+    expect(standingCharge(liveMorning())).toBeNull();
+    expect(netCost(liveMorning(), London).standing).toBeNull();
+    expect(standingChargeNote(liveMorning())).toBe("Costs leave out the standing charge: set it in Setup › Sensors.");
   });
 });
 

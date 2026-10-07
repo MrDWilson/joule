@@ -112,6 +112,12 @@
 .energy-paid > span {
   white-space: pre;
 }
+/* The standing charge is its own line under Paid · Earned. */
+.energy-paid > .energy-standing,
+.report-paid > .report-standing {
+  flex-basis: 100%;
+  white-space: normal;
+}
 .energy-hero-note {
   margin: 0;
   color: var(--warn);
