@@ -43,6 +43,8 @@ public sealed class StateService
         foreach(var revision in result.Revisions) investigationReadSanitizer.SanitizeCopy(revision);
         result.AnalysisError = investigationReadSanitizer.Clean(result.AnalysisError);
         result.Activities = result.Activities.Select(a => a with { Message = investigationReadSanitizer.Clean(a.Message)! }).ToList();
+        NotificationInbox.Present(result, DateTimeOffset.UtcNow);
+        foreach(var item in result.Inbox){item.Title=investigationReadSanitizer.Clean(item.Title)!;item.Detail=investigationReadSanitizer.Clean(item.Detail);}
         foreach(var e in result.Experiments)
         {
             // Old persisted scores may have used native/embedded Predbat values.

@@ -3,8 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace Joule;
 
-/// <summary>A setting the Setup page can save. Kind: bool, url, entity, accessKey or token. Secrets are never sent to the browser.</summary>
-public sealed record SetupField(string Key, string Kind, bool Secret)
+/// <summary>A setting the Setup page can save. Kind: bool, url, entity, accessKey or token, or one of the notification kinds (see
+/// PushCatalogue.Validate). Secrets are never sent to the browser. Live settings are read as they are saved and need no restart.</summary>
+public sealed record SetupField(string Key, string Kind, bool Secret, bool Live = false)
 {
     /// <summary>The environment variable that sets (and overrides) this value, e.g. Predbat__BaseUrl.</summary>
     public string EnvVar => Key.Replace(":", "__");
@@ -32,6 +33,7 @@ public sealed class SavedSettings
         .. SensorCandidates.EnvNames.Values.Select(name => new SetupField("HomeAssistant:Entities:" + name, "entity", false)),
         new("Ai:ApiBaseUrl", "url", false),
         new("Ai:ApiKey", "token", true),
+        .. PushCatalogue.Fields(),
     ];
     static readonly Dictionary<string, SetupField> byKey = Fields.ToDictionary(f => f.Key, StringComparer.OrdinalIgnoreCase);
     public static SetupField? Field(string key) => byKey.GetValueOrDefault(key);
@@ -51,6 +53,9 @@ public sealed class SavedSettings
 
     /// <summary>The values saved in settings.json now (including any saved since start), by key.</summary>
     public IReadOnlyDictionary<string, string> Saved { get { lock (gate) return new Dictionary<string, string>(saved, StringComparer.OrdinalIgnoreCase); } }
+
+    /// <summary>A live setting's value now: the environment's when it sets one, otherwise what Setup saved (even since start).</summary>
+    public string? Current(string key, IConfiguration configuration) => External.Contains(key) ? configuration[key] : Saved.GetValueOrDefault(key);
 
     /// <summary>"environment" when set outside settings.json, "saved" when it comes from Setup, otherwise null (the default).</summary>
     public string? Source(string key) => External.Contains(key) ? "environment" : Saved.ContainsKey(key) ? "saved" : null;
@@ -113,7 +118,7 @@ public sealed class SavedSettings
             case "token":
                 return v.Length is > 0 and <= 4096 && v.All(c => c is >= '!' and <= '~') ? null : "That doesn't look like a token: no spaces or special characters, up to 4096 characters.";
             default:
-                return "This setting can't be saved from Setup.";
+                return PushCatalogue.Validate(field.Kind, v) ?? (PushCatalogue.Fields().Any(f => f.Kind == field.Kind) ? null : "This setting can't be saved from Setup.");
         }
     }
     static string Short(string v) => v.Length > 60 ? v[..60] + "…" : v;

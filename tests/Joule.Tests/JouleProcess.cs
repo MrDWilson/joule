@@ -42,7 +42,7 @@ sealed class JouleProcess : IAsyncDisposable
         var start = new ProcessStartInfo(DotnetHost) { WorkingDirectory = Directory, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         start.ArgumentList.Add(typeof(StateService).Assembly.Location);
         foreach (var a in args) start.ArgumentList.Add(a);
-        foreach (var name in start.Environment.Keys.Where(x => new[] { "App__", "Predbat__", "HomeAssistant__", "ConfigFiles__", "Ai__", "ASPNETCORE_", "DOTNET_", "URLS" }.Any(prefix => x.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))).ToArray())
+        foreach (var name in start.Environment.Keys.Where(x => new[] { "App__", "Predbat__", "HomeAssistant__", "ConfigFiles__", "Ai__", "Notifications__", "ASPNETCORE_", "DOTNET_", "URLS" }.Any(prefix => x.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))).ToArray())
             start.Environment.Remove(name);
         start.Environment["ASPNETCORE_URLS"] = "http://127.0.0.1:0";
         start.Environment["App__DataDirectory"] = Directory;
