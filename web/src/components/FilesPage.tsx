@@ -9,6 +9,9 @@ import { plural } from "../lib/copy";
 import { api as callApi } from "../lib/api";
 import type { PredbatAppsView } from "../lib/setupApi";
 import type { FileDiff, FileInventory, FilesProps, FileVersion, FileView } from "../completion-types";
+import { EDIT_VOLUME_LINES, useConfigEditStatus } from "../lib/configEdits";
+import { useSetupConfig } from "../lib/setupConfig";
+import { ConfigEditSetup } from "./setup/ConfigEditPermission";
 
 interface RestoreDraft {
   target: FileVersion;
@@ -116,6 +119,8 @@ export function FilesPage({
     [reload, setReload] = useState<{ revision: number } | null>(null),
     [showAll, setShowAll] = useState(false);
   const viewer = useRef<HTMLElement>(null);
+  const editStatus = useConfigEditStatus();
+  const { config: setupConfig } = useSetupConfig();
   // Only the latest inventory request is applied, so overlapping loads can't refetch the file view twice.
   const loadRequest = useRef(0);
   async function load() {
@@ -207,10 +212,20 @@ export function FilesPage({
             <Chip tone="neutral">Not set up</Chip>
           </div>
           <ol className="files-steps">
-            <li>Mount Predbat's configuration folder into Joule's container (for example at /predbat-config).</li>
+            <li>
+              Mount Predbat's configuration folder (the one holding apps.yaml) into Joule's container, in Joule's
+              docker-compose service:
+            </li>
+          </ol>
+          <EnvSnippet lines={EDIT_VOLUME_LINES} label="Compose volume for Predbat's config folder" />
+          <ol className="files-steps" start={2}>
             <li>Add these lines to Joule's environment and restart Joule:</li>
           </ol>
           <EnvSnippet lines={SETUP_LINES} label="File copy settings" />
+          <p className="muted">
+            Add <code className="entity-id">ConfigFiles__AllowEdits=true</code> too and Joule can also make the AI's
+            apps.yaml edits for you, keeping a copy it can put back.
+          </p>
         </section>
         {mcpConfigured && <PredbatApps />}
       </div>
@@ -290,7 +305,7 @@ export function FilesPage({
         <p>
           <strong>Keeping copies of {inventory?.status.allowedFiles.join(", ")}</strong>
           <span className="muted">
-            {demo ? "Demo: a copy of the demo's settings file. " : ""}
+            {demo ? "Demo: copies of the demo's settings file and its sample apps.yaml. " : ""}
             {plural(versions.length, "copy", "copies")}
             {latest ? ` · latest ${dayTime(latest.at)}` : ""}
           </span>
@@ -306,6 +321,12 @@ export function FilesPage({
           Save a copy now
         </Button>
       </div>
+
+      {editStatus?.configured && (
+        <section className="files-card" aria-labelledby="config-edits">
+          <ConfigEditSetup status={editStatus} config={setupConfig} />
+        </section>
+      )}
 
       <section aria-labelledby="files-copies">
         <h2 id="files-copies" className="files-heading">

@@ -24,7 +24,7 @@ Joule is a self-hosted dashboard and AI analyst for [Predbat](https://springfall
 
 - **Plan versus reality.** Every half-hour Predbat planned, next to what your meters measured: house load, solar, grid, battery and EV, with Predbat's own reasons in plain English.
 - **Reviews in plain English.** Ask "why did the battery barely charge overnight?", or let it review on a schedule. It reads Predbat's plan, settings and logs plus your measured data, and says what happened and why, showing the evidence it looked at.
-- **Changes you approve.** When the fix is a Predbat setting you get the exact value, with Predbat's own documentation cited, and a one-click undo. File edits (such as `apps.yaml`) come as a reviewable diff you apply yourself.
+- **Changes you approve.** When the fix is a Predbat setting you get the exact value, with Predbat's own documentation cited, and a one-click undo. File edits (such as `apps.yaml`) come as a reviewable diff: copy it in yourself, or let Joule make it with a backup it puts back if Predbat objects.
 - **Trials.** Each change is judged on equal before-and-after periods for forecast accuracy and measured cost, with warnings when the comparison is muddied by weather, tariffs or car charging.
 - **It learns your house.** Tell it once that you have a heat pump or that the battery must never charge the car, and every review takes it into account. Disagree with a suggestion and it either accepts your reason or shows its evidence.
 - **History.** Daily and weekly energy reports, a record of every setting change (including ones made outside Joule), and exact snapshots of your configuration files.
@@ -171,6 +171,7 @@ Setup covers what most installs need and saves it in the data volume (`settings.
 | `HomeAssistant__BaseUrl`, `HomeAssistant__AccessToken` | (none) | Optional: read Home Assistant directly instead of through Predbat. |
 | `HomeAssistant__TimeZone` | `Europe/London` | Your household's timezone, for "today" and reports. |
 | `ConfigFiles__Root`, `ConfigFiles__AllowedFiles__0` | (off) | Keep versioned snapshots of mounted Predbat files such as `apps.yaml`. |
+| `ConfigFiles__AllowEdits` | `false` | Let Joule make the AI's `apps.yaml` edits you review, with a copy it can put back ([how](docs/configuration.md#letting-joule-make-appsyaml-edits)). |
 
 If a setting is wrong, Joule stops at startup with one line saying what to fix and exit code 2. All data lives in the `/data` volume; [back it up](docs/configuration.md#data-and-backups) like any other database.
 

@@ -156,3 +156,107 @@
     padding: var(--space-4);
   }
 }
+
+/* "Apply for me": how Predbat took Joule's edit, and the review dialog's diff. */
+.config-change-outcome {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.config-change-outcome.tone-success {
+  border-color: var(--success-border);
+  background: var(--success-surface);
+}
+.config-change-outcome.tone-info {
+  border-color: var(--info-border);
+  background: var(--info-surface);
+}
+.config-change-outcome.tone-warn {
+  border-color: var(--warn-border);
+  background: var(--warn-surface);
+}
+.config-review {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.config-review-alert {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-md);
+  background: var(--warn-surface);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.config-review-alert > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--warn);
+}
+.config-review-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.config-review-keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.config-review-keys code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.config-review-diff > pre {
+  max-height: min(420px, 50dvh);
+}
+.config-diff .diff-same,
+.config-diff .diff-gap {
+  display: block;
+  padding: 0 var(--space-4) 0 0;
+  white-space: pre;
+  color: var(--text-2);
+}
+.config-diff .diff-gap {
+  color: var(--text-3);
+}
+.config-diff .diff-number {
+  display: inline-block;
+  width: 36px;
+  padding-right: 6px;
+  text-align: right;
+  color: var(--text-3);
+  user-select: none;
+}
+.config-review-steps h3 {
+  margin: 0 0 var(--space-1);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+}
+.config-review-steps ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: decimal;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.config-review-steps li + li {
+  margin-top: 2px;
+}

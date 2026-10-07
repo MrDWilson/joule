@@ -10,7 +10,18 @@ import { dayLabel, localDate, when } from "./time";
  */
 
 export type ChangeIcon =
-  "first" | "predbat" | "you" | "approved" | "auto" | "undo" | "restore" | "software" | "override" | "control" | "list";
+  | "first"
+  | "predbat"
+  | "you"
+  | "approved"
+  | "auto"
+  | "undo"
+  | "restore"
+  | "software"
+  | "override"
+  | "control"
+  | "list"
+  | "file";
 
 export interface ChangeLine {
   key: string;
@@ -177,7 +188,7 @@ function eventTitle(ev: SettingEvent, settings: Map<string, Setting>) {
 }
 
 const eventIcon = (kind: string): ChangeIcon =>
-  kind === "software" ? "software" : kind === "control" ? "control" : "override";
+  kind === "software" ? "software" : kind === "control" ? "control" : kind === "file" ? "file" : "override";
 
 /** Every change, newest first. */
 export function buildTimeline(state: {
@@ -194,12 +205,15 @@ export function buildTimeline(state: {
     if (e) entries.push(e);
   }
   for (const ev of state.settingEvents ?? []) {
+    // An edit Joule made to apps.yaml (or put back): the settings it touched, by name, are the detail.
+    const file = ev.kind === "file";
     entries.push({
       id: `event-${ev.id}`,
       at: ev.at,
       icon: eventIcon(ev.kind),
-      title: eventTitle(ev, settings),
-      via: "In Predbat",
+      title: file ? ev.title : eventTitle(ev, settings),
+      ...(file && ev.after ? { detail: `Settings: ${ev.after}` } : {}),
+      via: file ? "Through Joule" : "In Predbat",
       lines: [],
       event: ev,
       trials: [],

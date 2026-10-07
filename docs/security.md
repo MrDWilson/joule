@@ -48,7 +48,7 @@ API responses are never stored by shared caches. The polled state endpoints use 
 - Before writing, Joule checks the current value is still the one you approved. After writing, it reads the value back. If it cannot confirm the result, it blocks further changes until you review and reconcile.
 - The AI cannot grant permissions, change the mode or bypass these checks. Its suggestions are validated by the server, and settings without supporting Predbat documentation are rejected.
 - Joule never runs Predbat MCP write tools. Only an allow-list of read tools is offered to the AI.
-- Configuration file edits are never written by the AI. You get a diff to apply yourself; file restores are a separate, hash-checked action.
+- Configuration file edits are never written by the AI. You get a diff to apply yourself, or, only when you've mounted the file and switched on `ConfigFiles__AllowEdits`, Joule writes the edit you reviewed after saving an exact copy, refuses edits that wouldn't be valid YAML or would touch other settings, and puts the copy back if Predbat reports a problem. File restores are a separate, hash-checked action.
 
 ## What Joule stores and sends
 

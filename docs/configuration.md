@@ -120,6 +120,23 @@ services:
 
 The container runs as the `app` user, which needs read access (and write access if you want restores). Secrets files and symbolic links are never read. Leave `ConfigFiles__Root` empty to turn this off. A restore writes a new version; it does not reload Predbat, so Joule pauses automatic changes until you reload Predbat and confirm in Files.
 
+### Letting Joule make apps.yaml edits
+
+When a check finds that the fix is an edit to `apps.yaml` (a missing `export_today` sensor, say), the suggestion shows the lines to add. By default you copy them in yourself and press **Mark as applied**. With the file mounted as above, Joule can make the edit for you instead: switch on **Let Joule edit Predbat's config files** in Setup › Files, or set it in the environment:
+
+```yaml
+      ConfigFiles__AllowEdits: "true"
+```
+
+The suggestion then offers **Review and apply**:
+
+1. **Review.** Joule shows your real file with the edit made: the lines it adds or replaces, with a few lines either side. Values that look like passwords or keys are hidden; `!secret` references are shown as written.
+2. **Apply.** Joule saves an exact copy of the file first (it appears in Files), then writes only those lines. It refuses, saying why, when the lines an edit replaces aren't in the file exactly once, when the result wouldn't be valid YAML, or when it would change any setting the edit doesn't name (usually a wrong indent). The file keeps its comments, line endings, permissions and owner; Joule writes a temporary file beside it and renames it over the original, or rewrites it in place when it can't keep the owner that way.
+3. **Watch Predbat.** Predbat notices a changed `apps.yaml` within seconds, logs `Stopping Predbat due to file changes` and is started again with the new file. Joule watches for that (in Predbat's log through MCP, or Predbat's web page going away and coming back), waits for it to answer, then reads the errors logged since the edit.
+4. **Put it back.** If Predbat doesn't come back within three minutes, or logs a configuration error, Joule puts the copy back by itself and says why. **Restore previous version** on the suggestion puts it back whenever you like, as long as the file hasn't changed again since (otherwise choose a copy in Files).
+
+Every edit and restore appears in Setup › Changes. The file's contents are never sent to the AI. Joule's container runs as user 1654, so it needs write access to `apps.yaml`; for example `sudo setfacl -m u:1654:rw ./predbat/config/apps.yaml` on the host, and no `:ro` on the volume.
+
 ## Data and backups
 
 Everything lives in the `/data` volume: `demo/` and `live/` databases (DuckDB), `settings.json` from Setup, and `auth/` for AI provider credentials. Joule keeps the newest few hundred reviews and the last 500 activity entries in its working state and moves older history into the database, so the dashboard stays quick as history grows.

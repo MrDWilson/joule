@@ -286,7 +286,7 @@ export default function RecommendationsPage() {
               <section aria-labelledby="confirming-heading" className="suggestions-group">
                 <h2 id="confirming-heading" className="suggestions-group-title">
                   Waiting for the next check
-                  <span>You've made these; Joule confirms they took effect.</span>
+                  <span>These are in place; the next check confirms they took effect.</span>
                 </h2>
                 <div className="suggestion-list">
                   {confirming.map((i) => (
