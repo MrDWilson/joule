@@ -64,7 +64,7 @@ const series = (figure: ReturnType<typeof today>) =>
  * Twelve hours of history ending at the current plan's start: one missing slot (bridged), four missing slots of home use
  * (washed and named), and solar unknown overnight where Predbat forecast none (counted as zero, no wash).
  */
-async function mockHistory(page: Page) {
+async function mockHistory(page: Page, options: { grid?: boolean } = {}) {
   // The plan starts at the half-hour in progress, and the history is the twelve hours before it.
   const end = Math.floor(Date.now() / 1800000) * 1800000;
   await page.route('**/api/state*', async (route) => {
@@ -83,6 +83,7 @@ async function mockHistory(page: Page) {
       socActual: 50 + i, loadActual: missingLoad.has(i) ? null : .3 + i / 100, pvActual: night ? null : .4,
       loadActualMethod: missingLoad.has(i) ? null : 'measured', pvActualMethod: night ? null : 'measured',
       importRate: 20, exportRate: 15, action: 'demand', cost: .1,
+      ...(options.grid ? { gridImportActual: night ? .6 : .1, gridExportActual: night ? 0 : .3 } : {}),
     };
   });
   await page.route('**/api/plans/timeline?*', (r) => r.fulfill({ json: { slots } }));
@@ -122,6 +123,23 @@ test('Today keeps to four legend chips and four series, compares with nothing by
   await expect(chart.locator('figcaption')).toContainText(/Last \d+ h: home used/);
   await chart.getByText('Show as table').click();
   await expect(chart.getByRole('region', { name: /Timeline, slot by slot/ })).toBeVisible();
+});
+
+test('with grid readings, Today adds the Grid lane and still keeps to five legend chips and five series', async ({ page }) => {
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    await mockHistory(page, { grid: true });
+    await page.goto('/');
+    const chart = today(page);
+    await expect(chart.locator('svg.tl-svg')).toBeVisible();
+    await expect(chart.locator('.tl-lane-grid')).toBeVisible();
+    // The documented limit (EnergyTimeline.tsx): home, solar, grid, car, battery; on a phone the price takes the grid's chip.
+    expect(await chart.locator('.chart-chips .chart-chip').count()).toBeLessThanOrEqual(5);
+    const drawn = await series(chart);
+    expect(drawn).toContain('grid');
+    expect(drawn.length).toBeLessThanOrEqual(5);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
 });
 
 test('comparing with yesterday draws one thin grey line for home use and remembers the choice', async ({ page }) => {

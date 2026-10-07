@@ -17,7 +17,7 @@ for (const [width, height] of [
     const grid = page.getByRole("article", { name: "Grid", exact: true });
     await expect(grid).toContainText("Grid import");
     await expect(grid.locator(".stat-value")).toContainText(/\d+\.\d\s*kWh/);
-    await expect(grid).toContainText(/Cost £\d+\.\d\d/);
+    await expect(grid).toContainText(/Cost £\d+\.\d\d · [\d.]+p\/kWh/);
     await expect(grid).toContainText(/Exported \d+\.\d kWh · earned £\d+\.\d\d|Nothing exported yet/);
     await expect(grid).toContainText(/Yesterday by now: \d+\.\d kWh/);
     await expect(grid.locator(".grid-trend rect.grid-bought").first()).toBeVisible();

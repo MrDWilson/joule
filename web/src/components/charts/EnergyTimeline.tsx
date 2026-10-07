@@ -941,16 +941,10 @@ export function EnergyTimeline({
               <text className="tl-tick" x={gl - 6} y={gridZero + 4} textAnchor="end">
                 0
               </text>
+              {/* The sold side has its floor line but no tick: a label there crowds the zero and the next lane's scale.
+                  The readout and the table give the figures. */}
               {gyOut && gridOut && (
-                <>
-                  <line className="tl-grid" x1={gl} x2={gl + plotW} y1={gyOut(gridOut.max)} y2={gyOut(gridOut.max)} />
-                  {/* On a short (phone) lane the sold scale's label would crowd the zero: the tooltip has the figures. */}
-                  {gg.bottom - gridZero >= 18 && (
-                    <text className="tl-tick" x={gl - 6} y={gyOut(gridOut.max) + 4} textAnchor="end">
-                      {tickText(gridOut.max, gridOut.step)}
-                    </text>
-                  )}
-                </>
+                <line className="tl-grid" x1={gl} x2={gl + plotW} y1={gyOut(gridOut.max)} y2={gyOut(gridOut.max)} />
               )}
               <g clipPath={`url(#${id}-clip)`}>
                 <path

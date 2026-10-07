@@ -306,6 +306,8 @@ export interface GridView {
   /** Bought from the grid so far today, kWh, and what it cost. */
   importKwh: number | null;
   importGbp: number | null;
+  /** The average price paid per kWh bought (pence), when both are known and enough was bought to make it meaningful. */
+  averagePence: number | null;
   /** Sold to the grid, kWh, and what it earned. */
   exportKwh: number | null;
   exportGbp: number | null;
@@ -333,9 +335,11 @@ export function gridView(summary: SummaryDetail | null | undefined, timeZone?: s
   const notes = [coverageNote("grid_import", imp, timeZone), coverageNote("grid_export", exp, timeZone)].filter(
     Boolean,
   );
+  const importGbp = finite(summary.importCostGbp) ? summary.importCostGbp : null;
   return {
     importKwh,
-    importGbp: finite(summary.importCostGbp) ? summary.importCostGbp : null,
+    importGbp,
+    averagePence: importGbp != null && importKwh != null && importKwh >= 0.1 ? (importGbp * 100) / importKwh : null,
     exportKwh,
     exportGbp,
     exported,

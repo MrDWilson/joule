@@ -156,12 +156,18 @@ describe("gridView", () => {
     const g = gridView(live, TZ)!;
     expect(g.importKwh).toBeCloseTo(live.metrics.grid_import.energyKwh!, 6);
     expect(g.importGbp).toBeCloseTo(live.importCostGbp!, 6);
+    expect(g.averagePence).toBeCloseTo((live.importCostGbp! * 100) / live.metrics.grid_import.energyKwh!, 6);
     expect(g.exported).toBe(`Exported ${kwh(live.metrics.grid_export.energyKwh)} · earned £0.77`);
     expect(g.note).toBeNull();
   });
   it("says so when nothing has been exported, and is empty without grid meters", () => {
     const quiet = { ...live, metrics: { ...live.metrics, grid_export: { ...live.metrics.grid_export, energyKwh: 0 } } };
     expect(gridView(quiet, TZ)!.exported).toBe("Nothing exported yet");
+    const barely = {
+      ...live,
+      metrics: { ...live.metrics, grid_import: { ...live.metrics.grid_import, energyKwh: 0.04 } },
+    };
+    expect(gridView(barely, TZ)!.averagePence).toBeNull();
     expect(gridView({ ...live, metrics: { load: live.metrics.load } }, TZ)).toBeNull();
   });
 });

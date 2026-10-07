@@ -3,7 +3,7 @@ import { Chip, Stat } from "../ui";
 import { Hint } from "../Hint";
 import { GridTrend, ObservedTrend, SocTrend } from "../ObservedTrend";
 import type { EnergySummary, ObservedMeterTrends } from "../../completion-types";
-import { gbp, kwh } from "../../lib/format";
+import { gbp, kwh, pence } from "../../lib/format";
 import { clock } from "../../lib/time";
 import type { TimelineSlot } from "../charts/timeline";
 import {
@@ -131,8 +131,9 @@ export function TodayTiles({
           <>
             Grid import
             <Hint label="What does the Grid tile show?">
-              Electricity bought from the grid since midnight and what it cost, from your import meter. Under it, what
-              you sold back. The bars are each half-hour: bought above the line, sold below.
+              Electricity bought from the grid since midnight, what it cost and the average price per kWh, from your
+              import meter. Under it, what you sold back. The bars are each half-hour: bought above the line, sold
+              below.
             </Hint>
           </>
         }
@@ -149,7 +150,9 @@ export function TodayTiles({
         delta={
           grid ? (
             <>
-              {grid.importGbp != null ? `Cost ${gbp(grid.importGbp)}` : "Cost not priced yet"}
+              {grid.importGbp != null
+                ? `Cost ${gbp(grid.importGbp)}${grid.averagePence != null ? ` · ${pence(Math.round(grid.averagePence * 10) / 10)}` : ""}`
+                : "Cost not priced yet"}
               <span className="stat-delta-line">{grid.exported}</span>
             </>
           ) : undefined
