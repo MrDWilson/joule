@@ -2,6 +2,16 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Features
+
+- **Notifications on your phone:** Setup › Notifications sends what needs you, new problems, checks that keep not finishing, things offline and an optional daily summary through ntfy, Pushover, Home Assistant (the companion app), Telegram, Discord or Slack, or your own JSON webhook. Each channel has its own events, quiet hours and a Test button; messages are limited per hour, combined when several are due, retried when a send fails and listed in a delivery log. Links open the item in Joule when `App__PublicUrl` is set.
+
+### Fixes
+
+- **The notifications bell can be cleared.** Its count was worked out afresh on every page load with nothing remembered on the server, so "Needs you" always counted as new. The bell is now an inbox kept by Joule: open an item to mark it read, dismiss it, or mark all as read and clear all, and it stays that way across browsers and restarts. Anything you handle elsewhere drops out of the count at once.
+
 ## 1.0.0 (2026-10-07)
 
 The first public release, under the Joule name.

@@ -15,6 +15,7 @@ Variable names use double underscores, for example `App__Demo`. When running fro
 | MCP | `Predbat__McpToken` | Predbat's `mcp_secret`. |
 | AI provider | `Ai__ApiKey` | Or sign in with ChatGPT under AI checks. |
 | Allow changes | `Predbat__WritesEnabled` | |
+| Notifications | `Notifications__*`, `App__PublicUrl` | Applies at once, without a restart. See [Notifications](#notifications). |
 
 Secrets saved this way (the access key, MCP secret and API key) are kept in `settings.json`, readable only by Joule's user, like the ChatGPT credentials in `auth/`; they are never sent back to the browser. If you'd rather keep secrets out of the data volume, set them as environment variables instead.
 
@@ -73,6 +74,30 @@ These settings map your energy meters so Joule can measure what really happened.
 | `HomeAssistant__PollMinutes` | `5` | How often meters are read. |
 | `HomeAssistant__MaxGapMinutes` | `10` | Readings older than this count as stale. |
 | `HomeAssistant__Units__<Name>` | (from the sensor) | Unit override for a sensor that does not declare one, for example `HomeAssistant__Units__Ev=kWh`. |
+
+### Notifications
+
+The bell at the top of every page lists what needs you: each suggestion, file edit, to-do and trial due a decision, new findings, AI checks that keep not finishing, Predbat or a sensor offline, and new reports. Opening an item marks it read; you can dismiss one, mark all as read or clear the lot, and that is kept on the server, so it sticks across browsers and restarts. Anything you handle elsewhere in Joule (approve a suggestion, close a to-do, Predbat comes back) drops out of the count by itself.
+
+**Setup › Notifications** can send the same things to your phone. Each channel has an on switch, a **Test** button, its own choice of events and optional quiet hours. Each notification goes to each channel once; messages due during quiet hours wait until they end and are then sent only if the thing still needs you (the daily summary is never held); at most `Notifications__MaxPerHour` messages an hour go to a channel, and anything over that is sent later as one combined message; a failed send is tried again after 1, 5 and 30 minutes. **Sent recently** in the same page is the delivery log. Things already waiting when notifications were first switched on (after an upgrade) are listed in the bell but never sent.
+
+These settings are saved like Setup's others and apply straight away. Secrets (tokens, keys and webhook addresses) are never sent back to the browser. Each can also be set in the environment, which wins.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `App__PublicUrl` | (none) | The address you open Joule at from your phone, such as `https://joule.example.com`. Notifications then link straight to the item. |
+| `Notifications__OfflineMinutes` | `30` | How long Predbat, Home Assistant or a sensor must be silent before it counts as offline (5 to 1440). |
+| `Notifications__SummaryTime` | `08:00` | When the daily summary goes, in `HomeAssistant__TimeZone`, for channels that choose it. |
+| `Notifications__MaxPerHour` | `6` | The most messages an hour per channel (1 to 60). |
+| `Notifications__<Channel>__Enabled` | `false` | Turns a channel on: `Ntfy`, `Pushover`, `HomeAssistant`, `Telegram`, `Chat` or `Webhook`. |
+| `Notifications__<Channel>__Events` | `needs_you,problem,unfinished,offline` | What it sends, comma-separated: `needs_you` (a suggestion, file edit, to-do or trial to decide), `problem` (a check found a problem or opportunity), `unfinished` (checks didn't finish twice or more in a row), `offline`, `summary` (the daily summary). `none` sends nothing. |
+| `Notifications__<Channel>__QuietHours` | (none) | For example `22:00-07:00`, in your household's timezone. |
+| `Notifications__Ntfy__Url`, `Topic`, `Token` | `https://ntfy.sh`, (none), (none) | [ntfy](https://ntfy.sh): your server (or ntfy.sh), a hard-to-guess topic to subscribe to in the app, and an access token for a protected topic. |
+| `Notifications__Pushover__UserKey`, `AppToken` | (none) | [Pushover](https://pushover.net): your user key and an application's API token. |
+| `Notifications__HomeAssistant__Service` | (none) | A notify service such as `notify.mobile_app_my_phone` (the companion app). Uses `HomeAssistant__BaseUrl` and `HomeAssistant__AccessToken`; Setup lists the services Home Assistant has. |
+| `Notifications__Telegram__BotToken`, `ChatId` | (none) | A bot from @BotFather and your chat id (send the bot a message first), or `@channelname` for a channel it posts to. |
+| `Notifications__Chat__WebhookUrl` | (none) | A Discord, Slack or Mattermost incoming webhook. Discord addresses get Discord's message shape, others Slack's `text`. |
+| `Notifications__Webhook__Url`, `Token` | (none) | Your own endpoint. Joule posts JSON `{ source, event, title, message, url, urgent, at }`, with `Authorization: Bearer <Token>` when a token is set. |
 
 ### Container
 
