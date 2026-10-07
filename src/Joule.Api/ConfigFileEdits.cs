@@ -202,7 +202,12 @@ public sealed class ConfigFileEditService(ConfigFileArchive archive, StateServic
             // Back on your list: the edit is no longer in the file. One closed as verified by a later check is reopened too; one you
             // dismissed stays dismissed.
             change.AppliedAt = null;
-            if (change.Status is "applied" or "verified") { change.Status = "pending"; change.ClosedAt = null; change.ClosedReason = null; }
+            if (change.Status is "applied" or "verified")
+            {
+                change.Status = "pending"; change.ClosedAt = null; change.ClosedReason = null;
+                // A check that closed because this was its last open item opens again with it.
+                RecommendationDecisions.ReopenResolvedFinding(next, investigationId);
+            }
             ChangeEngine.Log(next, automatic ? "error" : "configuration", automatic ? $"{why} Joule put the previous {file} back." : $"You restored {file} to the copy taken before Joule's edit.");
         }, ct);
     }

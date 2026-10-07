@@ -300,10 +300,14 @@ public class ConfigFileEditTests : IDisposable
         await state.MutateAsync(s => { var later = new Investigation { Id = "later2" }; s.Investigations.Add(later); InvestigationFileChanges.Reconcile(s, later, []); });
         Assert.Equal("verified", Change(state, ids).Status);
 
+        // Its check closed once nothing from it was left (as when the edit was its last item): restoring opens the check again too.
+        await state.MutateAsync(s => { var i = s.Investigations.Single(x => x.Id == ids.Investigation); i.DismissedAt = DateTimeOffset.UtcNow; i.ClosedReason = RecommendationDecisions.Resolved; });
         await edits.RestoreAsync(ids.Investigation, ids.Change);
         Assert.Equal(LiveApps, File.ReadAllText(AppsPath));
         change = Change(state, ids);
         Assert.Equal(("pending", "restored", null, null), (change.Status, change.Edit!.Check, change.ClosedAt, change.ClosedReason));
+        var check = state.Read(false).Investigations.Single(x => x.Id == ids.Investigation);
+        Assert.Equal((null, null), (check.DismissedAt, check.ClosedReason));
     }
 
     [Fact]
