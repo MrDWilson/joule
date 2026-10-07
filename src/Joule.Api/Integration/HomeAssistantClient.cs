@@ -14,6 +14,9 @@ public sealed class HomeAssistantOptions
     public TimeSpan PollInterval { get; }
     public Dictionary<string,string> Entities { get; }=[];
     public Dictionary<string,string> Units { get; }=[];
+    /// <summary>Metrics whose sensor Joule worked out itself rather than being told (the Octopus standing charge, from the import rate
+    /// sensor on the same meter). A worked-out sensor that doesn't exist is skipped quietly.</summary>
+    public HashSet<string> DerivedEntities { get; }=[];
     /// <summary>Sensor profile overrides by metric (HomeAssistant:Profiles:Ev=session_counter, …). Unset metrics are detected from history.</summary>
     public Dictionary<string,string> Profiles { get; }=[];
     /// <summary>auto, true or false (HomeAssistant:LoadIncludesEv): whether the load meter includes EV charging.</summary>
@@ -37,13 +40,17 @@ public sealed class HomeAssistantOptions
         var gap=config.GetValue("HomeAssistant:MaxGapMinutes",Math.Max(15,2.5*(double.IsFinite(poll)?poll:5)));
         if(!double.IsFinite(gap) || !double.IsFinite(poll) || poll is <1 or >60 || gap<poll || gap>1440)throw new DomainException("Set HA poll interval 1–60 minutes and maximum gap between poll interval and 1440 minutes.",400);
         MaxGap=TimeSpan.FromMinutes(gap);PollInterval=TimeSpan.FromMinutes(poll);
-        var names=new Dictionary<string,string>{["Load"]="load",["Pv"]="pv",["GridImport"]="grid_import",["GridExport"]="grid_export",["BatteryCharge"]="battery_charge",["BatteryDischarge"]="battery_discharge",["Ev"]="ev",["Soc"]="soc",["ImportTariff"]="import_tariff",["ExportTariff"]="export_tariff",["IntelligentSlots"]="intelligent_slots",["AlternativeForecast"]="alternative_forecast"};
+        var names=new Dictionary<string,string>{["Load"]="load",["Pv"]="pv",["GridImport"]="grid_import",["GridExport"]="grid_export",["BatteryCharge"]="battery_charge",["BatteryDischarge"]="battery_discharge",["Ev"]="ev",["Soc"]="soc",["ImportTariff"]="import_tariff",["ExportTariff"]="export_tariff",["StandingCharge"]="standing_charge",["IntelligentSlots"]="intelligent_slots",["AlternativeForecast"]="alternative_forecast"};
         foreach(var (name,metric) in names)
         {
             if(config["HomeAssistant:Entities:"+name] is not {} entity || string.IsNullOrWhiteSpace(entity))continue;
             if(!Regex.IsMatch(entity,"^[a-z_]+\\.[a-z0-9_]+$"))throw new DomainException("Home Assistant entity mapping is invalid.",400);
             Entities[metric]=entity;
             if(config["HomeAssistant:Units:"+name] is {} unit)Units[metric]=unit;
+        }
+        if(!Entities.ContainsKey(StandingCharge.Metric) && StandingCharge.FromOctopusRate(Entities.GetValueOrDefault("import_tariff")) is {} standing)
+        {
+            Entities[StandingCharge.Metric]=standing;DerivedEntities.Add(StandingCharge.Metric);
         }
         foreach(var (name,metric) in names)
         {
@@ -79,6 +86,7 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
             try
             {
                 var matches=states.OfType<JsonObject>().Where(x=>x["entity_id"]?.ToString()==entity).Take(2).ToList();
+                if(matches.Count==0 && options.DerivedEntities.Contains(metric))continue;
                 result.Add(matches.Count==1?Parse(metric,entity,matches[0],observedAt,source):matches.Count==0?NotFound(metric,entity,observedAt,source):Unavailable(metric,entity,observedAt,source));
             }
             catch(Exception e) when(e is FormatException or InvalidOperationException or DomainException){result.Add(Unavailable(metric,entity,observedAt,source));}
@@ -134,6 +142,7 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         if(TelemetrySchema.EnergyMetrics.Contains(metric)){unit="kWh";value=normalized switch{"kwh"=>n,"wh"=>n/1000,"mwh"=>n*1000,_=>null};if(value<0)value=null;}
         else if(metric=="soc"){unit="%";value=normalized=="%" && n is >=0 and <=100 ? n : null;}
         else if(metric is "import_tariff" or "export_tariff"){unit="p/kWh";value=normalized switch {"p/kwh" or "pence/kwh"=>n,"£/kwh" or "gbp/kwh"=>n*100,"p/wh"=>n*1000,"£/mwh" or "gbp/mwh"=>n/10,_=>null};}
+        else if(metric==StandingCharge.Metric){unit="p/day";value=StandingCharge.Pence(n,rawUnit);}
         if(value is {} converted && !double.IsFinite(converted))return (null,unit,"invalid");
         return (value,unit,value is null?"unsupported_unit":"observed");
     }

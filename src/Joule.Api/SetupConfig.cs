@@ -45,6 +45,7 @@ public static class SetupConfigEndpoints
     {
         ["load"] = ["load_today"], ["pv"] = ["pv_today"], ["grid_import"] = ["import_today"], ["grid_export"] = ["export_today"],
         ["soc"] = ["soc_percent"], ["ev"] = ["car_charging_energy"], ["import_tariff"] = ["metric_octopus_import"], ["export_tariff"] = ["metric_octopus_export"],
+        ["standing_charge"] = ["metric_standing_charge"],
     };
 
     public static WebApplication MapSetupConfigEndpoints(this WebApplication app, bool inContainer)

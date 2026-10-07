@@ -87,6 +87,7 @@ public partial class DataStore
                 if (alignToSource) batch = AlignToSourceTimes(batch);
                 InsertRows("telemetry_samples", batch.Select(s => new object?[] { s.Metric, s.EntityId, s.Time, s.Value, s.Unit, s.Source, s.RawState, s.RawUnit, s.SourceUpdatedAt, s.AttributesJson, s.Status }));
                 RememberSamples(batch);
+                RecordStandingChargeSamples(batch);
                 foreach (var group in batch.GroupBy(x => x.Metric))
                 {
                     var from = group.Min(x => x.Time); var to = group.Max(x => x.Time);
@@ -285,6 +286,7 @@ public partial class DataStore
             try
             {
                 foreach (var chunk in batch.Chunk(2000)) Transaction(() => { InsertRows("telemetry_samples", chunk.Select(s => new object?[] { s.Metric, s.EntityId, s.Time, s.Value, s.Unit, s.Source, s.RawState, s.RawUnit, s.SourceUpdatedAt, s.AttributesJson, s.Status })); RememberSamples(chunk); });
+                RecordStandingChargeSamples(batch);
                 var touched = batch.GroupBy(x => x.Metric).ToDictionary(g => g.Key, g => (From: g.Min(x => x.Time), To: g.Max(x => x.Time)));
                 foreach (var (tariff, grid) in new[] { ("import_tariff", "grid_import"), ("export_tariff", "grid_export") })
                     if (touched.TryGetValue(tariff, out var t)) touched[grid] = touched.TryGetValue(grid, out var g) ? (g.From < t.From ? g.From : t.From, g.To > t.To ? g.To : t.To) : t;

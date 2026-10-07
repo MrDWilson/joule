@@ -29,6 +29,8 @@ public static class DemoHouse
     /// <summary>Export price (p/kWh): 18p in the 16:00–19:00 peak, 15p otherwise.</summary>
     public static double ExportRate(double localHour) => localHour >= 16 && localHour < 19 ? 18 : 15;
     public static double ImportRate(DateTimeOffset local) => ImportRate(local.Hour + local.Minute / 60d);
+    /// <summary>The demo house's standing charge, pence per day (a typical UK electricity rate).</summary>
+    public const double StandingChargePence = 53.68;
     public static double ExportRate(DateTimeOffset local) => ExportRate(local.Hour + local.Minute / 60d);
 
     /// <summary>The car charges in the evening every other day; the plan holds the battery for it only on those evenings.</summary>

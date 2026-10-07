@@ -162,13 +162,25 @@ public static class InvestigationBrief
         var net = summary.NetCostGbp ?? (summary.ImportCostGbp is { } i && summary.ExportCreditGbp is { } e ? i - e : null);
         var approxNet = summary.ImportCostCoverage < 0.95 || summary.ExportCostCoverage < 0.95 || summary.ImportCostEstimated || summary.ExportCostEstimated ? "≈ " : "";
         lines.Add(net is { } n
-            ? $"{period}: net cost {approxNet}{Money(n)} (this is the figure to quote). {Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}. Standing charge not included."
+            ? $"{period}: net cost {approxNet}{Money(n)} (this is the figure to quote). {Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}. {StandingChargeBrief(summary, n)}"
             : $"{period}: net cost not known. {Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}.");
         foreach (var gap in summary.CostGaps.Take(4))
             lines.Add($"- {(gap.Metric == "grid_export" ? "Export meter" : gap.Metric == "grid_import" ? "Import meter" : gap.Metric)} not priced {Clock(gap.From, zone)}–{Clock(gap.To, zone)} ({gap.Reason.Replace('_', ' ')}).");
         if (summary.ObservedNetCostGbp is { } matched)
             lines.Add($"Only while both meters were reporting with whole readings: {Money(matched)}. Use this only to compare like-for-like periods; never quote it as the day's cost.");
         return string.Join("\n", lines);
+    }
+
+    /// <summary>The standing charge for the money section: the amount, the daily rate, where it came from and whether the owner's headline
+    /// includes it. The net cost above never includes it, so experiments and like-for-like comparisons are unaffected.</summary>
+    public static string StandingChargeBrief(EnergySummary summary, double net)
+    {
+        if (summary.StandingChargeGbp is not { } standing || summary.StandingChargePencePerDay is not { } rate)
+            return "Standing charge not known to Joule, so not included.";
+        var source = summary.StandingChargeSource == "manual" ? "the owner's figure" : "the standing charge sensor";
+        return $"Standing charge for this period {Money(standing)} ({rate.ToString("0.##", CultureInfo.InvariantCulture)}p a day, from {source}{(summary.StandingChargeAssumed ? "; early days assumed the same rate" : "")}), not in the net cost above; "
+            + $"with it the bill is {Money(net + standing)}. The owner's dashboard {(summary.StandingChargeIncluded ? "includes" : "leaves out")} the standing charge in its headline. "
+            + "The standing charge is fixed per day: never treat it as something a setting change can save.";
     }
 
     /// <summary>

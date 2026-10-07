@@ -16,7 +16,7 @@ public record TelemetryIssue(string Metric,string Message,DateTimeOffset? Since)
 public sealed class TelemetryCollectionService
 {
     /// <summary>Sensors that are legitimately idle or absent for long periods (an EV charger between sessions, optional forecast feeds). Their gaps are recorded per metric but never fail a collection.</summary>
-    public static readonly string[] OptionalMetrics=["ev","intelligent_slots","alternative_forecast"];
+    public static readonly string[] OptionalMetrics=["ev","intelligent_slots","alternative_forecast",StandingCharge.Metric];
     /// <summary>An unexpected outage becomes a collection error only after this long: brief Home Assistant restarts are normal.</summary>
     public static readonly TimeSpan CounterOutageGrace=TimeSpan.FromMinutes(30),StateOutageGrace=TimeSpan.FromMinutes(15);
     readonly DataStore db;readonly HomeAssistantClient client;readonly HomeAssistantOptions options;
@@ -39,6 +39,8 @@ public sealed class TelemetryCollectionService
         try
         {
             if(!intervalRulesChecked){db.EnsureIntervalRules(options.MaxGap);intervalRulesChecked=true;}
+            // Without a standing charge sensor reading today, today takes the owner's figure from Setup (when there is one).
+            db.RecordManualStandingCharge();
             if(demo)DemoTelemetry.Seed(db,clock.GetUtcNow());
             else
             {
@@ -118,8 +120,15 @@ public static class HomeAssistantIntegration
             [SensorProfiles.SolarDaily]="Daily solar counter; unknown counts as zero only when the counter proves it or the sun is down.",
             [SensorProfiles.SessionCounter]="Restarts with each charging session; unknown between sessions counts as zero.",
             [SensorProfiles.LifetimeCounter]="Only rises; unknown is an outage."}});
+        app.MapGet("/api/telemetry/standing-charge",(DataStore db,HomeAssistantOptions options)=>StandingChargeView(db,options));
+        app.MapPost("/api/telemetry/standing-charge",(StandingChargeRequest request,DataStore db,HomeAssistantOptions options)=>{db.SaveStandingChargePreferences(request);return StandingChargeView(db,options);});
         app.MapPost("/api/telemetry/collect",async(TelemetryCollectionService service,CancellationToken ct)=>{await service.CollectAsync(ct);return Results.Ok(service.Status());});
         return app;
+    }
+    static StandingChargeView StandingChargeView(DataStore db,HomeAssistantOptions options)
+    {
+        var entity=options.Entities.GetValueOrDefault(StandingCharge.Metric);
+        return db.ReadStandingCharge(entity,entity is null?null:options.DerivedEntities.Contains(StandingCharge.Metric)?"octopus":"configured");
     }
 }
 
@@ -211,6 +220,8 @@ public static class DemoTelemetry
         {
             if (db.ReadLatestTelemetry().GetValueOrDefault("load") is { } latest) start = latest.Time.AddMinutes(5);
         }
+        // The demo house reads its standing charge from a sensor, as an Octopus Energy installation would.
+        db.RecordStandingCharge(DemoHouse.LocalDate(now, zone), DemoHouse.StandingChargePence, "sensor", "demo.standing_charge");
         if (start > end) return;
         var batch = new List<TelemetrySample>();
         for (var at = start; at <= end; at = at.AddMinutes(5))

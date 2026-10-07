@@ -180,12 +180,14 @@ public partial class DataStore
         var limitations = new List<string>
         {
             "Totals include measured intervals and 'spread' intervals (energy proved by the meter's counter across a short outage, timing estimated); intervals straddling the period edges are prorated. Missing coverage is not zero.",
-            "netCostGbp is import cost minus export credit, each with its own coverage. observedNetCostGbp counts only periods both meters cover with whole measured intervals. Standing charges are excluded.",
+            "netCostGbp is import cost minus export credit, each with its own coverage. observedNetCostGbp counts only periods both meters cover with whole measured intervals. Neither includes the standing charge: standingChargeGbp is that, prorated over the window, and netCostWithStandingChargeGbp adds it.",
             "Tariffs are applied as recorded by Home Assistant, split at rate changes; Predbat's plan rates fill periods when the tariff sensor was unavailable.",
             "Aggregate sensors cannot identify physical battery-to-EV flow or causal savings.",
             "Home Assistant 'unavailable' means a device is offline. 'unknown' is stored as idle and counts as zero only where the sensor's profile expects it (solar overnight, a charger between sessions, a daily counter before its first reading)."
         };
         if (costOverflowed || metricOverflowed) limitations.Add("Invalid totals are unavailable and cannot claim usable period coverage; source intervals remain retained.");
+        var standing = detail ? StandingChargeFor(from, to) : null;
+        var standingPrefs = detail ? ReadStandingChargePreferences() : null;
         return new EnergySummary(from, to, metrics, grossOverflowed && importHas ? null : importTotal, grossOverflowed && exportHas ? null : exportTotal, anyMatched ? matched : null, Math.Min(1, costSeconds / seconds), costSeconds,
             all.Select(x => x.Source).Distinct().ToArray(), limitations.ToArray())
         {
@@ -195,7 +197,10 @@ public partial class DataStore
             EstimatedCostGbp = importEstimatedCost + exportEstimatedCost,
             UnpricedGridKwh = unpricedGrid, GridEnergyUnknown = gridUnknown,
             CostGaps = MergeCostGaps(costGaps),
-            Home = home, LoadIncludesEv = includesEv
+            Home = home, LoadIncludesEv = includesEv,
+            StandingChargeGbp = standing?.Gbp, StandingChargePencePerDay = standing?.PencePerDay, StandingChargeSource = standing?.Source, StandingChargeAssumed = standing?.Assumed ?? false,
+            StandingChargeIncluded = standing is not null && standingPrefs?.IncludeInNet != false,
+            NetCostWithStandingChargeGbp = net is { } n && standing is { } sc ? n + sc.Gbp : null
         };
     }
 

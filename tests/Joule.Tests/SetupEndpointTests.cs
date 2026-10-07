@@ -123,7 +123,8 @@ public class SetupEndpointTests
         static string[] Steps(JsonElement p) => [.. p.GetProperty("steps").EnumerateArray().Select(s => $"{s.GetProperty("key").GetString()}:{s.GetProperty("label").GetString()}:{s.GetProperty("done").GetBoolean()}:{s.GetProperty("required").GetBoolean()}"),
             $"{p.GetProperty("done").GetInt32()}/{p.GetProperty("total").GetInt32()}"];
         Assert.Equal(Steps(header.RootElement.GetProperty("setupProgress")), Steps(setup.RootElement.GetProperty("progress")));
-        Assert.Equal(10, setup.RootElement.GetProperty("sensors").GetProperty("meters").GetArrayLength());
+        // Ten meters and prices, plus the standing charge sensor.
+        Assert.Equal(11, setup.RootElement.GetProperty("sensors").GetProperty("meters").GetArrayLength());
     }
 
     [Fact]

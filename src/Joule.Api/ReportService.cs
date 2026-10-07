@@ -216,7 +216,8 @@ public sealed class ReportService(StateService state, DataStore db)
 
     /// <summary>
     /// The written summary: short sentences using the same rounding as the page (kWh to 1 dp, pounds to 2 dp), the meters by
-    /// name, and only gaps that are long enough to matter. Standing charges are never included.
+    /// name, and only gaps that are long enough to matter. The standing charge, when Joule knows it, is named with its daily rate and is
+    /// in the net cost when the owner includes it (the default).
     /// </summary>
     public static string Describe(EnergySummary s, DateTimeOffset from, DateTimeOffset to, TimeZoneInfo zone, bool demo)
     {
@@ -261,7 +262,15 @@ public sealed class ReportService(StateService state, DataStore db)
         {
             var coverage = Math.Min(s.ImportCostCoverage, s.ExportCostCoverage);
             var about = coverage < 0.95 || s.EstimatedCostGbp > 0.05 * Math.Max(0.01, Math.Abs((s.ImportCostGbp ?? 0) + (s.ExportCreditGbp ?? 0))) ? "about " : "";
-            parts.Add(n >= 0 ? $"Net cost {about}{Gbp(n)}." : $"Net earnings {about}{Gbp(-n)}.");
+            if (s.StandingChargeGbp is { } standing && s.StandingChargePencePerDay is { } rate)
+            {
+                var standingText = $"the {Gbp(standing)} standing charge ({StandingRate(rate)})";
+                var total = n + standing;
+                parts.Add(s.StandingChargeIncluded
+                    ? total >= 0 ? $"Net cost {about}{Gbp(total)}, including {standingText}." : $"Net earnings {about}{Gbp(-total)}, after {standingText}."
+                    : (n >= 0 ? $"Net cost {about}{Gbp(n)}" : $"Net earnings {about}{Gbp(-n)}") + $"; {standingText} isn't included.");
+            }
+            else parts.Add(n >= 0 ? $"Net cost {about}{Gbp(n)}." : $"Net earnings {about}{Gbp(-n)}.");
         }
         else if (import != null) parts.Add("The net cost isn't known because a grid meter or price is missing.");
 
@@ -277,9 +286,12 @@ public sealed class ReportService(StateService state, DataStore db)
             var known = group.Sum(x => x.Gap.KnownKwh ?? 0);
             parts.Add($"{who} {(names.Count > 1 ? GapVerb(group.Key.Reason).Replace("was ", "were ") : GapVerb(group.Key.Reason))} {Range(group.Key.From, group.Key.To, zone, multiDay)}{(known > 0.05 && names.Count == 1 ? $" ({Kwh(known)} in that time isn't counted)" : "")}.");
         }
-        parts.Add("Standing charges aren't included.");
+        if (s.StandingChargeGbp is null) parts.Add("Standing charges aren't included.");
         return string.Join(" ", parts);
     }
+
+    /// <summary>"53.68p a day".</summary>
+    static string StandingRate(double pence) => $"{pence.ToString(pence % 1 == 0 ? "0" : "0.##", System.Globalization.CultureInfo.InvariantCulture)}p a day";
 
     /// <summary>One line for a notification: "You used 61.1 kWh · net cost £5.20".</summary>
     public static string Headline(EnergySummary s)
@@ -287,6 +299,7 @@ public sealed class ReportService(StateService state, DataStore db)
         var bits = new List<string>();
         if (Energy(s, "load") is not null) bits.Add($"You used {Amount(s, "load")}");
         var net = s.NetCostGbp ?? (s.ImportCostGbp is { } i && s.ExportCreditGbp is { } e ? i - e : null);
+        if (net is { } energy && s.StandingChargeIncluded && s.StandingChargeGbp is { } standing) net = energy + standing;
         if (net is { } n) bits.Add(n >= 0 ? $"net cost {Gbp(n)}" : $"net earnings {Gbp(-n)}");
         if (bits.Count == 0) return "Your energy report is ready.";
         var text = string.Join(" · ", bits);

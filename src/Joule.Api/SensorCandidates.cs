@@ -18,11 +18,12 @@ public static class SensorCandidates
     {
         ["load"] = "Load", ["pv"] = "Pv", ["grid_import"] = "GridImport", ["grid_export"] = "GridExport", ["battery_charge"] = "BatteryCharge",
         ["battery_discharge"] = "BatteryDischarge", ["ev"] = "Ev", ["soc"] = "Soc", ["import_tariff"] = "ImportTariff", ["export_tariff"] = "ExportTariff",
+        ["standing_charge"] = "StandingCharge",
     };
     /// <summary>The meters a usable setup needs: without home use there is nothing to compare Predbat's plan against.</summary>
     public static readonly string[] Required = ["load"];
 
-    enum Unit { Energy, Percent, Price }
+    enum Unit { Energy, Percent, Price, DailyCharge }
     sealed record Rule(Unit Unit, string[] Any, string[] All, string[] Not);
     static readonly string[] NotEnergy = ["forecast", "predict", "cost", "rate", "price", "tariff", "power", "limit", "target"];
     static readonly Dictionary<string, Rule> Rules = new()
@@ -37,6 +38,7 @@ public static class SensorCandidates
         ["soc"] = new(Unit.Percent, ["soc", "battery_level", "state_of_charge", "battery_percent"], [], ["target", "reserve", "limit", "max", "min", "car", "_ev", "ev_", "predbat", "forecast", "best"]),
         ["import_tariff"] = new(Unit.Price, ["import", "current_rate", "electricity_current", "unit_rate"], [], ["export", "standing", "forecast", "previous", "next"]),
         ["export_tariff"] = new(Unit.Price, ["export"], [], ["import", "standing", "forecast", "previous", "next"]),
+        ["standing_charge"] = new(Unit.DailyCharge, ["standing_charge"], [], ["export", "gas", "previous", "next"]),
     };
 
     /// <summary>Up to <paramref name="limit"/> candidates per metric, best first. <paramref name="state"/> is Predbat's /api/state object.</summary>
@@ -89,6 +91,7 @@ public static class SensorCandidates
         if (u is "kwh" or "wh" or "mwh") return Unit.Energy;
         if (u == "%") return Unit.Percent;
         if (u.EndsWith("/kwh", StringComparison.Ordinal)) return Unit.Price;
+        if (u is "gbp" or "£" or "gbp/day" or "£/day" or "p/day" or "pence/day") return Unit.DailyCharge;
         return null;
     }
 }
