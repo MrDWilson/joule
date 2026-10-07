@@ -10,10 +10,10 @@ updates:
         patterns: ["*"]
     open-pull-requests-limit: 5
     ignore:
-      # TypeScript 7 is the native (Go) compiler and has no JavaScript API yet, so typescript-eslint (which supports
-      # TypeScript below 6.1) can't lint with it. Stay on 6.x until typescript-eslint supports 7, then remove this.
+      # typescript-eslint supports TypeScript below 6.1 (and TypeScript 7, the native compiler, has no JavaScript API
+      # yet), so stay on 6.0.x. Raise this when typescript-eslint's peer range does.
       - dependency-name: typescript
-        versions: [">= 7.0.0"]
+        versions: [">= 6.1.0"]
       # The Node.js type definitions follow the Node version the dashboard is built with (the LTS in the Dockerfile
       # and CI). Raise this together with that Node version.
       - dependency-name: "@types/node"

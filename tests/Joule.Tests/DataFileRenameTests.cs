@@ -156,6 +156,28 @@ public class DataFileRenameTests : IDisposable
     }
 
     [Fact]
+    public void WhenTheDatabaseCantFollowItsLogTheLogGoesBackAndNothingIsSetAsideNextTime()
+    {
+        File.WriteAllText(Legacy, "old database");
+        File.WriteAllText(Legacy + DataFiles.WalSuffix, "old log");
+        var moves = 0;
+        void FailSecond(string from, string to) { if (++moves == 2) throw new IOException("in use"); File.Move(from, to); }
+
+        var choice = DataFiles.ChooseDatabase(directory, _ => { }, FailSecond);
+
+        Assert.True(choice.Warning);
+        Assert.Equal(Legacy, choice.Path);
+        Assert.Equal("old log", File.ReadAllText(Legacy + DataFiles.WalSuffix));
+        Assert.False(File.Exists(Current + DataFiles.WalSuffix));
+
+        // The next start renames both, and nothing was set aside.
+        var next = DataFiles.ChooseDatabase(directory, _ => { });
+        Assert.Equal(Current, next.Path);
+        Assert.Equal("old log", File.ReadAllText(Current + DataFiles.WalSuffix));
+        Assert.Empty(Directory.GetFiles(directory, "*.set-aside-*"));
+    }
+
+    [Fact]
     public void TheDemoFolderMarkerTakesTheNewName()
     {
         var root = Path.Combine(directory, "demo-config");

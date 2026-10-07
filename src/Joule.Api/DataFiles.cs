@@ -27,13 +27,15 @@ public static class DataFiles
     /// rename is tried again at the next start.
     /// </summary>
     /// <param name="checkpoint">Folds a database's write-ahead log into the file. Tests replace it to inject failures.</param>
-    public static DatabaseChoice ChooseDatabase(string directory, Action<string>? checkpoint = null)
+    /// <param name="move">Renames a file (File.Move). Tests replace it to inject failures.</param>
+    public static DatabaseChoice ChooseDatabase(string directory, Action<string>? checkpoint = null, Action<string, string>? move = null)
     {
         var current = System.IO.Path.Combine(directory, Database);
         var legacy = System.IO.Path.Combine(directory, LegacyDatabase);
         if (File.Exists(current))
             return new(current, File.Exists(legacy) ? $"Using {current}. An older {LegacyDatabase} in the same folder is left as it is; remove it once you no longer need it." : null, false);
         if (!File.Exists(legacy)) return new(current, null, false);
+        var walMoved = false;
         try
         {
             // With the log folded in, the database is one file and one rename moves all of it.
@@ -42,12 +44,14 @@ public static class DataFiles
             // the renamed file. Its content is already in the file the checkpoint just wrote, so it is set aside, not used.
             SetAside(current + WalSuffix);
             // Normally gone after the checkpoint. If not, it moves first so the database never arrives without its log.
-            if (File.Exists(legacy + WalSuffix)) File.Move(legacy + WalSuffix, current + WalSuffix);
-            File.Move(legacy, current);
+            if (File.Exists(legacy + WalSuffix)) { (move ?? File.Move)(legacy + WalSuffix, current + WalSuffix); walMoved = true; }
+            (move ?? File.Move)(legacy, current);
             return new(current, $"Renamed {legacy} to {Database}, Joule's name for its database. This happens once.", false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or DuckDBException)
         {
+            // The old database stays in use, so a log that already moved goes back with it rather than being set aside next time.
+            if (walMoved) try { File.Move(current + WalSuffix, legacy + WalSuffix); } catch (Exception back) when (back is IOException or UnauthorizedAccessException) { }
             return new(legacy, $"Couldn't rename {legacy} to {Database} ({e.Message}). Joule is using it under its old name and will try again at the next start.", true);
         }
     }
