@@ -11,7 +11,7 @@ RUN npm run build
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-noble AS api
 ARG TARGETARCH
-ARG VERSION=1.0.0
+ARG VERSION=1.1.0
 ARG REVISION=""
 WORKDIR /build
 COPY src/Joule.Api/Joule.Api.csproj src/Joule.Api/
@@ -23,7 +23,7 @@ RUN dotnet publish src/Joule.Api/Joule.Api.csproj --no-restore -c Release ${TARG
 COPY --from=web /build/web/dist/ /publish/wwwroot/
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
-ARG VERSION=1.0.0
+ARG VERSION=1.1.0
 ARG REVISION=""
 LABEL org.opencontainers.image.title="Joule" \
       org.opencontainers.image.description="A self-hosted dashboard and AI analyst that works alongside the Predbat home battery optimiser." \

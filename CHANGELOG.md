@@ -2,7 +2,7 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.0 (2026-10-07)
 
 ### Features
 
