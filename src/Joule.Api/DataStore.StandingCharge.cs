@@ -26,7 +26,8 @@ public partial class DataStore
         }
     }
 
-    /// <summary>Saves the owner's choices. A manual figure is recorded for today at once (unless today already has a sensor reading).</summary>
+    /// <summary>Saves the owner's choices. A manual figure is recorded for today at once (unless today already has a sensor reading); clearing it
+    /// removes it from every day it was recorded on.</summary>
     public StandingChargePreferences SaveStandingChargePreferences(StandingChargeRequest request)
     {
         if (request.ManualPencePerDay is { } p && (!double.IsFinite(p) || p < 0 || p > 1000))
@@ -37,6 +38,9 @@ public partial class DataStore
             var next = new StandingChargePreferences(request.ClearManual ? null : request.ManualPencePerDay is { } m ? Math.Round(m, 4) : current.ManualPencePerDay, request.IncludeInNet ?? current.IncludeInNet);
             Execute("INSERT OR REPLACE INTO standing_charge_preferences VALUES (1,?,?,?)", next.ManualPencePerDay, next.IncludeInNet, Clock.GetUtcNow());
             standingChargePreferences = next;
+            // Clearing forgets the owner's figure on every day it was used, so a mistyped figure can be withdrawn (and retyped, which then
+            // also covers the earlier days as their assumed rate). Sensor readings are kept.
+            if (request.ClearManual) { Execute("DELETE FROM standing_charges WHERE source = 'manual'"); standingCharges = null; }
             if (request.ManualPencePerDay is not null && next.ManualPencePerDay is { } manual) RecordStandingCharge(LocalDay(Clock.GetUtcNow()), manual, "manual", null);
             return next;
         }

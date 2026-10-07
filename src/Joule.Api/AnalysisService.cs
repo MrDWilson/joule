@@ -1064,7 +1064,7 @@ public sealed class AnalysisService(StateService state, DataStore db, AiModelCli
         var end = CivilTime.FirstValidInstant(TimeZoneInfo.ConvertTime(now, zone).Date, zone);
         var summary = db.ReadEnergySummary(end.AddDays(-7), end);
         string Avg(string metric) => summary.Metrics.TryGetValue(metric, out var m) && m.EnergyKwh is { } e && m.CoverageFraction > 0.5 ? (e / 7).ToString("0.0", CultureInfo.InvariantCulture) + " kWh" : "-";
-        return $"Last 7 full days, average per day: home use {Avg("load")}, solar {Avg("pv")}, from grid {Avg("grid_import")}, to grid {Avg("grid_export")}, battery charged {Avg("battery_charge")}, discharged {Avg("battery_discharge")}, car {Avg("ev")}; net cost {(summary.NetCostGbp is { } n ? InvestigationBrief.Money(n / 7) : "-")} per day.";
+        return $"Last 7 full days, average per day: home use {Avg("load")}, solar {Avg("pv")}, from grid {Avg("grid_import")}, to grid {Avg("grid_export")}, battery charged {Avg("battery_charge")}, discharged {Avg("battery_discharge")}, car {Avg("ev")}; net cost {(StandingCharge.HeadlineNet(summary) is { } n ? InvestigationBrief.Money(n / 7) : "-")} per day{(summary.StandingChargeIncluded && summary.StandingChargeGbp is not null ? " including the standing charge" : "")}.";
     }
     string PreviousFindings(AppState s, TimeZoneInfo zone)
     {

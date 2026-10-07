@@ -29,10 +29,17 @@ public sealed class TelemetryCollectionService
         this.db=db;this.client=client;this.options=options;this.clock=clock??db.Clock;demo=config.GetValue("App:Demo",true);
         db.ConfigureTelemetry(options.TelemetrySettings);
     }
-    public TelemetryStatus Status()=>new(demo,client.Configured,options.TimeZone,last,error,new(options.Entities),TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!options.Entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,db.ReadLatestTelemetry(options.MaxGap),options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
+    public TelemetryStatus Status()
     {
-        Profiles=db.ReadSensorProfiles(),Issues=issues,LoadIncludesEv=db.LoadIncludesEv()
-    };
+        // A sensor Joule worked out itself (the Octopus standing charge) is left out until it has given a real reading.
+        var latest=db.ReadLatestTelemetry(options.MaxGap);
+        var shown=options.ShownEntities(latest);
+        foreach(var metric in options.DerivedEntities)if(!shown.ContainsKey(metric) && latest.GetValueOrDefault(metric)?.LastObservedAt is null)latest.Remove(metric);
+        return new(demo,client.Configured,options.TimeZone,last,error,shown,TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!options.Entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,latest,options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
+        {
+            Profiles=db.ReadSensorProfiles(),Issues=issues,LoadIncludesEv=db.LoadIncludesEv()
+        };
+    }
     public async Task CollectAsync(CancellationToken ct)
     {
         await collecting.WaitAsync(ct);

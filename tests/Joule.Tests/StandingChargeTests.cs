@@ -123,6 +123,65 @@ public sealed class StandingChargeTests : IDisposable
         Assert.Contains("standing_charge", TelemetryCollectionService.OptionalMetrics);
     }
 
+    [Fact]
+    public async Task AWorkedOutSensorThatIsMissingIsNotShownAsMappedOrAsNeedingALook()
+    {
+        const string rate = "sensor.octopus_energy_electricity_21l1234567_1900012345678_current_rate";
+        const string standing = "sensor.octopus_energy_electricity_21l1234567_1900012345678_current_standing_charge";
+        var options = Options(new() { ["Load"] = "sensor.house_energy", ["ImportTariff"] = rate });
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:Demo"] = "false" }).Build();
+        var clock = new ManualClock(Midnight.AddHours(9));
+        using var db = new DataStore(path, clock);
+        var states = """[{"entity_id":"sensor.house_energy","state":"12","attributes":{"unit_of_measurement":"kWh","state_class":"total_increasing"}},{"entity_id":"sensor.octopus_energy_electricity_21l1234567_1900012345678_current_rate","state":"0.2541","attributes":{"unit_of_measurement":"GBP/kWh"}}]""";
+        var respond = (HttpRequestMessage _) => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(states) };
+        var service = new TelemetryCollectionService(db, new HomeAssistantClient(new HttpClient(new Handler(r => respond(r))), options, clock: clock), options, config, clock);
+        await service.CollectAsync(default);
+        var status = service.Status();
+        Assert.False(status.EntityMappings.ContainsKey("standing_charge"));
+        Assert.False(status.LatestReadings.ContainsKey("standing_charge"));
+        Assert.DoesNotContain("standing_charge", status.MissingMappings);
+        Assert.Equal(rate, status.EntityMappings["import_tariff"]);
+        Assert.False(options.ShownEntities(db.ReadLatestTelemetry()).ContainsKey("standing_charge"));
+
+        // Home Assistant unreachable: nothing is stored for the worked-out sensor either.
+        respond = _ => new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        clock.Now = clock.Now.AddMinutes(5);
+        await Assert.ThrowsAnyAsync<Exception>(() => service.CollectAsync(default));
+        Assert.False(service.Status().LatestReadings.ContainsKey("standing_charge"));
+
+        // Once it gives a reading, it shows like any other sensor.
+        states = states.TrimEnd(']') + $$$""",{"entity_id":"{{{standing}}}","state":"0.5368","attributes":{"unit_of_measurement":"GBP"}}]""";
+        respond = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(states) };
+        clock.Now = clock.Now.AddMinutes(5);
+        await service.CollectAsync(default);
+        status = service.Status();
+        Assert.Equal(standing, status.EntityMappings["standing_charge"]);
+        Assert.Equal("observed", status.LatestReadings["standing_charge"].Status);
+    }
+
+    [Fact]
+    public void ClearingTheTypedFigureRemovesItFromEveryDayItWasUsed()
+    {
+        var clock = new ManualClock(Midnight.AddDays(-1).AddHours(1));
+        using var db = new DataStore(path, clock);
+        Day(db, Midnight.AddDays(-1), 24, null);
+        db.SaveStandingChargePreferences(new(99, null)); // mistyped
+        clock.Now = Midnight.AddHours(6);
+        Day(db, Midnight, 6, null);
+        db.RecordManualStandingCharge();
+        Assert.Equal(.99, db.ReadEnergySummary(Midnight.AddDays(-1), Midnight).StandingChargeGbp!.Value, 6);
+
+        db.SaveStandingChargePreferences(new(null, null, ClearManual: true));
+        db.RecordManualStandingCharge();
+        Assert.Null(db.ReadEnergySummary(Midnight.AddDays(-1), Midnight).StandingChargeGbp);
+        Assert.Null(db.ReadStandingCharge(null, null).ManualPencePerDay);
+
+        // Retyped: today takes it, and yesterday assumes it.
+        db.SaveStandingChargePreferences(new(55, null));
+        var yesterday = db.ReadEnergySummary(Midnight.AddDays(-1), Midnight);
+        Assert.Equal(.55, yesterday.StandingChargeGbp!.Value, 6); Assert.True(yesterday.StandingChargeAssumed);
+    }
+
     static readonly DateTimeOffset Midnight = LocalMidnight(2026, 10, 5);
     static TelemetrySample Meter(string metric, DateTimeOffset at, double value) =>
         new(metric, "sensor." + metric, at, value, "kWh", "HomeAssistant", value.ToString(CultureInfo.InvariantCulture), "kWh", at, "{\"state_class\":\"total\",\"last_reset\":\"2026-10-05T00:00:00+01:00\"}");
@@ -229,9 +288,20 @@ public sealed class StandingChargeTests : IDisposable
         var excluded = ReportService.Describe(summary with { StandingChargeIncluded = false }, from, to, London, demo: false);
         Assert.Contains("Net cost £2.00; the £0.54 standing charge (53.68p a day) isn't included.", excluded);
 
+        // Included (the default): the AI is told to quote the dashboard's figure, with the energy-only one as secondary.
         var brief = InvestigationBrief.MoneyBrief(summary, London, "Today");
-        Assert.Contains("Standing charge for this period £0.54 (53.68p a day, from the standing charge sensor)", brief);
-        Assert.Contains("with it the bill is £2.54", brief);
+        Assert.StartsWith("Today: net cost £2.54 including the standing charge (this is the figure to quote; it matches the owner's dashboard).", brief);
+        Assert.Contains("Energy only, without the standing charge: £2.00 (what trials and like-for-like comparisons use; never quote it as the cost)", brief);
+        Assert.Contains("Standing charge for this period £0.54 (53.68p a day, from the standing charge sensor), included in the net cost above", brief);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(brief, "figure to quote"));
+        Assert.DoesNotContain("£2.00 (this is the figure to quote)", brief);
+
+        // Left out by the owner: the energy-only figure is the one to quote, and the bill with the charge is stated alongside.
+        var left = InvestigationBrief.MoneyBrief(summary with { StandingChargeIncluded = false }, London, "Today");
+        Assert.StartsWith("Today: net cost £2.00 (this is the figure to quote).", left);
+        Assert.Contains("not in the net cost above; with it the bill is £2.54", left);
+        Assert.Contains("leave the standing charge out of the dashboard's headline", left);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(left, "figure to quote"));
         Assert.Contains("Standing charge not known", InvestigationBrief.MoneyBrief(summary with { StandingChargeGbp = null, StandingChargePencePerDay = null }, London, "Today"));
     }
 

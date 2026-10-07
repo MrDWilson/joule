@@ -40,6 +40,14 @@ describe("standingChargeSource", () => {
     );
     expect(standingChargeSource(base)).toMatch(/^Joule doesn’t know it yet\./);
   });
+
+  it("says when the Octopus sensor it worked out has never given a reading", () => {
+    const entity = "sensor.octopus_energy_electricity_x_y_current_standing_charge";
+    expect(standingChargeSource({ ...base, entity, entityOrigin: "octopus" })).toBe(
+      `Joule looked for the Octopus Energy standing charge sensor (${entity}) but hasn’t found a reading. It may be turned off in Home Assistant. You can enter the figure below.`,
+    );
+    expect(standingChargeSource({ ...base, entity, entityOrigin: "configured" })).toMatch(/^Joule is watching/);
+  });
 });
 
 describe("rateChanges", () => {

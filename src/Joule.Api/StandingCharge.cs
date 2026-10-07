@@ -41,6 +41,11 @@ public static class StandingCharge
             ? $"sensor.octopus_energy_electricity_{m.Groups[1].Value}_{m.Groups[2].Value}_current_standing_charge"
             : null;
 
+    /// <summary>The net cost the owner's dashboard shows: with the standing charge when it's known and switched on, otherwise energy only.
+    /// Matches headlineNet() in web/src/lib/energy.ts.</summary>
+    public static double? HeadlineNet(EnergySummary summary) =>
+        summary.StandingChargeIncluded && summary.NetCostWithStandingChargeGbp is { } withStanding ? withStanding : summary.NetCostGbp;
+
     /// <summary>A Home Assistant reading in pence per day: GBP or £ (per day) × 100, pence as is. Null for any other unit.</summary>
     public static double? Pence(double value, string unit)
     {

@@ -52,7 +52,10 @@ public static class DemoAnswers
         var today = Midnight(now, zone); var yesterday = Midnight(now, zone, -1); var weekAgo = Midnight(now, zone, -8);
         var day = db.ReadEnergySummary(yesterday, today);
         var week = db.ReadEnergySummary(weekAgo, yesterday);
-        if (day.NetCostGbp is not { } cost || week.NetCostGbp is not { } weekCost) throw new InvalidOperationException();
+        if (StandingCharge.HeadlineNet(day) is not { } cost || StandingCharge.HeadlineNet(week) is not { } weekCost) throw new InvalidOperationException();
+        var standingText = day.StandingChargeIncluded && day.StandingChargeGbp is { } standing && day.StandingChargePencePerDay is { } rate
+            ? $"net cost includes the {Gbp(standing)} standing charge ({rate.ToString("0.##", Invariant)}p a day)."
+            : "costs leave out the standing charge.";
         var average = weekCost / 7;
         var date = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(yesterday, zone).Date);
         var house = DemoHouse.Measured(date);
@@ -68,11 +71,11 @@ public static class DemoAnswers
         var plain = Math.Abs(difference) < .15 ? $"{dayName} {net}, about the same as {averageText}. {why}"
             : difference > 0 ? $"{dayName} {net}, {Gbp(difference)} more than {averageText}. {why}"
             : $"{dayName} wasn't expensive: it {net}, {Gbp(-difference)} better than {averageText}. {why}";
-        var summary = $"{plain} Solar made {Kwh(solar)}. Bought {Gbp(day.ImportCostGbp ?? 0)}, sold {Gbp(day.ExportCreditGbp ?? 0)}; costs leave out standing charges.";
+        var summary = $"{plain} Solar made {Kwh(solar)}. Bought {Gbp(day.ImportCostGbp ?? 0)}, sold {Gbp(day.ExportCreditGbp ?? 0)}; {standingText}";
         var heading = Math.Abs(difference) < .15 ? $"{dayName} cost about the same as the week's average" : difference > 0 ? $"{dayName} cost {Gbp(difference)} more than the week's average" : $"{dayName} cost less than the week's average";
         return new(heading, asked, InvestigationQuality.Shorten(plain, 280), summary, "finding",
         [
-            $"{dayName} (meters): bought {Gbp(day.ImportCostGbp ?? 0)}, sold {Gbp(day.ExportCreditGbp ?? 0)}, net {Gbp(cost)}.",
+            $"{dayName} (meters): bought {Gbp(day.ImportCostGbp ?? 0)}, sold {Gbp(day.ExportCreditGbp ?? 0)}{(day.StandingChargeIncluded && day.StandingChargeGbp is { } sc ? $", standing charge {Gbp(sc)}" : "")}, net {Gbp(cost)}.",
             $"Previous 7 days: net {Gbp(weekCost)}, {Gbp(average)} a day.",
             eveningCar > 0 ? $"Evening car charge: {Kwh(eveningCar)} at 25.4p/kWh." : "No evening car charge.",
             "Scripted demo answer from the sample house's meters; no AI was used.",

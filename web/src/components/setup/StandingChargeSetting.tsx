@@ -14,6 +14,8 @@ export function standingChargeSource(s: StandingChargeSettings): string {
     return `${perDay(s.todayPencePerDay)}, read from Home Assistant${s.entityOrigin === "octopus" ? " (the Octopus Energy sensor on the same meter as your import rate)" : ""}.`;
   if (s.todaySource === "manual" && s.todayPencePerDay != null)
     return `${perDay(s.todayPencePerDay)}, the figure you entered.`;
+  if (s.entity && s.entityOrigin === "octopus" && s.sensorPencePerDay == null)
+    return `Joule looked for the Octopus Energy standing charge sensor (${s.entity}) but hasn’t found a reading. It may be turned off in Home Assistant. You can enter the figure below.`;
   if (s.entity)
     return "Joule is watching for the standing charge sensor but hasn’t had a reading yet. You can enter the figure below meanwhile.";
   return "Joule doesn’t know it yet. With the Octopus Energy integration it’s read automatically from the same meter as your import rate; otherwise enter it below. It’s on your bill or in your supplier’s app.";
@@ -120,7 +122,9 @@ export function StandingChargeSetting() {
                     variant="ghost"
                     size="sm"
                     disabled={busy}
-                    onClick={() => void save({ clearManual: true }, "Your figure is cleared.")}
+                    onClick={() =>
+                      void save({ clearManual: true }, "Your figure is cleared from every day it was used.")
+                    }
                   >
                     Clear
                   </Button>

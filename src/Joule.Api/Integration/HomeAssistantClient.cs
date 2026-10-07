@@ -17,6 +17,10 @@ public sealed class HomeAssistantOptions
     /// <summary>Metrics whose sensor Joule worked out itself rather than being told (the Octopus standing charge, from the import rate
     /// sensor on the same meter). A worked-out sensor that doesn't exist is skipped quietly.</summary>
     public HashSet<string> DerivedEntities { get; }=[];
+    /// <summary>The mappings as the owner sees them (status, Setup): a worked-out sensor appears only once it has given a real reading,
+    /// so a missing or disabled one never shows as mapped or as a sensor that needs a look.</summary>
+    public Dictionary<string,string> ShownEntities(IReadOnlyDictionary<string,LatestTelemetry> latest)=>
+        Entities.Where(x=>!DerivedEntities.Contains(x.Key) || latest.GetValueOrDefault(x.Key)?.LastObservedAt is not null).ToDictionary(x=>x.Key,x=>x.Value);
     /// <summary>Sensor profile overrides by metric (HomeAssistant:Profiles:Ev=session_counter, …). Unset metrics are detected from history.</summary>
     public Dictionary<string,string> Profiles { get; }=[];
     /// <summary>auto, true or false (HomeAssistant:LoadIncludesEv): whether the load meter includes EV charging.</summary>
@@ -79,7 +83,7 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         if(states is null && fallback?.Configured==true){source=MirrorSource;states=await ReadMirrorAsync(ct);}
         var observedAt=(clock??TimeProvider.System).GetUtcNow();
         LastReadFailed=states is null;
-        if(states is null)return options.Entities.Select(x=>Unavailable(x.Key,x.Value,observedAt,source)).ToList();
+        if(states is null)return options.Entities.Where(x=>!options.DerivedEntities.Contains(x.Key)).Select(x=>Unavailable(x.Key,x.Value,observedAt,source)).ToList();
         var result=new List<TelemetrySample>();
         foreach(var (metric,entity) in options.Entities)
         {

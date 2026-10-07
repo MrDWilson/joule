@@ -244,7 +244,8 @@ public static class SetupConfigEndpoints
         var (apps, source, error) = await AppsYaml(mcp, configuration, ct);
         var fromApps = apps is null ? [] : AppsValues(apps);
         var guesses = state is null ? [] : SensorCandidates.Find(root, 4);
-        var current = options?.Entities ?? [];
+        Dictionary<string, string> current = [];
+        try { current = options?.ShownEntities(db.ReadLatestTelemetry()) ?? []; } catch (Exception e) when (e is not OperationCanceledException) { current = options?.Entities ?? []; }
         var meters = SensorCandidates.EnvNames.Select(x =>
         {
             var metric = x.Key; var key = "HomeAssistant:Entities:" + x.Value;
