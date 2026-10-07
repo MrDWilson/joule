@@ -13,8 +13,16 @@ public partial class DataStore : IDisposable
     public TimeProvider Clock { get; }
     /// <summary>The database file: joule.duckdb, or the pre-rename predbat.duckdb when it couldn't be renamed (see <see cref="DataFiles"/>).</summary>
     public string DatabasePath { get; }
-    public DataStore(string directory, TimeProvider? clock = null, ILogger? logger = null)
+    /// <summary>DuckDB's working-memory cap. Folding a large write-ahead log back into a database of a gigabyte or more
+    /// needs far more than the old fixed 256 MB, which crashed live start-ups ("failed to pin block"). Override with
+    /// App__DatabaseMemoryLimit, e.g. "512MB" on a small device or "2GB" for years of history.</summary>
+    public const string DefaultMemoryLimit = "1GB";
+    public string MemoryLimit { get; }
+    public static string ValidMemoryLimit(string? value) =>
+        value is { } v && Regex.IsMatch(v.Trim(), @"^\d{1,6}(\.\d{1,3})?\s*(KB|MB|GB|TB|KiB|MiB|GiB|TiB)$", RegexOptions.IgnoreCase) ? v.Trim() : DefaultMemoryLimit;
+    public DataStore(string directory, TimeProvider? clock = null, ILogger? logger = null, string? memoryLimit = null)
     {
+        MemoryLimit = ValidMemoryLimit(memoryLimit);
         Clock = clock ?? TimeProvider.System;
         Logger = logger;
         DirectoryPath = Path.GetFullPath(directory);
@@ -26,7 +34,8 @@ public partial class DataStore : IDisposable
             if (choice.Warning) Logger?.LogWarning("{Note}", note); else Logger?.LogInformation("{Note}", note);
         }
         db = new DuckDBConnection($"Data Source={DatabasePath}"); db.Open();
-        Execute("SET enable_external_access=false; SET memory_limit='256MB'; SET threads=2");
+        // preserve_insertion_order=false lets DuckDB stream large inserts and checkpoints instead of buffering them.
+        Execute($"SET enable_external_access=false; SET memory_limit='{MemoryLimit}'; SET threads=2; SET preserve_insertion_order=false");
         Execute("""
             CREATE TABLE IF NOT EXISTS application_state (id INTEGER PRIMARY KEY, payload VARCHAR NOT NULL);
             CREATE TABLE IF NOT EXISTS revisions (id INTEGER PRIMARY KEY, recorded_at TIMESTAMPTZ, source VARCHAR, payload VARCHAR NOT NULL);

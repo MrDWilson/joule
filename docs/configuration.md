@@ -34,6 +34,7 @@ A demo whose `App__Demo=true` comes from the environment can't be switched from 
 | `App__SecureCookie` | `auto` | Marks the sign-in cookie `Secure` (HTTPS only). `auto` does so when Joule itself serves HTTPS. Set `true` when a proxy in front of Joule terminates HTTPS, so the cookie is never sent over plain HTTP. |
 | `App__FrameAncestors` | (nobody) | Sites allowed to show Joule inside a frame, for example `https://homeassistant.example.com` for a Home Assistant panel. |
 | `App__DataDirectory` | `./data` | Where the database and credentials live when running from source. The container always uses `/data`. |
+| `App__DatabaseMemoryLimit` | `1GB` | Working memory the database may use, e.g. `512MB` on a small device or `2GB` for years of history. Too low a limit stops Joule starting once the database grows past a gigabyte ("failed to pin block"). |
 
 If a setting is wrong, Joule stops straight away with a single line saying what to fix, for example `Joule cannot start: App__AccessKey is too short.`, and exit code 2. Setup checks every value before saving it, so it can't save a setting that stops Joule starting; if `settings.json` itself is damaged, Joule says so and you can fix or move the file aside.
 

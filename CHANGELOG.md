@@ -2,6 +2,15 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
+## 1.1.1 (2026-10-07)
+
+### Fixes
+
+- Joule no longer fails to start once its database passes about a gigabyte. The database's working memory was fixed at 256 MB,
+  and folding a large write-ahead log back into the file needs more ("failed to pin block … 243.4 MiB/244.1 MiB used"). The
+  default is now 1 GB and `App__DatabaseMemoryLimit` sets it. No data is lost: the failed step happens after the change is safely
+  written, and the next start completes it.
+
 ## 1.1.0 (2026-10-07)
 
 ### Features

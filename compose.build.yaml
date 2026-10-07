@@ -6,4 +6,4 @@ services:
     build:
       context: .
       args:
-        VERSION: ${JOULE_VERSION:-1.1.0}
+        VERSION: ${JOULE_VERSION:-1.1.1}

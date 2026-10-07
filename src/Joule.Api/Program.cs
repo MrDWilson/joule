@@ -41,7 +41,7 @@ while (true)
     builder.Services.AddHttpClient("docs", c => c.Timeout = TimeSpan.FromSeconds(15));
     builder.Services.AddHttpClient("notify", c => c.Timeout = TimeSpan.FromSeconds(30)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
     builder.Services.AddSingleton(TimeProvider.System);
-    builder.Services.AddSingleton(sp => new DataStore(Path.Combine(dataDirectory, demo ? "demo" : "live"), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger("Joule.Storage")));
+    builder.Services.AddSingleton(sp => new DataStore(Path.Combine(dataDirectory, demo ? "demo" : "live"), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger("Joule.Storage"), builder.Configuration["App:DatabaseMemoryLimit"]));
     builder.Services.AddSingleton<IPredbatClient>(sp => new PredbatClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("predbat"), builder.Configuration));
     builder.Services.AddPredbatMcp(builder.Configuration);
     builder.Services.AddSingleton(sp => new StateService(sp.GetRequiredService<DataStore>(), sp.GetRequiredService<IPredbatClient>(), demo, sp.GetRequiredService<ConfigFileArchive>(), builder.Configuration, sampleHistory: demo));
