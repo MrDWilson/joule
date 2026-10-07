@@ -17,8 +17,9 @@ import {
 import { directionText, presentAction, type BatteryNow, type PriceNow } from "./model";
 
 /**
- * The battery level as a ring, with the reserve marked by a short notch just outside it. Amber when the level is at or
- * within 5 points of the reserve; greyed when it isn't a current reading.
+ * The battery level as a ring: one arc for the level and nothing else on it, so there is no mark to decode. The arc has flat
+ * ends, so its start at 12 o'clock is a clean edge rather than a dot. The reserve is written under the ring ("Reserve 4%"),
+ * and the arc turns amber when the level is at or within 5 points of it; greyed when it isn't a current reading.
  */
 export function BatteryRing({
   value,
@@ -32,50 +33,36 @@ export function BatteryRing({
   size?: number;
 }) {
   const stroke = size >= 70 ? 7 : 6;
-  // The ring sits 5px in from the edge so the reserve notch fits outside it.
-  const r = (size - stroke) / 2 - 5,
+  const r = (size - stroke) / 2 - 1,
     c = 2 * Math.PI * r,
-    mid = size / 2,
-    outer = r + stroke / 2;
+    mid = size / 2;
   const v = value == null ? 0 : Math.max(0, Math.min(100, value));
-  const angle = (p: number) => ((p / 100) * 360 - 90) * (Math.PI / 180);
   const hasReserve = reserve != null && reserve > 0 && reserve < 100;
-  const tick = value != null && hasReserve ? angle(reserve) : null;
   const low = value != null && hasReserve && value <= reserve + 5;
   return (
-    <div
-      className={`battery-ring${stale ? " is-stale" : ""}${low ? " is-low" : ""}`}
-      style={{ width: size, height: size }}
-    >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle className="ring-track" cx={mid} cy={mid} r={r} strokeWidth={stroke} />
-        {value != null && v > 0 && (
-          <circle
-            className="ring-value"
-            cx={mid}
-            cy={mid}
-            r={r}
-            strokeWidth={stroke}
-            // Round caps on a short arc reach back past 12 o'clock and read as a blob; a flat end stays at the level.
-            strokeLinecap={v < 12 ? "butt" : "round"}
-            strokeDasharray={`${(v / 100) * c} ${c}`}
-            transform={`rotate(-90 ${mid} ${mid})`}
-          />
-        )}
-        {tick != null && (
-          <line
-            className="ring-reserve"
-            x1={mid + (outer + 1) * Math.cos(tick)}
-            y1={mid + (outer + 1) * Math.sin(tick)}
-            x2={mid + (outer + 5) * Math.cos(tick)}
-            y2={mid + (outer + 5) * Math.sin(tick)}
-          />
-        )}
-      </svg>
-      <span className="ring-label">
-        {value == null ? "—" : Math.round(value)}
-        {value != null && <small>%</small>}
-      </span>
+    <div className={`battery-ring${stale ? " is-stale" : ""}${low ? " is-low" : ""}`}>
+      <div className="ring-dial" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+          <circle className="ring-track" cx={mid} cy={mid} r={r} strokeWidth={stroke} />
+          {value != null && v > 0 && (
+            <circle
+              className="ring-value"
+              cx={mid}
+              cy={mid}
+              r={r}
+              strokeWidth={stroke}
+              strokeLinecap="butt"
+              strokeDasharray={`${(v / 100) * c} ${c}`}
+              transform={`rotate(-90 ${mid} ${mid})`}
+            />
+          )}
+        </svg>
+        <span className="ring-label">
+          {value == null ? "—" : Math.round(value)}
+          {value != null && <small>%</small>}
+        </span>
+      </div>
+      {hasReserve && <span className="ring-reserve">Reserve {Math.round(reserve)}%</span>}
     </div>
   );
 }
