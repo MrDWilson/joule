@@ -8,6 +8,7 @@ import type { Investigation, Usage } from "../../types";
 import { gbp, kw, kwh, number, percent } from "../../lib/format";
 import { clock, localDate } from "../../lib/time";
 import { metricLabel } from "../../lib/labels";
+import { standingCharge, type StandingChargeView } from "../../lib/energy";
 import { investigationVerdict, type VerdictView } from "../InvestigationText";
 import { slotAction } from "../../lib/planActions";
 import { dayWord, type ActionView, type PlanSlotLike, type PlanWindow } from "../plan/windows";
@@ -253,13 +254,18 @@ export interface CostView {
   breakdown: string;
   /** Which meter is short and when, when a side is below 95%. */
   note: string | null;
+  /** Today's standing charge so far, whether or not it is in `value`. */
+  standing: StandingChargeView | null;
 }
-/** Net cost = what you paid for imports minus what you earned from exports, each with its own coverage. */
+/**
+ * Net cost = what you paid for imports minus what you earned from exports, each with its own coverage, plus the standing
+ * charge so far when the owner includes it (the default once Joule knows it).
+ */
 export function costView(summary: SummaryDetail | null | undefined, timeZone?: string): CostView | null {
   if (!summary) return null;
   const paid = finite(summary.importCostGbp) ? summary.importCostGbp : null;
   const earned = finite(summary.exportCreditGbp) ? summary.exportCreditGbp : null;
-  const net = finite(summary.netCostGbp)
+  const energy = finite(summary.netCostGbp)
     ? summary.netCostGbp
     : paid != null || earned != null
       ? (paid ?? 0) - (earned ?? 0)
@@ -267,6 +273,8 @@ export function costView(summary: SummaryDetail | null | undefined, timeZone?: s
         finite(summary.observedNetCostGbp)
         ? summary.observedNetCostGbp
         : null;
+  const standing = standingCharge(summary);
+  const net = energy != null && standing?.included ? energy + standing.amount : energy;
   const importCover = summary.importCostCoverage ?? summary.costCoverageFraction ?? 0;
   const exportCover = summary.exportCostCoverage ?? summary.costCoverageFraction ?? 0;
   const approx =
@@ -290,6 +298,52 @@ export function costView(summary: SummaryDetail | null | undefined, timeZone?: s
     earned,
     breakdown: `Paid ${gbp(paid)} · Earned ${gbp(earned)}`,
     note: short.length ? short.join("; ") : null,
+    standing,
+  };
+}
+
+export interface GridView {
+  /** Bought from the grid so far today, kWh, and what it cost. */
+  importKwh: number | null;
+  importGbp: number | null;
+  /** The average price paid per kWh bought (pence), when both are known and enough was bought to make it meaningful. */
+  averagePence: number | null;
+  /** Sold to the grid, kWh, and what it earned. */
+  exportKwh: number | null;
+  exportGbp: number | null;
+  /** "Exported 2.1 kWh · earned £0.32", or "Nothing exported yet". */
+  exported: string;
+  /** Which meter is short and when, below 95% coverage. */
+  note: string | null;
+}
+
+/** The Grid tile: what was bought and sold so far today, in kWh and pounds. */
+export function gridView(summary: SummaryDetail | null | undefined, timeZone?: string): GridView | null {
+  if (!summary) return null;
+  const imp = summary.metrics?.grid_import as MetricDetail | undefined,
+    exp = summary.metrics?.grid_export as MetricDetail | undefined;
+  const importKwh = finite(imp?.energyKwh) ? imp!.energyKwh : null,
+    exportKwh = finite(exp?.energyKwh) ? exp!.energyKwh : null;
+  if (importKwh == null && exportKwh == null) return null;
+  const exportGbp = finite(summary.exportCreditGbp) ? summary.exportCreditGbp : null;
+  const exported =
+    exportKwh == null
+      ? "Export not measured"
+      : exportKwh < 0.05
+        ? "Nothing exported yet"
+        : `Exported ${kwh(exportKwh)}${exportGbp != null ? ` · earned ${gbp(exportGbp)}` : ""}`;
+  const notes = [coverageNote("grid_import", imp, timeZone), coverageNote("grid_export", exp, timeZone)].filter(
+    Boolean,
+  );
+  const importGbp = finite(summary.importCostGbp) ? summary.importCostGbp : null;
+  return {
+    importKwh,
+    importGbp,
+    averagePence: importGbp != null && importKwh != null && importKwh >= 0.1 ? (importGbp * 100) / importKwh : null,
+    exportKwh,
+    exportGbp,
+    exported,
+    note: notes.length ? notes.join("; ") : null,
   };
 }
 
@@ -501,8 +555,11 @@ export function soFarSentence({
   if (cost && cost.value !== "—") {
     const value = cost.value.replace("≈ ", "≈");
     const money = cost.earning ? `Up ${value} today` : `Net cost ${value} so far`;
+    const standing = cost.standing?.included ? `, standing charge ${cost.standing.text}` : "";
     const detail =
-      cost.paid != null || cost.earned != null ? ` (paid ${gbp(cost.paid)}, earned ${gbp(cost.earned)})` : "";
+      cost.paid != null || cost.earned != null
+        ? ` (paid ${gbp(cost.paid)}, earned ${gbp(cost.earned)}${standing})`
+        : "";
     parts.push(`${money}${detail}`);
   }
   const endedToday =

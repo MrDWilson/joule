@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** The colour a stat or card belongs to: a data series, or the brand accent. */
-export type Accent = "accent" | "load" | "solar" | "battery" | "ev" | "export" | "neutral";
+export type Accent = "accent" | "load" | "solar" | "battery" | "ev" | "export" | "grid" | "neutral";
 
 /**
  * A headline figure: label, value with unit, an optional delta line, a status chip and a slot for a sparkline.

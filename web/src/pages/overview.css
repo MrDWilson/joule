@@ -148,10 +148,22 @@
   line-height: var(--lh-normal);
 }
 
+/* The net cost tile's second line: the standing charge in the figure. */
+.stat-delta-line {
+  display: block;
+  color: var(--text-3);
+}
+
 /* Battery ring. */
 .battery-ring {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+.ring-dial {
+  position: relative;
 }
 .battery-ring svg {
   display: block;
@@ -168,10 +180,15 @@
 .battery-ring.is-low .ring-value {
   stroke: var(--warn);
 }
+/* The reserve, in words under the ring: no tick on the dial to decode. */
 .ring-reserve {
-  stroke: var(--text-3);
-  stroke-width: 2;
-  stroke-linecap: round;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.battery-ring.is-low .ring-reserve {
+  color: var(--warn);
 }
 .ring-label {
   position: absolute;
@@ -291,15 +308,35 @@
 }
 
 /* ------------------------------------------------------------------ Tiles */
+/* Five tiles: two columns on a phone (the battery, last, takes the whole row), three then two on a tablet, one row of
+   five on a wide screen. */
 .today-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
+.today-tiles > .stat:last-child {
+  grid-column: span 2;
+}
 @container today (min-width: 820px) {
   .today-tiles {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-4);
+  }
+  .today-tiles > .stat {
+    grid-column: span 2;
+  }
+  .today-tiles > .stat:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+}
+@container today (min-width: 1060px) {
+  .today-tiles {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .today-tiles > .stat,
+  .today-tiles > .stat:nth-child(n + 4) {
+    grid-column: auto;
   }
 }
 .today-tiles .stat {

@@ -34,6 +34,7 @@ import {
   type Reading,
 } from "../components/today/model";
 import { zoneNote } from "../lib/time";
+import { headlineNet, standingChargeNote } from "../lib/energy";
 import "./overview.css";
 
 // The timeline loads just after the page, so the first paint shows the figures straight away.
@@ -118,10 +119,8 @@ export default function OverviewPage() {
         yesterday.summary.exportCostCoverage ?? yesterday.summary.costCoverageFraction,
       )
     : 0;
-  const yesterdayCost =
-    yesterday && yesterdayCover >= 0.9
-      ? (yesterday.summary.netCostGbp ?? yesterday.summary.observedNetCostGbp ?? null)
-      : null;
+  // Yesterday by now on the same footing as today's figure: with the standing charge when that is included.
+  const yesterdayCost = yesterday && yesterdayCover >= 0.9 ? headlineNet(yesterday.summary) : null;
   const solarAsleep =
     !!daily &&
     (daily.metrics.pv?.energyKwh ?? 0) < 0.05 &&
@@ -261,7 +260,7 @@ export default function OverviewPage() {
         </div>
       </div>
       <p className="today-footnote muted">
-        Today counts from midnight{zoneNote(timeZone)}. Costs leave out standing charges.
+        Today counts from midnight{zoneNote(timeZone)}. {standingChargeNote(daily)}
       </p>
     </div>
   );

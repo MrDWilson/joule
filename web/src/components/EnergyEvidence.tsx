@@ -42,6 +42,7 @@ import {
   reconcile,
   sensorHeadline,
   sensorRows,
+  standingChargeNote,
   type Change,
   type SensorRow,
 } from "../lib/energy";
@@ -431,6 +432,12 @@ function FigureBody({
                     </span>
                   )}
                   {net.earned && <span>Earned {net.earned}</span>}
+                  {net.standing && (
+                    <span className="energy-standing">
+                      {net.standing.included ? "Standing charge" : "Not counted: standing charge"} {net.standing.text}
+                      <span className="muted"> · {net.standing.rate}</span>
+                    </span>
+                  )}
                 </span>
               )
             }
@@ -515,7 +522,7 @@ function FigureBody({
           {notes.more > 0 && <li className="muted">and {notes.more} more like these</li>}
         </ul>
       )}
-      <HowFiguresWork demo={status.demo} car={!!summary.loadIncludesEv} />
+      <HowFiguresWork demo={status.demo} car={!!summary.loadIncludesEv} standing={standingChargeNote(summary)} />
     </div>
   );
 }
@@ -621,7 +628,16 @@ function ChangeText({ change: c, label, compact = false }: { change: Change; lab
 }
 
 /** The plain explainer: four bullets, with the server settings behind "For installers". */
-export function HowFiguresWork({ demo = false, car = false }: { demo?: boolean; car?: boolean }) {
+export function HowFiguresWork({
+  demo = false,
+  car = false,
+  standing = "Costs leave out the standing charge: set it in Setup › Sensors.",
+}: {
+  demo?: boolean;
+  car?: boolean;
+  /** What the costs say about the standing charge (lib/energy standingChargeNote). */
+  standing?: string;
+}) {
   return (
     <Disclosure summary="How these figures work" className="energy-how">
       <ul className="energy-how-list">
@@ -635,7 +651,9 @@ export function HowFiguresWork({ demo = false, car = false }: { demo?: boolean; 
           marked ≈. Longer outages are left out, never guessed, and named under the chart.
         </li>
         <li>Costs use your Octopus rate at the time of each reading.</li>
-        <li>Standing charges aren’t included.</li>
+        <li>
+          {standing} The standing charge is a fixed amount per day, counted for the part of each day the period covers.
+        </li>
         {car && (
           <li>Home use leaves out the car: your house meter includes its charging, so the car has its own figure.</li>
         )}
@@ -652,11 +670,13 @@ export function HomeAssistantSetupHelp({ summary = "For installers" }: { summary
       <p>
         Joule reads the sensors named in its server settings: <code>HomeAssistant__BaseUrl</code> and{" "}
         <code>HomeAssistant__AccessToken</code>, plus one <code>HomeAssistant__Entities__…</code> line per meter (Load,
-        Pv, GridImport, GridExport, BatteryCharge, BatteryDischarge, Ev, Soc, ImportTariff, ExportTariff).
+        Pv, GridImport, GridExport, BatteryCharge, BatteryDischarge, Ev, Soc, ImportTariff, ExportTariff, and optionally
+        StandingCharge).
       </p>
       <p>
-        Energy meters must report kWh, Wh or MWh, the battery level a percentage and prices pence per kWh. Without a
-        Home Assistant token, Joule reads the same sensors through Predbat.
+        Energy meters must report kWh, Wh or MWh, the battery level a percentage and prices pence per kWh. The standing
+        charge is found on its own from an Octopus Energy import rate sensor. Without a Home Assistant token, Joule
+        reads the same sensors through Predbat.
       </p>
     </Disclosure>
   );

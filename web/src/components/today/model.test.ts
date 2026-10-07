@@ -6,6 +6,7 @@ import {
   batteryNow,
   batteryOutlook,
   costView,
+  gridView,
   coverageNote,
   directionText,
   homeUse,
@@ -150,11 +151,43 @@ describe("prices and what comes next", () => {
   });
 });
 
+describe("gridView", () => {
+  it("says what was bought and sold so far, in kWh and pounds", () => {
+    const g = gridView(live, TZ)!;
+    expect(g.importKwh).toBeCloseTo(live.metrics.grid_import.energyKwh!, 6);
+    expect(g.importGbp).toBeCloseTo(live.importCostGbp!, 6);
+    expect(g.averagePence).toBeCloseTo((live.importCostGbp! * 100) / live.metrics.grid_import.energyKwh!, 6);
+    expect(g.exported).toBe(`Exported ${kwh(live.metrics.grid_export.energyKwh)} · earned £0.77`);
+    expect(g.note).toBeNull();
+  });
+  it("says so when nothing has been exported, and is empty without grid meters", () => {
+    const quiet = { ...live, metrics: { ...live.metrics, grid_export: { ...live.metrics.grid_export, energyKwh: 0 } } };
+    expect(gridView(quiet, TZ)!.exported).toBe("Nothing exported yet");
+    const barely = {
+      ...live,
+      metrics: { ...live.metrics, grid_import: { ...live.metrics.grid_import, energyKwh: 0.04 } },
+    };
+    expect(gridView(barely, TZ)!.averagePence).toBeNull();
+    expect(gridView({ ...live, metrics: { load: live.metrics.load } }, TZ)).toBeNull();
+  });
+});
+
 describe("costView", () => {
   it("is paid minus earned with both sides shown", () => {
     const c = costView(live, TZ)!;
     expect(c).toMatchObject({ value: "£1.05", label: "Net cost today", approx: false, earning: false, note: null });
     expect(c.breakdown).toBe("Paid £1.83 · Earned £0.77");
+  });
+  it("adds today's standing charge so far when it is included, and keeps paid and earned as measured", () => {
+    const standing = { standingChargeGbp: 0.27, standingChargePencePerDay: 53.68, standingChargeIncluded: true };
+    const c = costView({ ...live, ...standing }, TZ)!;
+    expect(c.value).toBe("£1.32");
+    expect(c.breakdown).toBe("Paid £1.83 · Earned £0.77");
+    expect(c.standing).toMatchObject({ text: "£0.27", rate: "£0.54/day", included: true });
+    expect(soFarSentence({ cost: c, night: null, needs: 0 })).toBe(
+      "Net cost £1.32 so far (paid £1.83, earned £0.77, standing charge £0.27) · nothing needs you",
+    );
+    expect(costView({ ...live, ...standing, standingChargeIncluded: false }, TZ)!.value).toBe("£1.05");
   });
   it("reads a negative net as earnings, in plain pounds", () => {
     const c = costView({ ...live, importCostGbp: 0.4, exportCreditGbp: 4.65, netCostGbp: -4.25 }, TZ)!;

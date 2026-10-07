@@ -95,6 +95,12 @@ function ReportFigures({ view }: { view: ReportView }) {
         </span>
       )}
       {net.earned && <span>Earned {net.earned}</span>}
+      {net.standing && (
+        <span className="report-standing">
+          {net.standing.included ? "Standing charge" : "Not counted: standing charge"} {net.standing.text} (
+          {net.standing.rate})
+        </span>
+      )}
     </small>
   );
   // One line per note ("16.9 kWh including the car", "Missing 11:00–13:30"), never joined into one long run.

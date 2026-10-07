@@ -275,7 +275,9 @@ public static class SetupConfigEndpoints
         var (apps, source, error) = await AppsYaml(mcp, configuration, predbat, ct);
         var args = apps is null ? [] : AppsArgs(apps);
         var ranked = state is null ? [] : SensorCandidates.Ranked(root);
-        var current = options?.Entities ?? [];
+        // A worked-out sensor (the Octopus standing charge) counts as mapped only once it has given a reading.
+        Dictionary<string, string> current = [];
+        try { current = options?.ShownEntities(db.ReadLatestTelemetry()) ?? []; } catch (Exception e) when (e is not OperationCanceledException) { current = options?.Entities ?? []; }
         var picks = SensorCandidates.EnvNames.Keys.Select(metric =>
         {
             string? entity = null, from = null; var confident = false; List<string> others = [];

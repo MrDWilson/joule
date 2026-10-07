@@ -26,7 +26,7 @@ public record TelemetryIssue(string Metric,string Message,DateTimeOffset? Since)
 public sealed class TelemetryCollectionService
 {
     /// <summary>Sensors that are legitimately idle or absent for long periods (an EV charger between sessions, optional forecast feeds). Their gaps are recorded per metric but never fail a collection.</summary>
-    public static readonly string[] OptionalMetrics=["ev","standing_charge","intelligent_slots","alternative_forecast"];
+    public static readonly string[] OptionalMetrics=["ev",StandingCharge.Metric,"intelligent_slots","alternative_forecast"];
     /// <summary>An unexpected outage becomes a collection error only after this long: brief Home Assistant restarts are normal.</summary>
     public static readonly TimeSpan CounterOutageGrace=TimeSpan.FromMinutes(30),StateOutageGrace=TimeSpan.FromMinutes(15);
     readonly DataStore db;readonly HomeAssistantClient client;readonly HomeAssistantOptions options;
@@ -42,8 +42,12 @@ public sealed class TelemetryCollectionService
     }
     public TelemetryStatus Status()
     {
+        // One consistent set of mappings. A sensor Joule worked out itself (the Octopus standing charge) is left out until it has given a real reading.
         var entities=options.Entities;
-        return new(demo,client.Configured,options.TimeZone,last,error,new(entities),TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,db.ReadLatestTelemetry(options.MaxGap),options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
+        var latest=db.ReadLatestTelemetry(options.MaxGap);
+        var shown=options.ShownEntities(latest);
+        foreach(var metric in options.DerivedEntities)if(!shown.ContainsKey(metric) && latest.GetValueOrDefault(metric)?.LastObservedAt is null)latest.Remove(metric);
+        return new(demo,client.Configured,options.TimeZone,last,error,shown,TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,latest,options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
         {
             Profiles=db.ReadSensorProfiles(),Issues=issues,LoadIncludesEv=db.LoadIncludesEv(),
             Detected=options.Detected.ToDictionary(x=>x.Key,x=>x.Value),NeedsChoice=[..options.NeedsChoice],Declined=[..options.Declined.Order(StringComparer.Ordinal)],
@@ -56,11 +60,13 @@ public sealed class TelemetryCollectionService
         try
         {
             if(!intervalRulesChecked){db.EnsureIntervalRules(options.MaxGap);intervalRulesChecked=true;}
-            if(demo)DemoTelemetry.Seed(db,clock.GetUtcNow());
+            if(demo){db.RecordManualStandingCharge();DemoTelemetry.Seed(db,clock.GetUtcNow());}
             else
             {
                 // Sensors nobody chose are found from Predbat on the first poll and refreshed every few hours; never fatal to a poll.
                 if(autoDetect is not null)await autoDetect.RunIfDueAsync(ct);
+                // Without a standing charge sensor reading today, today takes the owner's figure from Setup, else a number in apps.yaml.
+                db.RecordManualStandingCharge(options.FixedStandingChargePence);
                 if(!client.Configured)throw new DomainException("No meters yet: Joule finds them from Predbat once it can read Predbat, or choose them in Setup. Readings need either the Home Assistant URL and token or the Predbat URL.",503);
                 var readings=await client.CollectAsync(ct);lastSource=readings.FirstOrDefault()?.Source;db.SaveTelemetry(readings,options.MaxGap,alignToSource:true);
                 // Readings are persisted and the poll recorded before per-sensor health is judged, so partial data and LastCollection survive a failing sensor.
@@ -137,8 +143,15 @@ public static class HomeAssistantIntegration
             [SensorProfiles.SolarDaily]="Daily solar counter; unknown counts as zero only when the counter proves it or the sun is down.",
             [SensorProfiles.SessionCounter]="Restarts with each charging session; unknown between sessions counts as zero.",
             [SensorProfiles.LifetimeCounter]="Only rises; unknown is an outage."}});
+        app.MapGet("/api/telemetry/standing-charge",(DataStore db,HomeAssistantOptions options)=>StandingChargeView(db,options));
+        app.MapPost("/api/telemetry/standing-charge",(StandingChargeRequest request,DataStore db,HomeAssistantOptions options)=>{db.SaveStandingChargePreferences(request);return StandingChargeView(db,options);});
         app.MapPost("/api/telemetry/collect",async(TelemetryCollectionService service,CancellationToken ct)=>{await service.CollectAsync(ct);return Results.Ok(service.Status());});
         return app;
+    }
+    static StandingChargeView StandingChargeView(DataStore db,HomeAssistantOptions options)
+    {
+        var entity=options.Entities.GetValueOrDefault(StandingCharge.Metric);
+        return db.ReadStandingCharge(entity,entity is null?null:options.DerivedEntities.Contains(StandingCharge.Metric)?"octopus":"configured");
     }
 }
 
@@ -230,6 +243,8 @@ public static class DemoTelemetry
         {
             if (db.ReadLatestTelemetry().GetValueOrDefault("load") is { } latest) start = latest.Time.AddMinutes(5);
         }
+        // The demo house reads its standing charge from a sensor, as an Octopus Energy installation would.
+        db.RecordStandingCharge(DemoHouse.LocalDate(now, zone), DemoHouse.StandingChargePence, "sensor", "demo.standing_charge");
         if (start > end) return;
         var batch = new List<TelemetrySample>();
         for (var at = start; at <= end; at = at.AddMinutes(5))

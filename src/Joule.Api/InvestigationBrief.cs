@@ -147,7 +147,8 @@ public static class InvestigationBrief
     }
 
     /// <summary>
-    /// Today's money in words, led by the headline net cost (import cost − export credit, each with its own coverage). The matched-period
+    /// Today's money in words, led by the headline net cost (import cost − export credit, each with its own coverage, plus the standing
+    /// charge when the owner's dashboard includes it, so the AI quotes the same figure the owner sees). The matched-period
     /// figure is labelled as the "both meters reporting" value, so the AI never quotes it as the day's cost.
     /// </summary>
     public static string MoneyBrief(EnergySummary summary, TimeZoneInfo zone, string period)
@@ -161,14 +162,36 @@ public static class InvestigationBrief
         var lines = new List<string>();
         var net = summary.NetCostGbp ?? (summary.ImportCostGbp is { } i && summary.ExportCreditGbp is { } e ? i - e : null);
         var approxNet = summary.ImportCostCoverage < 0.95 || summary.ExportCostCoverage < 0.95 || summary.ImportCostEstimated || summary.ExportCostEstimated ? "≈ " : "";
-        lines.Add(net is { } n
-            ? $"{period}: net cost {approxNet}{Money(n)} (this is the figure to quote). {Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}. Standing charge not included."
-            : $"{period}: net cost not known. {Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}.");
+        var sides = $"{Side("Paid for import", summary.ImportCostGbp, summary.ImportCostCoverage, summary.ImportCostEstimated)}; {Side("earned from export", summary.ExportCreditGbp, summary.ExportCostCoverage, summary.ExportCostEstimated)}";
+        if (net is not { } n) lines.Add($"{period}: net cost not known. {sides}.");
+        else if (summary.StandingChargeIncluded && summary.StandingChargeGbp is { } standing)
+        {
+            // The dashboard's headline includes the standing charge, so that is the figure the AI quotes; the energy-only figure is secondary.
+            var withStanding = summary.NetCostWithStandingChargeGbp ?? n + standing;
+            lines.Add($"{period}: net cost {approxNet}{Money(withStanding)} including the standing charge (this is the figure to quote; it matches the owner's dashboard). "
+                + $"Energy only, without the standing charge: {approxNet}{Money(n)} (what trials and like-for-like comparisons use; never quote it as the cost). {sides}. {StandingChargeBrief(summary)}");
+        }
+        else lines.Add($"{period}: net cost {approxNet}{Money(n)} (this is the figure to quote). {sides}. {StandingChargeBrief(summary, n)}");
         foreach (var gap in summary.CostGaps.Take(4))
             lines.Add($"- {(gap.Metric == "grid_export" ? "Export meter" : gap.Metric == "grid_import" ? "Import meter" : gap.Metric)} not priced {Clock(gap.From, zone)}–{Clock(gap.To, zone)} ({gap.Reason.Replace('_', ' ')}).");
         if (summary.ObservedNetCostGbp is { } matched)
             lines.Add($"Only while both meters were reporting with whole readings: {Money(matched)}. Use this only to compare like-for-like periods; never quote it as the day's cost.");
         return string.Join("\n", lines);
+    }
+
+    /// <summary>The standing charge for the money section: the amount, the daily rate, where it came from and whether the owner's headline
+    /// includes it. When <paramref name="netWithout"/> is given the quoted net cost leaves it out, so the bill with it is stated too.
+    /// Experiments and like-for-like comparisons always use the energy-only figure.</summary>
+    public static string StandingChargeBrief(EnergySummary summary, double? netWithout = null)
+    {
+        if (summary.StandingChargeGbp is not { } standing || summary.StandingChargePencePerDay is not { } rate)
+            return "Standing charge not known to Joule, so not included.";
+        var source = summary.StandingChargeSource switch { "manual" => "the owner's figure", "predbat" => "the figure in Predbat's apps.yaml", _ => "the standing charge sensor" };
+        var detail = $"Standing charge for this period {Money(standing)} ({rate.ToString("0.##", CultureInfo.InvariantCulture)}p a day, from {source}{(summary.StandingChargeAssumed ? "; early days assumed the same rate" : "")})";
+        var placement = netWithout is { } n
+            ? $", not in the net cost above; with it the bill is {Money(n + standing)}. The owner has chosen to leave the standing charge out of the dashboard's headline. "
+            : ", included in the net cost above, as on the owner's dashboard. ";
+        return detail + placement + "The standing charge is fixed per day: never treat it as something a setting change can save.";
     }
 
     /// <summary>

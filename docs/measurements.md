@@ -40,7 +40,9 @@ The dashboard says how complete each figure is in words, for example "Complete",
 
 ## Costs
 
-Net cost is what you paid for imports minus what you earned from exports, each costed half-hour by half-hour from the tariff sensors. Each side shows its own completeness; if either is noticeably incomplete, the figure is marked approximate and names the meter that was offline. Standing charges are not included. A negative net cost is shown as net earnings.
+Net cost is what you paid for imports minus what you earned from exports, each costed half-hour by half-hour from the tariff sensors. Each side shows its own completeness; if either is noticeably incomplete, the figure is marked approximate and names the meter that was offline. A negative net cost is shown as net earnings.
+
+The standing charge is added on its own line ("Standing charge £0.21 · £0.54/day") and, unless you switch it off in Setup › Sensors, included in the net cost. Joule reads it from the Octopus Energy integration's *Current Standing Charge* sensor on the same meter as your import rate (or a sensor you map), otherwise from the figure you enter in pence per day. Each day keeps its own rate, so a price change doesn't rewrite earlier days; days before Joule knew any rate assume the first one it recorded. A period is charged for the share of each day it covers, from Joule's first reading up to now, so a clock-change day still counts as one day. Trials compare costs without the standing charge, since no setting can change it.
 
 ## Plan versus actual
 

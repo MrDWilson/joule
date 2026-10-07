@@ -3,14 +3,17 @@
  *
  * Lanes, top to bottom: the plan (an action ribbon coloured by the glossary tone, with Free / Saving / IOG tags, over a thin
  * import-price heat strip), energy (home and solar, kWh per half-hour, measured solid in the past and forecast dashed
- * ahead), the car when it is part of the picture (its own lane: its hue is too close to home's to sit beside it), and the
- * battery level with the reserve line. A "Now" line with a pill crosses every lane; hovering, touching or using the arrow
+ * ahead), the grid (bought above its zero line, sold below, measured only: Joule doesn't forecast it), the car when it is
+ * part of the picture (its own lane: its hue is too close to home's to sit beside it), and the battery level with the
+ * reserve line. A "Now" line with a pill crosses every lane; hovering, touching or using the arrow
  * keys picks out one slot in every lane at once. On a phone, or any touch screen, the reading appears in a fixed strip above
  * the plot instead of a floating tooltip, so a finger never hides what it is reading.
  *
- * Presets keep each page calm: "today" (Overview: about 12 h back and 24 h ahead, at most 4 legend chips), "plan" (the
- * whole plan, price chip and the forecast-accuracy overlay, at most 5 chips), "battery" (the battery lane alone) and "day"
- * (one measured day, energy only).
+ * Presets keep each page calm: "today" (Overview: about 12 h back and 24 h ahead, at most 5 legend chips: home, solar,
+ * grid, car, battery; the grid was added in October 2026 because what is bought is what the bill is made of; on a phone
+ * the price takes a chip and the grid lane goes without one), "plan" (the
+ * whole plan, price chip and the forecast-accuracy overlay, at most 5 chips; no grid lane, the plan page is about what
+ * comes next), "battery" (the battery lane alone) and "day" (one measured day: energy, grid and the car).
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { Api } from "../../completion-types";
@@ -49,7 +52,7 @@ import {
 } from "./timeline";
 
 export type TimelinePreset = "today" | "plan" | "battery" | "day";
-type Lane = "plan" | "energy" | "car" | "battery";
+type Lane = "plan" | "energy" | "grid" | "car" | "battery";
 export type RangeKey = "around" | "past" | "next12" | "next48" | "all";
 export type Compare = "off" | "day" | "week";
 
@@ -116,10 +119,10 @@ const presetRanges: Record<TimelinePreset, RangeKey[]> = {
   day: [],
 };
 const presetLanes: Record<TimelinePreset, Lane[]> = {
-  today: ["plan", "energy", "car", "battery"],
+  today: ["plan", "energy", "grid", "car", "battery"],
   plan: ["plan", "energy", "car", "battery"],
   battery: ["battery"],
-  day: ["energy", "car"],
+  day: ["energy", "grid", "car"],
 };
 const compareOptions: { value: Compare; label: string; days: number; noun: string }[] = [
   { value: "off", label: "Nothing", days: 0, noun: "" },
@@ -256,11 +259,7 @@ export function EnergyTimeline({
 
   // ------------------------------------------------------------ lanes and layout
   const carInRange = car && rows.some((r) => (r.ev.actual ?? 0) > 0.05 || (r.ev.forecast ?? 0) > 0.05);
-  const lanes = presetLanes[preset].filter((l) => {
-    if (l === "car") return carInRange && !hidden.includes("ev");
-    if (l === "battery") return !hidden.includes("battery") || preset === "battery";
-    return true;
-  });
+  const gridInRange = rows.some((r) => r.grid.importRaw != null || r.grid.exportRaw != null);
   const nowVisible = now > d0 && now < d1 && preset !== "day";
   const gl = compact ? 30 : 38,
     gr = compact ? 6 : 12;
@@ -269,6 +268,15 @@ export function EnergyTimeline({
   // Now pill; the Plan page always has the chip.
   const priceInChip = plotW < PRICE_KEY_MIN_PLOT;
   const priceChip = presetLanes[preset].includes("plan") && (preset === "plan" || priceInChip);
+  // Five chips at most: where the price needs a chip (a phone's Today), the grid lane is always drawn and named by its
+  // own label instead of a chip, like the plan lane.
+  const gridChip = !priceChip;
+  const lanes = presetLanes[preset].filter((l) => {
+    if (l === "car") return carInRange && !hidden.includes("ev");
+    if (l === "grid") return gridInRange && (!gridChip || !hidden.includes("grid"));
+    if (l === "battery") return !hidden.includes("battery") || preset === "battery";
+    return true;
+  });
   const showPrice = lanes.includes("plan") && !(priceChip && hidden.includes("price"));
   const x = linear([d0, d1 > d0 ? d1 : d0 + HOUR], [gl, gl + plotW]);
   // The ribbon's colours, named under it: only the actions in view, once each, in the order they first appear.
@@ -301,13 +309,17 @@ export function EnergyTimeline({
               : 172
           : lane === "car"
             ? 40
-            : preset === "battery"
+            : lane === "grid"
               ? compact
-                ? 84
-                : 96
-              : compact
-                ? 58
-                : 76;
+                ? 52
+                : 64
+              : preset === "battery"
+                ? compact
+                  ? 84
+                  : 96
+                : compact
+                  ? 58
+                  : 76;
     geom[lane] = { label: y + 12, top: y + head, bottom: y + head + plot };
     y += head + plot + GAP;
   }
@@ -333,6 +345,15 @@ export function EnergyTimeline({
   const cy = cg ? linear([0, carTicks.max], [cg.bottom, cg.top]) : null;
   const bg = geom.battery;
   const by = bg ? linear([0, 100], [bg.bottom, bg.top]) : null;
+  // Grid: bought above the zero line, sold below, each on its own labelled scale. Selling has the lower 30% of the lane, so
+  // buying (what the bill is made of) leads, and a little export is still visible.
+  const gg = geom.grid;
+  const gridIn = niceTicks(Math.max(0, ...viewRows.map((r) => r.grid.import ?? 0)), 1, 0.5);
+  const soldMax = Math.max(0, ...viewRows.map((r) => r.grid.export ?? 0));
+  const gridOut = soldMax > 0.005 ? niceTicks(soldMax, 1, 0.5) : null;
+  const gridZero = gg ? (gridOut ? gg.top + (gg.bottom - gg.top) * 0.7 : gg.bottom) : 0;
+  const gyIn = gg ? linear([0, gridIn.max], [gridZero, gg.top]) : null;
+  const gyOut = gg && gridOut ? linear([0, gridOut.max], [gridZero, gg.bottom]) : null;
 
   // ------------------------------------------------------------ marks
   const xs = (r: Row) => ({ x0: x(Math.max(r.start, d0)), x1: x(Math.min(r.end, d1)) });
@@ -478,6 +499,8 @@ export function EnergyTimeline({
     chips.push({ key: "home", label: series.home.label, color: series.home.color });
     chips.push({ key: "solar", label: series.solar.label, color: series.solar.color });
   }
+  if (gridInRange && gridChip && presetLanes[preset].includes("grid"))
+    chips.push({ key: "grid", label: series.grid.label, color: series.grid.color });
   if (carInRange && presetLanes[preset].includes("car"))
     chips.push({ key: "ev", label: series.ev.label, color: series.ev.color });
   if (presetLanes[preset].includes("battery") && preset !== "battery")
@@ -506,6 +529,7 @@ export function EnergyTimeline({
   const drawnSeries = [
     showHome && lanes.includes("energy") && "home",
     showSolar && lanes.includes("energy") && "solar",
+    lanes.includes("grid") && "grid",
     lanes.includes("car") && "ev",
     showBattery && "battery",
   ].filter(Boolean) as string[];
@@ -555,6 +579,7 @@ export function EnergyTimeline({
       rows={viewRows}
       timeZone={timeZone}
       car={carInRange}
+      grid={gridInRange}
       energy={lanes.includes("energy")}
       compact={compact}
     />
@@ -891,6 +916,88 @@ export function EnergyTimeline({
                         (r) => r.start < now,
                       ),
                     )}
+                  />
+                )}
+              </g>
+            </g>
+          )}
+
+          {/* ---------------- grid lane */}
+          {gg && gyIn && (
+            <g className="tl-lane tl-lane-grid">
+              <text className="tl-lane-label" x={gl} y={gg.label}>
+                {`Grid · ${unit}`}
+              </text>
+              {gl + plotW - (`Grid · ${unit}`.length + 22) * CHAR > gl && (
+                <text className="tl-lane-label tl-grid-key" x={gl + plotW} y={gg.label} textAnchor="end">
+                  {gyOut ? "bought ↑ · sold ↓" : "bought"}
+                </text>
+              )}
+              <line className="daily-zero" x1={gl} x2={gl + plotW} y1={gridZero} y2={gridZero} />
+              <line className="tl-grid" x1={gl} x2={gl + plotW} y1={gyIn(gridIn.max)} y2={gyIn(gridIn.max)} />
+              <text className="tl-tick" x={gl - 6} y={gyIn(gridIn.max) + 4} textAnchor="end">
+                {tickText(gridIn.max, gridIn.step)}
+              </text>
+              <text className="tl-tick" x={gl - 6} y={gridZero + 4} textAnchor="end">
+                0
+              </text>
+              {/* The sold side has its floor line but no tick: a label there crowds the zero and the next lane's scale.
+                  The readout and the table give the figures. */}
+              {gyOut && gridOut && (
+                <line className="tl-grid" x1={gl} x2={gl + plotW} y1={gyOut(gridOut.max)} y2={gyOut(gridOut.max)} />
+              )}
+              <g clipPath={`url(#${id}-clip)`}>
+                <path
+                  className="tl-area"
+                  d={stepArea(
+                    steps(
+                      (r) => r.grid.import,
+                      gyIn,
+                      (r) => r.phase === "past",
+                    ),
+                    gridZero,
+                  )}
+                  style={{ fill: series.grid.color, fillOpacity: 0.28 }}
+                />
+                <path
+                  className="tl-series tl-measured"
+                  data-series="grid"
+                  d={stepPath(
+                    steps(
+                      (r) => r.grid.import,
+                      gyIn,
+                      (r) => r.phase === "past",
+                    ),
+                  )}
+                  style={{ stroke: series.grid.color, strokeWidth: encodings.measured.strokeWidth }}
+                />
+                {gyOut && (
+                  <path
+                    className="tl-area tl-grid-sold"
+                    data-series="grid"
+                    d={stepArea(
+                      steps(
+                        (r) => r.grid.export,
+                        gyOut,
+                        (r) => r.phase === "past",
+                      ),
+                      gridZero,
+                    )}
+                    style={{ fill: series.grid.color, fillOpacity: 0.16 }}
+                  />
+                )}
+                {gyOut && (
+                  <path
+                    className="tl-series tl-measured tl-grid-sold"
+                    data-series="grid"
+                    d={stepPath(
+                      steps(
+                        (r) => ((r.grid.export ?? 0) > 0.005 ? r.grid.export : null),
+                        gyOut,
+                        (r) => r.phase === "past",
+                      ),
+                    )}
+                    style={{ stroke: series.grid.color, strokeOpacity: 0.55, strokeWidth: 1.5 }}
                   />
                 )}
               </g>
@@ -1278,6 +1385,8 @@ function readoutText(row: Row, timeZone: string | undefined, car: boolean, earli
   if (!noSolar) bits.push(`Solar ${value(row.solar)}`);
   bits.push(`Home ${value(row.home)}`);
   if (car) bits.push(`Car ${value(row.ev)}`);
+  if (past && row.grid.importRaw != null) bits.push(`Grid in ${kwhTable(row.grid.importRaw)} kWh`);
+  if (past && (row.grid.exportRaw ?? 0) > 0.005) bits.push(`out ${kwhTable(row.grid.exportRaw)} kWh`);
   if (earlier && row.earlierRaw != null) bits.push(`Earlier ${kwhTable(row.earlierRaw)} kWh`);
   const soc = past ? (row.soc.end ?? row.soc.start) : row.soc.forecastStart;
   if (soc != null) bits.push(`Battery ${percent(soc)}`);
@@ -1375,6 +1484,13 @@ function TimelineTip({
         </table>
       )}
       {energy && <p className="tl-tip-unit">kWh in this slot</p>}
+      {row.phase === "past" && (row.grid.importRaw != null || row.grid.exportRaw != null) && (
+        <TipRow
+          color={series.grid.color}
+          name="Grid"
+          value={`bought ${kwhTable(row.grid.importRaw)} · sold ${kwhTable(row.grid.exportRaw)} kWh`}
+        />
+      )}
       {soc && <TipRow color={series.battery.color} name="Battery" value={soc} />}
       {row.price.import != null && (
         <TipRow
@@ -1408,19 +1524,22 @@ function TimelineTable({
   rows,
   timeZone,
   car,
+  grid = false,
   energy,
   compact = false,
 }: {
   rows: Row[];
   timeZone?: string;
   car: boolean;
+  /** A column for the grid: bought / sold, measured only. */
+  grid?: boolean;
   energy: boolean;
   /** Phone: short headings, and the plan column wraps so the figures are what scrolls. */
   compact?: boolean;
 }) {
   const cell = (r: Row, p: SeriesPoint) =>
     `${kwhTable(p.forecastRaw)} / ${r.phase === "past" ? (p.actualRaw != null ? `${p.approx ? "≈" : ""}${kwhTable(p.actualRaw)}` : p.state === "missing" ? "no reading" : "—") : "—"}`;
-  const columns = 5 + (energy ? 2 : 0) + (car ? 1 : 0);
+  const columns = 5 + (energy ? 2 : 0) + (car ? 1 : 0) + (grid ? 1 : 0);
   // Rows sit under a heading for their day, so each row needs only its times.
   const days: { day: string; rows: Row[] }[] = [];
   for (const r of rows) {
@@ -1457,6 +1576,11 @@ function TimelineTable({
               Car
             </th>
           )}
+          {grid && (
+            <th scope="col" className="num">
+              {compact ? "Grid" : "Grid in / out"}
+            </th>
+          )}
           <th scope="col" className="num">
             Battery
           </th>
@@ -1486,6 +1610,13 @@ function TimelineTable({
               {energy && <td className="num">{cell(r, r.solar)}</td>}
               {energy && <td className="num">{cell(r, r.home)}</td>}
               {car && <td className="num">{cell(r, r.ev)}</td>}
+              {grid && (
+                <td className="num">
+                  {r.phase === "past" && (r.grid.importRaw != null || r.grid.exportRaw != null)
+                    ? `${kwhTable(r.grid.importRaw)} / ${kwhTable(r.grid.exportRaw)}`
+                    : "—"}
+                </td>
+              )}
               <td className="num">
                 {r.phase === "past" ? percent(r.soc.end ?? r.soc.start) : percent(r.soc.forecastStart)}
               </td>

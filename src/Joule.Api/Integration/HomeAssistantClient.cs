@@ -37,14 +37,31 @@ public sealed class HomeAssistantOptions
         lock(detectedGate)
         {
             var use=found.Where(x=>!chosen.Contains(x.Key)&&Regex.IsMatch(x.Value.Entity,"^[a-z_]+\\.[a-z0-9_]+$")).ToDictionary(x=>x.Key,x=>x.Value);
-            var next=Entities.Where(x=>!Detected.ContainsKey(x.Key)).ToDictionary(x=>x.Key,x=>x.Value);
+            var next=Entities.Where(x=>!Detected.ContainsKey(x.Key)&&!DerivedEntities.Contains(x.Key)).ToDictionary(x=>x.Key,x=>x.Value);
             foreach(var (metric,sensor) in use)next[metric]=sensor.Entity;
+            // An Octopus import rate found from Predbat brings its standing charge sensor with it, unless one was chosen or found.
+            DerivedEntities=Derive(next);
             Detected=use;Entities=next;
             NeedsChoice=needsChoice.Where(m=>!chosen.Contains(m)&&!use.ContainsKey(m)).Distinct().ToList();
             FixedStandingChargePence=fixedStandingChargePence;
         }
     }
     public Dictionary<string,string> Units { get; }=[];
+    /// <summary>Metrics whose sensor Joule worked out itself rather than being told (the Octopus standing charge, from the import rate
+    /// sensor on the same meter). A worked-out sensor that doesn't exist is skipped quietly.</summary>
+    public IReadOnlySet<string> DerivedEntities { get; private set; }=new HashSet<string>();
+    /// <summary>Adds the Octopus standing charge sensor worked out from the import rate sensor to <paramref name="entities"/> when the
+    /// standing charge was neither chosen (or declined) nor found; returns the metrics so added.</summary>
+    HashSet<string> Derive(Dictionary<string,string> entities)
+    {
+        if(entities.ContainsKey(StandingCharge.Metric) || chosen.Contains(StandingCharge.Metric) || StandingCharge.FromOctopusRate(entities.GetValueOrDefault("import_tariff")) is not {} standing)return [];
+        entities[StandingCharge.Metric]=standing;
+        return [StandingCharge.Metric];
+    }
+    /// <summary>The mappings as the owner sees them (status, Setup): a worked-out sensor appears only once it has given a real reading,
+    /// so a missing or disabled one never shows as mapped or as a sensor that needs a look.</summary>
+    public Dictionary<string,string> ShownEntities(IReadOnlyDictionary<string,LatestTelemetry> latest)=>
+        Entities.Where(x=>!DerivedEntities.Contains(x.Key) || latest.GetValueOrDefault(x.Key)?.LastObservedAt is not null).ToDictionary(x=>x.Key,x=>x.Value);
     /// <summary>Sensor profile overrides by metric (HomeAssistant:Profiles:Ev=session_counter, …). Unset metrics are detected from history.</summary>
     public Dictionary<string,string> Profiles { get; }=[];
     /// <summary>auto, true or false (HomeAssistant:LoadIncludesEv): whether the load meter includes EV charging.</summary>
@@ -79,6 +96,7 @@ public sealed class HomeAssistantOptions
             Entities[metric]=entity;
             if(config["HomeAssistant:Units:"+name] is {} unit)Units[metric]=unit;
         }
+        DerivedEntities=Derive(Entities);
         foreach(var (name,metric) in names)
         {
             if(config["HomeAssistant:Profiles:"+name] is not {} profile || string.IsNullOrWhiteSpace(profile))continue;
@@ -106,13 +124,14 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         if(states is null && fallback?.Configured==true){source=MirrorSource;states=await ReadMirrorAsync(ct);}
         var observedAt=(clock??TimeProvider.System).GetUtcNow();
         LastReadFailed=states is null;
-        if(states is null)return options.Entities.Select(x=>Unavailable(x.Key,x.Value,observedAt,source)).ToList();
+        if(states is null)return options.Entities.Where(x=>!options.DerivedEntities.Contains(x.Key)).Select(x=>Unavailable(x.Key,x.Value,observedAt,source)).ToList();
         var result=new List<TelemetrySample>();
         foreach(var (metric,entity) in options.Entities)
         {
             try
             {
                 var matches=states.OfType<JsonObject>().Where(x=>x["entity_id"]?.ToString()==entity).Take(2).ToList();
+                if(matches.Count==0 && options.DerivedEntities.Contains(metric))continue;
                 result.Add(matches.Count==1?Parse(metric,entity,matches[0],observedAt,source):matches.Count==0?NotFound(metric,entity,observedAt,source):Unavailable(metric,entity,observedAt,source));
             }
             catch(Exception e) when(e is FormatException or InvalidOperationException or DomainException){result.Add(Unavailable(metric,entity,observedAt,source));}
@@ -168,8 +187,7 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         if(TelemetrySchema.EnergyMetrics.Contains(metric)){unit="kWh";value=normalized switch{"kwh"=>n,"wh"=>n/1000,"mwh"=>n*1000,_=>null};if(value<0)value=null;}
         else if(metric=="soc"){unit="%";value=normalized=="%" && n is >=0 and <=100 ? n : null;}
         else if(metric is "import_tariff" or "export_tariff"){unit="p/kWh";value=normalized switch {"p/kwh" or "pence/kwh"=>n,"£/kwh" or "gbp/kwh"=>n*100,"p/wh"=>n*1000,"£/mwh" or "gbp/mwh"=>n/10,_=>null};}
-        // The daily standing charge (Octopus reports pounds, unit GBP), in pence a day.
-        else if(metric=="standing_charge"){unit="p/day";value=n<0?null:normalized switch {"p" or "pence" or "p/day" or "pence/day"=>n,"£" or "gbp" or "£/day" or "gbp/day"=>n*100,_=>null};}
+        else if(metric==StandingCharge.Metric){unit="p/day";value=StandingCharge.Pence(n,rawUnit);}
         if(value is {} converted && !double.IsFinite(converted))return (null,unit,"invalid");
         return (value,unit,value is null?"unsupported_unit":"observed");
     }

@@ -15,7 +15,14 @@ import { metricLabel, sourceLabel } from "./labels";
 /** The energy meters, in the order of the tiles and the daily bars. */
 export const ENERGY_METRICS = ["load", "pv", "grid_import", "grid_export", "battery_charge", "battery_discharge", "ev"];
 /** Every sensor, in a fixed order (so rows never shuffle between loads). */
-export const SENSOR_ORDER = [...ENERGY_METRICS, "soc", "import_tariff", "export_tariff", "intelligent_slots"];
+export const SENSOR_ORDER = [
+  ...ENERGY_METRICS,
+  "soc",
+  "import_tariff",
+  "export_tariff",
+  "standing_charge",
+  "intelligent_slots",
+];
 /** The compact chips under the two headline figures. */
 export const CHIP_METRICS = ["pv", "grid_import", "grid_export", "battery_charge", "battery_discharge", "ev"];
 
@@ -100,6 +107,63 @@ export interface NetCost {
   earned: string | null;
   /** Why the figure is approximate, naming the meter: "Export meter offline 00:00–02:47". */
   note: string | null;
+  /** The standing charge for the period, whether or not it is in `value`. */
+  standing: StandingChargeView | null;
+}
+
+/** The standing charge for a window, as the pages show it. */
+export interface StandingChargeView {
+  /** £ for the window. */
+  amount: number;
+  /** "£0.54". */
+  text: string;
+  /** "£0.54/day". */
+  rate: string;
+  /** In the headline net cost (the owner's choice; the default). */
+  included: boolean;
+  source: "sensor" | "manual" | "predbat";
+  assumed: boolean;
+}
+
+/** The window's standing charge, or null when Joule doesn't know the rate. */
+export function standingCharge(s: EnergySummary | null | undefined): StandingChargeView | null {
+  const amount = s?.standingChargeGbp,
+    rate = s?.standingChargePencePerDay;
+  if (!finite(amount) || !finite(rate)) return null;
+  return {
+    amount,
+    text: gbp(amount),
+    rate: `${gbp(rate / 100)}/day`,
+    included: s?.standingChargeIncluded !== false,
+    source:
+      s?.standingChargeSource === "manual" ? "manual" : s?.standingChargeSource === "predbat" ? "predbat" : "sensor",
+    assumed: !!s?.standingChargeAssumed,
+  };
+}
+
+/** The energy net cost (import cost − export credit), plus the standing charge when the owner includes it. */
+export function headlineNet(s: EnergySummary | null | undefined): number | null {
+  if (!s) return null;
+  const paid = s.importCostGbp,
+    earned = s.exportCreditGbp;
+  const energy =
+    s.netCostGbp !== undefined
+      ? s.netCostGbp
+      : finite(paid) || finite(earned)
+        ? (paid ?? 0) - (earned ?? 0)
+        : s.observedNetCostGbp;
+  if (!finite(energy)) return null;
+  const standing = standingCharge(s);
+  return standing?.included ? energy + standing.amount : energy;
+}
+
+/** One line for the foot of a page: what the costs include. */
+export function standingChargeNote(s: EnergySummary | null | undefined) {
+  const standing = standingCharge(s);
+  if (!standing) return "Costs leave out the standing charge: set it in Setup › Sensors.";
+  return standing.included
+    ? `Costs include the standing charge (${standing.rate}).`
+    : `Costs leave out the standing charge (${standing.rate}), as chosen in Setup › Sensors.`;
 }
 
 /** The share of either side priced below which the headline net cost reads "≈". */
@@ -112,6 +176,8 @@ export function netCost(s: EnergySummary | null | undefined, options: Options = 
   if (!s) value = null;
   else if (s.netCostGbp !== undefined) value = s.netCostGbp;
   else value = finite(paid) && finite(earned) ? paid - earned : s.observedNetCostGbp;
+  const standing = standingCharge(s);
+  if (finite(value) && standing?.included) value += standing.amount;
   const importCov = s?.importCostCoverage ?? s?.costCoverageFraction ?? 0,
     exportCov = s?.exportCostCoverage ?? s?.costCoverageFraction ?? 0;
   const gross = Math.abs(paid ?? 0) + Math.abs(earned ?? 0);
@@ -136,6 +202,7 @@ export function netCost(s: EnergySummary | null | undefined, options: Options = 
     paid: finite(paid) ? gbp(paid) : null,
     earned: finite(earned) ? gbp(earned) : null,
     note,
+    standing,
   };
 }
 
@@ -514,6 +581,7 @@ function readingValue(key: string, r: LatestReading) {
   if (!finite(v)) return null;
   if (key === "soc" || r.unit === "%") return percent(v);
   if (/p\/kWh/.test(r.unit)) return pence(v);
+  if (r.unit === "p/day") return `${pence(v, { unit: "p" })}/day`;
   // An offline reading has no unit of its own; energy meters are stored in kWh.
   if (r.unit === "kWh" || (!r.unit && ENERGY_METRICS.includes(key))) return kwh(v, { precision: "table" });
   return `${number(v, 2)} ${r.unit}`.trim();

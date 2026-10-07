@@ -23,7 +23,7 @@ public static class SensorCandidates
     /// <summary>The meters a usable setup needs: without home use there is nothing to compare Predbat's plan against.</summary>
     public static readonly string[] Required = ["load"];
 
-    enum Unit { Energy, Percent, Price, Money }
+    enum Unit { Energy, Percent, Price, DailyCharge }
     sealed record Rule(Unit Unit, string[] Any, string[] All, string[] Not);
     static readonly string[] NotEnergy = ["forecast", "predict", "cost", "rate", "price", "tariff", "power", "limit", "target"];
     static readonly Dictionary<string, Rule> Rules = new()
@@ -39,7 +39,7 @@ public static class SensorCandidates
         ["import_tariff"] = new(Unit.Price, ["import", "current_rate", "electricity_current", "unit_rate"], [], ["export", "standing", "forecast", "previous", "next"]),
         ["export_tariff"] = new(Unit.Price, ["export"], [], ["import", "standing", "forecast", "previous", "next"]),
         // The daily standing charge in pounds (Octopus: sensor.octopus_energy_electricity_…_current_standing_charge, unit GBP).
-        ["standing_charge"] = new(Unit.Money, ["standing_charge"], [], ["gas", "previous", "next", "forecast", "export"]),
+        ["standing_charge"] = new(Unit.DailyCharge, ["standing_charge"], [], ["gas", "previous", "next", "forecast", "export"]),
     };
 
     /// <summary>True when <paramref name="unit"/> is one Joule can read for <paramref name="metric"/>: energy for the meters, % for the
@@ -107,7 +107,7 @@ public static class SensorCandidates
         if (u is "kwh" or "wh" or "mwh") return Unit.Energy;
         if (u == "%") return Unit.Percent;
         if (u.EndsWith("/kwh", StringComparison.Ordinal)) return Unit.Price;
-        if (u is "gbp" or "£" or "p" or "pence" or "gbp/day" or "£/day" or "p/day" or "pence/day") return Unit.Money;
+        if (u is "gbp" or "£" or "p" or "pence" or "gbp/day" or "£/day" or "p/day" or "pence/day") return Unit.DailyCharge;
         return null;
     }
 }

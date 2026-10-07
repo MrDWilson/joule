@@ -212,6 +212,35 @@ describe("earlier period", () => {
   });
 });
 
+describe("grid rows", () => {
+  it("carry measured import and export for elapsed half-hours only, and the caption totals them", () => {
+    const now = T0 + 60 * MIN;
+    const { rows } = buildRows(
+      [
+        slot(0, { loadActual: 0.5, gridImportActual: 1.2, gridExportActual: 0 }),
+        slot(30, { loadActual: 0.4, gridImportActual: 0.3, gridExportActual: 0.25 }),
+        slot(60, { gridImportActual: 9 }),
+      ],
+      { now },
+    );
+    expect(rows[0].grid).toEqual({ import: 1.2, export: 0, importRaw: 1.2, exportRaw: 0 });
+    expect(rows[1].grid.exportRaw).toBe(0.25);
+    // The half-hour in progress is not measured yet: Joule doesn't forecast the grid.
+    expect(rows[2].grid).toEqual({ import: null, export: null, importRaw: null, exportRaw: null });
+    const wall = (ms: number) => new Date(ms).toISOString().slice(11, 16);
+    expect(describeTimeline(rows, { now, wall, car: false })).toContain(
+      "1.5 kWh came from the grid, 0.3 kWh went back to it.",
+    );
+  });
+  it("keep the measured grid when the plan's first slot folds into the half-hour in progress", () => {
+    const merged = mergeTimeline(
+      [slot(0, { gridImportActual: 0.4, gridExportActual: 0.1 })],
+      [slot(10, { durationMinutes: 20 })],
+    );
+    expect(merged[0]).toMatchObject({ gridImportActual: 0.4, gridExportActual: 0.1 });
+  });
+});
+
 describe("describeTimeline", () => {
   it("describes only the battery for the battery outlook", () => {
     const now = T0 + 60 * MIN;

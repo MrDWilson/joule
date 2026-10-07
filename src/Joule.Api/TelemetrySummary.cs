@@ -180,12 +180,14 @@ public partial class DataStore
         var limitations = new List<string>
         {
             "Totals include measured intervals and 'spread' intervals (energy proved by the meter's counter across a short outage, timing estimated); intervals straddling the period edges are prorated. Missing coverage is not zero.",
-            "netCostGbp is import cost minus export credit, each with its own coverage. observedNetCostGbp counts only periods both meters cover with whole measured intervals. Standing charges are excluded.",
+            "netCostGbp is import cost minus export credit, each with its own coverage. observedNetCostGbp counts only periods both meters cover with whole measured intervals. Neither includes the standing charge: standingChargeGbp is that, prorated over the window, and netCostWithStandingChargeGbp adds it.",
             "Tariffs are applied as recorded by Home Assistant, split at rate changes; Predbat's plan rates fill periods when the tariff sensor was unavailable.",
             "Aggregate sensors cannot identify physical battery-to-EV flow or causal savings.",
             "Home Assistant 'unavailable' means a device is offline. 'unknown' is stored as idle and counts as zero only where the sensor's profile expects it (solar overnight, a charger between sessions, a daily counter before its first reading)."
         };
         if (costOverflowed || metricOverflowed) limitations.Add("Invalid totals are unavailable and cannot claim usable period coverage; source intervals remain retained.");
+        var standing = detail ? StandingChargeFor(from, to) : null;
+        var standingPrefs = detail ? ReadStandingChargePreferences() : null;
         return new EnergySummary(from, to, metrics, grossOverflowed && importHas ? null : importTotal, grossOverflowed && exportHas ? null : exportTotal, anyMatched ? matched : null, Math.Min(1, costSeconds / seconds), costSeconds,
             all.Select(x => x.Source).Distinct().ToArray(), limitations.ToArray())
         {
@@ -195,7 +197,10 @@ public partial class DataStore
             EstimatedCostGbp = importEstimatedCost + exportEstimatedCost,
             UnpricedGridKwh = unpricedGrid, GridEnergyUnknown = gridUnknown,
             CostGaps = MergeCostGaps(costGaps),
-            Home = home, LoadIncludesEv = includesEv
+            Home = home, LoadIncludesEv = includesEv,
+            StandingChargeGbp = standing?.Gbp, StandingChargePencePerDay = standing?.PencePerDay, StandingChargeSource = standing?.Source, StandingChargeAssumed = standing?.Assumed ?? false,
+            StandingChargeIncluded = standing is not null && standingPrefs?.IncludeInNet != false,
+            NetCostWithStandingChargeGbp = net is { } n && standing is { } sc ? n + sc.Gbp : null
         };
     }
 
@@ -456,12 +461,13 @@ public partial class DataStore
     {
         var now = Clock.GetUtcNow();
         var elapsed = plan.Slots.Where(s => s.DurationMinutes > 0 && s.Time.AddMinutes(s.DurationMinutes) <= now).ToList();
-        List<StoredInterval> load = [], pv = [], ev = []; List<TelemetrySample> soc = []; bool? includesEv = null;
+        List<StoredInterval> load = [], pv = [], ev = [], gridIn = [], gridOut = []; List<TelemetrySample> soc = []; bool? includesEv = null;
         if (elapsed.Count > 0)
         {
             var first = elapsed.Min(s => s.Time); var last = elapsed.Max(s => s.Time.AddMinutes(s.DurationMinutes));
-            var intervals = LoadIntervals(first, last, ["load", "pv", "ev"]);
+            var intervals = LoadIntervals(first, last, ["load", "pv", "ev", "grid_import", "grid_export"]);
             load = intervals.Where(x => x.Metric == "load").ToList(); pv = intervals.Where(x => x.Metric == "pv").ToList(); ev = intervals.Where(x => x.Metric == "ev").ToList();
+            gridIn = intervals.Where(x => x.Metric == "grid_import").ToList(); gridOut = intervals.Where(x => x.Metric == "grid_export").ToList();
             soc = SamplesInternal(first.AddMinutes(-10), last.AddMinutes(10), "soc", 0, int.MaxValue);
             includesEv = ev.Count > 0 ? LoadIncludesEv() : null;
         }
@@ -470,7 +476,7 @@ public partial class DataStore
             var s = plan.Slots[i]; var end = s.Time.AddMinutes(s.DurationMinutes);
             if (s.DurationMinutes <= 0 || end > now)
             {
-                plan.Slots[i] = s with { LoadActual = null, PvActual = null, SocActual = null, LoadActualMethod = null, PvActualMethod = null, SocActualStart = null, HomeActual = null, EvActual = null };
+                plan.Slots[i] = s with { LoadActual = null, PvActual = null, SocActual = null, LoadActualMethod = null, PvActualMethod = null, SocActualStart = null, HomeActual = null, EvActual = null, GridImportActual = null, GridExportActual = null };
                 continue;
             }
             static (double? Value, string? Method) Actual(SlotAllocation a) =>
@@ -488,7 +494,8 @@ public partial class DataStore
                 LoadActual = loadValue ?? (Embedded("load", s.Time, end) ? s.LoadActual : null), LoadActualMethod = loadMethod,
                 PvActual = pvValue ?? (Embedded("pv", s.Time, end) ? s.PvActual : null), PvActualMethod = pvMethod,
                 SocActual = socEnd ?? (Embedded("soc", end - socWindow, end + socWindow) ? s.SocActual : null),
-                SocActualStart = socStart, HomeActual = homeValue, EvActual = evValue
+                SocActualStart = socStart, HomeActual = homeValue, EvActual = evValue,
+                GridImportActual = Allocate(gridIn, s.Time, end).Value, GridExportActual = Allocate(gridOut, s.Time, end).Value
             };
         }
         return plan;

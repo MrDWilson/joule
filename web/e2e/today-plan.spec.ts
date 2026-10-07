@@ -65,6 +65,8 @@ test("net cost is paid minus earned, and a negative net reads as earnings", asyn
       summary.importCostGbp = net + 0.7 + (net < 0 ? 0 : 0);
       summary.exportCreditGbp = 0.7;
       summary.netCostGbp = net;
+      // The energy figures only: the standing charge on top has its own checks (money.spec.ts).
+      summary.standingChargeGbp = null;
       summary.importCostCoverage = 1;
       summary.exportCostCoverage = 1;
       if (net < 0) {
@@ -266,7 +268,9 @@ test("Today's Needs you is the same list as Insights, trials due a decision incl
   await expect(page.getByRole("region", { name: /Right now/ })).not.toContainText(/needs? you/);
 });
 
-test("the battery ring turns amber near the reserve, without a round cap past 12 o'clock", async ({ page }) => {
+test("the battery ring turns amber near the reserve and says the reserve in words, with no marks to decode", async ({
+  page,
+}) => {
   await page.route("**/api/telemetry/status", async (route) => {
     const response = await fetchFresh(route);
     const payload = await response.json();
@@ -277,14 +281,11 @@ test("the battery ring turns amber near the reserve, without a round cap past 12
   const ring = page.locator(".now-hero .battery-ring");
   await expect(ring.locator(".ring-label")).toHaveText("6%");
   await expect(ring).toHaveClass(/is-low/);
+  // The reserve is written out under the ring, not a tick beside it; the arc has flat ends, so nothing pokes past 12 o'clock.
+  await expect(ring.locator(".ring-reserve")).toHaveText(/^Reserve \d+%$/);
+  await expect(ring.locator("svg line")).toHaveCount(0);
+  await expect(ring.locator("svg circle")).toHaveCount(2);
   await expect(ring.locator(".ring-value")).toHaveAttribute("stroke-linecap", "butt");
-  // The reserve is a notch outside the ring, not a line across it.
-  const r = Number(await ring.locator(".ring-value").getAttribute("r"));
-  const [x1, y1, size] = await ring.evaluate((el) => {
-    const line = el.querySelector(".ring-reserve")!;
-    return [Number(line.getAttribute("x1")), Number(line.getAttribute("y1")), el.getBoundingClientRect().width];
-  });
-  expect(Math.hypot(x1 - size / 2, y1 - size / 2)).toBeGreaterThan(r);
 });
 
 test("the Plan page leads with Predbat's status and never says Upcoming", async ({ page }) => {
@@ -334,14 +335,19 @@ for (const width of [390, 768]) {
 test("on a phone a What happened window expands to its half-hours", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/plan");
-  const happened = page.locator("section").filter({ has: page.getByRole("heading", { name: "What happened (last 24 h)" }) });
+  const happened = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "What happened (last 24 h)" }) });
   const first = happened
     .locator(".next-card")
     .filter({ has: page.getByRole("button", { name: /^Show \d+ half-hours$/ }) })
     .first();
   // Found again by its time, since its button stops saying "Show" once it's open.
   const time = await first.locator(".next-card-time").first().innerText();
-  const card = happened.locator(".next-card").filter({ has: page.getByText(time, { exact: true }) }).first();
+  const card = happened
+    .locator(".next-card")
+    .filter({ has: page.getByText(time, { exact: true }) })
+    .first();
   const button = card.getByRole("button", { name: /^Show \d+ half-hours$/ });
   const count = Number((await button.innerText()).match(/\d+/)![0]);
   await button.click();

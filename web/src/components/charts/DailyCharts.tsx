@@ -11,6 +11,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Api, EnergySummary } from "../../completion-types";
 import { gbp, kwh, percent } from "../../lib/format";
+import { headlineNet, standingCharge } from "../../lib/energy";
 import { ChartFigure, ChartTable, FloatingTip, LegendChips, TipRow, useHiddenSeries, useWidth, type Chip } from "./kit";
 import { barPath } from "./paths";
 import { divergingTicks, fittedTicks, linear, tickText } from "./scale";
@@ -47,6 +48,9 @@ interface DayRow {
   costCoverage: number;
   paid: number | null;
   earned: number | null;
+  /** The day's standing charge (£) and whether it is in `cost`. */
+  standing: number | null;
+  standingIncluded: boolean;
 }
 
 /**
@@ -68,7 +72,8 @@ function homeOf(d: EnergySummary, load: DayValue, ev: DayValue, loadIncludesEv: 
  */
 function netCostOf(d: EnergySummary): { cost: number | null; coverage: number } {
   if (d.netCostGbp === undefined) return { cost: d.observedNetCostGbp, coverage: d.costCoverageFraction };
-  return { cost: d.netCostGbp, coverage: Math.min(d.importCostCoverage ?? 0, d.exportCostCoverage ?? 0) };
+  // With the standing charge when the owner includes it, as the headline figure does.
+  return { cost: headlineNet(d), coverage: Math.min(d.importCostCoverage ?? 0, d.exportCostCoverage ?? 0) };
 }
 
 /** One day's figures, with home use excluding the car only when the load meter includes it. */
@@ -90,6 +95,8 @@ export function dayRow(d: EnergySummary, timeZone: string, loadIncludesEv = true
     costCoverage: net.coverage,
     paid: d.importCostGbp,
     earned: d.exportCreditGbp,
+    standing: standingCharge(d)?.amount ?? null,
+    standingIncluded: !!standingCharge(d)?.included,
   };
 }
 
@@ -404,6 +411,7 @@ function DailyBars({
           )}
         </div>
       </ChartFigure>
+      <GridBars rows={rows} />
       <CostBars rows={rows} />
     </div>
   );
@@ -460,6 +468,162 @@ function DayTip({
       {prevUse != null && <p className="chart-tip-note">{`Average home use for ${previousLabel}: ${kwh(prevUse)}`}</p>}
       {prevSolar != null && <p className="chart-tip-note">{`Average solar for ${previousLabel}: ${kwh(prevSolar)}`}</p>}
     </div>
+  );
+}
+
+/**
+ * Grid per day: what was bought (up, in the grid colour) and sold (down, fainter), so the money side of each day is plain
+ * at a glance. Partly measured days are hatched; below half measured they are left out ("n/a").
+ */
+function GridBars({ rows }: { rows: DayRow[] }) {
+  const id = useId().replace(/:/g, "");
+  const [box, width] = useWidth<HTMLDivElement>(720);
+  const [active, setActive] = useState<number | null>(null);
+  const side = (v: DayValue) => (v.kwh != null && v.coverage >= OMIT ? v.kwh : null);
+  const bought = rows.map((r) => side(r.values.grid_import));
+  const sold = rows.map((r) => side(r.values.grid_export));
+  if (!bought.some((v) => v != null) && !sold.some((v) => v != null)) return null;
+  const ticks = divergingTicks(-Math.max(0, ...sold.map((v) => v ?? 0)), Math.max(0, ...bought.map((v) => v ?? 0)), 4);
+  const compact = width < 600;
+  const gl = compact ? 34 : 42,
+    gr = 8,
+    top = 8,
+    plotH = 130,
+    height = top + plotH + 26;
+  const plotW = Math.max(40, width - gl - gr);
+  const band = plotW / rows.length;
+  const barW = Math.max(6, Math.min(56, band * 0.5));
+  const y = linear([ticks.min, ticks.max], [top + plotH, top]);
+  const sum = (values: (number | null)[]) => values.reduce<number>((t, v) => t + (v ?? 0), 0);
+  const paid = sum(rows.map((r) => r.paid)),
+    earned = sum(rows.map((r) => r.earned));
+  const summary = `Grid over ${rows.length} days: bought ${kwh(sum(bought))} for ${gbp(paid)}, sold ${kwh(sum(sold))} for ${gbp(earned)}.`;
+  const r = active != null ? rows[active] : null;
+  return (
+    <ChartFigure id={`${id}-grid`} title="Grid each day · kWh" summary={summary} className="chart-daily-grid">
+      <div className="mini-chart" ref={box} onPointerLeave={() => setActive(null)}>
+        <svg
+          className="daily-svg"
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <pattern
+              id={`${id}-hatch`}
+              width={6}
+              height={6}
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <line x1={0} y1={0} x2={0} y2={6} stroke="var(--bg-1)" strokeWidth={1.5} strokeOpacity={0.8} />
+            </pattern>
+          </defs>
+          {ticks.ticks.map((t) => (
+            <g key={t}>
+              <line className={t === 0 ? "daily-zero" : "tl-grid"} x1={gl} x2={gl + plotW} y1={y(t)} y2={y(t)} />
+              <text className="tl-tick" x={gl - 6} y={y(t) + 4} textAnchor="end">
+                {tickText(Math.abs(t), ticks.step)}
+              </text>
+            </g>
+          ))}
+          {r && <rect className="tl-hover" x={gl + band * active!} width={band} y={top} height={plotH} />}
+          {rows.map((row, i) => {
+            const x = gl + band * (i + 0.5);
+            const b = bought[i],
+              s = sold[i];
+            const partialIn = row.values.grid_import.coverage < PARTIAL,
+              partialOut = row.values.grid_export.coverage < PARTIAL;
+            const up = b != null ? barPath(x - barW / 2, barW, y(0), y(b)) : "";
+            const down = s != null ? barPath(x - barW / 2, barW, y(0), y(-s)) : "";
+            return (
+              <g key={row.from} data-day={row.from}>
+                {up && (
+                  <path
+                    className="daily-bar grid-bought"
+                    d={up}
+                    style={{ fill: series.grid.color, opacity: partialIn ? encodings.partial : 0.9 }}
+                  />
+                )}
+                {up && partialIn && <path d={up} fill={`url(#${id}-hatch)`} />}
+                {down && (
+                  <path
+                    className="daily-bar grid-sold"
+                    d={down}
+                    style={{ fill: series.grid.color, opacity: partialOut ? encodings.partial * 0.6 : 0.45 }}
+                  />
+                )}
+                {down && partialOut && <path d={down} fill={`url(#${id}-hatch)`} />}
+                {b == null && s == null && (
+                  <text className="daily-na" x={x} y={y(0) - 6} textAnchor="middle">
+                    n/a
+                  </text>
+                )}
+                <DayTick
+                  x={x}
+                  y={top + plotH + 18}
+                  label={row.label}
+                  short={row.short}
+                  band={band}
+                  index={i}
+                  count={rows.length}
+                />
+                <rect
+                  className="daily-hit"
+                  x={gl + band * i}
+                  width={band}
+                  y={top}
+                  height={plotH}
+                  onPointerEnter={() => setActive(i)}
+                  onPointerDown={() => setActive(i)}
+                />
+              </g>
+            );
+          })}
+        </svg>
+        {r && (
+          <FloatingTip x={gl + band * (active! + 0.5)} top={top} width={width}>
+            <div className="tl-tip">
+              <p className="chart-tip-label">{r.label}</p>
+              <TipRow
+                color={series.grid.color}
+                kind="block"
+                name="Bought"
+                value={
+                  bought[active!] != null
+                    ? `${kwh(bought[active!], { precision: "table" })}${r.paid != null ? ` · ${gbp(r.paid)}` : ""}${coverageNote(r.values.grid_import)}`
+                    : "no readings"
+                }
+                muted={bought[active!] == null}
+              />
+              <TipRow
+                color={`color-mix(in srgb, ${series.grid.color} 45%, transparent)`}
+                kind="block"
+                name="Sold"
+                value={
+                  sold[active!] != null
+                    ? `${kwh(sold[active!], { precision: "table" })}${r.earned != null ? ` · ${gbp(r.earned)}` : ""}${coverageNote(r.values.grid_export)}`
+                    : "no readings"
+                }
+                muted={sold[active!] == null}
+              />
+            </div>
+          </FloatingTip>
+        )}
+      </div>
+      <p className="daily-grid-key">
+        <span>
+          <i className="chart-key block" style={{ color: series.grid.color }} aria-hidden="true" />
+          Bought, above the line
+        </span>
+        <span>
+          <i className="chart-key block" style={{ color: series.grid.color, opacity: 0.45 }} aria-hidden="true" />
+          Sold, below
+        </span>
+      </p>
+    </ChartFigure>
   );
 }
 
@@ -567,6 +731,13 @@ function CostBars({ rows }: { rows: DayRow[] }) {
               />
               <TipRow color="transparent" name="Paid for imports" value={gbp(r.paid)} />
               <TipRow color="transparent" name="Earned from exports" value={gbp(r.earned)} />
+              {r.standing != null && (
+                <TipRow
+                  color="transparent"
+                  name={r.standingIncluded ? "Standing charge" : "Standing charge (not counted)"}
+                  value={gbp(r.standing)}
+                />
+              )}
               {r.costCoverage < 0.98 && (
                 <p className="chart-tip-note">{`${percent(r.costCoverage, { fraction: true, round: "floor" })} of the day priced`}</p>
               )}
@@ -749,6 +920,8 @@ export function historySlot(
     homeActual: s.home ?? s.homeEstimate ?? null,
     // A charging session whose timing is estimated (spread across a short outage) still counts, as it does for home use.
     evActual: s.ev ?? s.evEstimate ?? null,
+    gridImportActual: s.gridImport ?? null,
+    gridExportActual: s.gridExport ?? null,
     loadActualMethod: method(s.homeStatus ?? s.loadStatus),
     pvActualMethod: method(s.pvStatus),
     action: "",

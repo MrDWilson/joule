@@ -50,6 +50,7 @@ public partial class DataStore : IDisposable
         InitializeTelemetry();
         InitializeInvestigationEvidence();
         InitializeMemory();
+        InitializeStandingCharges();
     }
     DuckDBCommand Command(string sql, params object?[] values)
     {

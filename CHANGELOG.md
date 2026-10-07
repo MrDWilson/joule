@@ -4,10 +4,22 @@ All notable changes to Joule are listed here. Versions follow [semantic versioni
 
 ## Unreleased
 
+### Features
+
+- **Grid import, front and centre:** Today has a Grid tile (bought since midnight, what it cost and the average price per kWh, what was sold and earned, a bar per half-hour and yesterday by the same time). Today's timeline has a Grid lane (bought above the line, sold below), and the Energy page has a "Grid each day" chart.
+- **Standing charge:** Joule reads the Octopus Energy integration's standing charge sensor on the same meter as your import rate by itself, or you can map any sensor (`HomeAssistant__Entities__StandingCharge`) or type a figure in pence per day in Setup › Sensors. Each day keeps its own rate. Net cost on Today, the Energy page, reports and AI reviews includes it as its own line ("Standing charge £0.21 · £0.54/day"); a switch in Setup leaves it out of the headline.
+- **API:** the energy summary gains `standingChargeGbp`, `standingChargePencePerDay`, `standingChargeSource`, `standingChargeAssumed`, `standingChargeIncluded` and `netCostWithStandingChargeGbp` (`netCostGbp` stays energy only, so trials compare like with like). Plan slots gain `gridImportActual`/`gridExportActual` and history slots `gridImport`/`gridExport`. New `GET`/`POST /api/telemetry/standing-charge`.
+- **Meters found from Predbat:** Joule reads Predbat's `apps.yaml` (through MCP, Predbat's web interface or a mounted copy) and its entity list, and maps every Home Assistant meter it is sure of by itself, rechecking every few hours. Setup shows "Found automatically from Predbat" with **Change**, asks only when there is a real choice (one sensor per inverter, close name matches), and **Not mapped** keeps a meter unmapped for good. `HomeAssistant__Entities__*` settings are now optional overrides and always win. A `metric_standing_charge` given as a number in `apps.yaml` is used as the standing charge when there is no sensor and no figure of your own.
+
 ### Changed
 
 - **Joule names on disk.** The database is now `joule.duckdb` (it was `predbat.duckdb`) and the demo folder marker is `.joule-demo` (it was `.predbat-ai-demo`). The first start renames the old files in place, write-ahead log included, and logs one line saying so. Nothing is deleted: if the rename can't happen, Joule keeps using the old file under its old name and tries again at the next start. Going back to 1.0.0 afterwards would start with an empty database, so take a backup first if you might.
 - **Dependencies.** Node.js 24 (the current LTS) builds the dashboard; Vite 8, Vitest 5, ESLint 10, TypeScript 6, lucide-react 1, DuckDB.NET 1.5.6. This clears every open Dependabot alert (tinypool, vitest and @vitest/mocker, all development-only).
+- **Predbat MCP sign-in:** Joule exchanges the MCP secret for an access token at Predbat's `/oauth/token` and renews it before it expires, so Predbat no longer logs "MCP: Token … failed: Not enough segments" or "Authenticated via legacy bearer token" every few minutes. Older Predbat versions without the token endpoint still get the secret as before.
+
+### Fixes
+
+- **Battery ring:** the short tick beside the ring (it marked the reserve) and the round cap at 12 o'clock are gone. The ring shows only the level; "Reserve 4%" is written under it and turns amber when the battery is close to it.
 
 ### Upgrading
 
