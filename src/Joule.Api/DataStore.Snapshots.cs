@@ -222,7 +222,7 @@ public partial class DataStore
     public StorageReport ReadStorageReport(string retentionMode, int keepDays)
     {
         long Size(string path) { try { return File.Exists(path) ? new FileInfo(path).Length : 0; } catch (IOException) { return 0; } }
-        var file = Path.Combine(DirectoryPath, "predbat.duckdb");
+        var file = DatabasePath;
         lock (gate)
         {
             long Scalar(string sql) { using var c = Command(sql); return Convert.ToInt64(c.ExecuteScalar() is { } v and not DBNull ? v : 0L); }

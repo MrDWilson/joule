@@ -18,7 +18,7 @@ public sealed class NativeActualProvenanceTests : IDisposable
     static TelemetrySample Meter(string metric,int minute,double value)=>new(metric,"sensor."+metric,Start.AddMinutes(minute),value,metric=="soc"?"%":"kWh","HomeAssistant",value.ToString(System.Globalization.CultureInfo.InvariantCulture),metric=="soc"?"%":"kWh");
     void LegacyRows()
     {
-        using var connection=new DuckDBConnection($"Data Source={Path.Combine(directory,"predbat.duckdb")}");connection.Open();
+        using var connection=new DuckDBConnection($"Data Source={Path.Combine(directory,DataFiles.Database)}");connection.Open();
         using var command=connection.CreateCommand();
         command.CommandText="""
             INSERT INTO actual_energy VALUES ('2020-01-01T11:00:00Z','2020-01-01T10:00:00Z',8);
@@ -43,7 +43,7 @@ public sealed class NativeActualProvenanceTests : IDisposable
         Assert.Empty(db.Query("SELECT * FROM actual_energy"));Assert.Empty(db.Query("SELECT * FROM predbat_actual_intervals"));
         // The identical second collection adds no duplicate observation or snapshot; the plan's own snapshot keeps the curve.
         Assert.Single(db.Query("SELECT * FROM observations WHERE entity_id='predbat.load_energy_actual'"));
-        using var connection=new DuckDBConnection($"Data Source={Path.Combine(directory,"predbat.duckdb")}");connection.Open();using var command=connection.CreateCommand();
+        using var connection=new DuckDBConnection($"Data Source={Path.Combine(directory,DataFiles.Database)}");connection.Open();using var command=connection.CreateCommand();
         command.CommandText="SELECT count(*) FROM source_snapshots WHERE state_json LIKE '%load_energy_actual%'";
         Assert.Equal(1,Convert.ToInt32(command.ExecuteScalar()));
     }

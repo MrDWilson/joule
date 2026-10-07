@@ -122,7 +122,7 @@ The container runs as the `app` user, which needs read access (and write access 
 
 ## Data and backups
 
-Everything lives in the `/data` volume: `demo/` and `live/` databases (DuckDB), `settings.json` from Setup, and `auth/` for AI provider credentials. Joule keeps the newest few hundred reviews and the last 500 activity entries in its working state and moves older history into the database, so the dashboard stays quick as history grows.
+Everything lives in the `/data` volume: `demo/joule.duckdb` and `live/joule.duckdb` databases (DuckDB; versions before the rename called them `predbat.duckdb`, and Joule renames them once on its first start), `settings.json` from Setup, and `auth/` for AI provider credentials. Joule keeps the newest few hundred reviews and the last 500 activity entries in its working state and moves older history into the database, so the dashboard stays quick as history grows.
 
 To back up, stop the container and copy the whole volume, including any DuckDB companion files. Backups contain your access key and AI credentials: encrypt them and keep them private. Restore with the container stopped and keep the files owned by the `app` user.
 
@@ -133,3 +133,16 @@ docker compose start joule
 ```
 
 (Compose adds your project name, usually the folder name, in front of the volume name; `docker volume ls` shows the real one.)
+
+### Moving to the joule-data volume
+
+Installs from before the rename may still keep their data in a volume called `predbat-ai-data` (with your Compose project name in front, for example `smart_predbat-ai-data`). That keeps working. To give it Joule's name, copy it into a new volume; the old one stays as it is until you remove it yourself.
+
+```sh
+docker volume ls                       # find the old volume's full name
+docker compose stop joule              # or whatever your service is called
+docker volume create myproject_joule-data
+docker run --rm -v myproject_predbat-ai-data:/from:ro -v myproject_joule-data:/to alpine cp -a /from/. /to/
+```
+
+Then point your compose file at the new volume (`- joule-data:/data` under the service, `joule-data:` under `volumes:`) and run `docker compose up -d`. `cp -a` keeps the files owned by the `app` user. Check that your history is all there before you remove the old volume with `docker volume rm`.

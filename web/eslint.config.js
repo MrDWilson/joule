@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
+import { defineConfig } from "eslint/config";
 
 /**
  * Numbers and dates go through web/src/lib/format.ts and lib/time.ts so every figure reads the same everywhere.
@@ -31,10 +32,10 @@ const notYetConverted = [
   "src/components/InvestigationText.tsx",
 ];
 
-export default tseslint.config(
+export default defineConfig(
   { ignores: ["dist", "node_modules", "e2e", "playwright-report", "test-results"] },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  tseslint.configs.recommended,
   {
     files: ["src/**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks },

@@ -205,7 +205,7 @@ public class PlanCaptureTests : IDisposable
 
     void Execute(string sql)
     {
-        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, "predbat.duckdb")}"); connection.Open();
+        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, DataFiles.Database)}"); connection.Open();
         using var command = connection.CreateCommand(); command.CommandText = sql; command.ExecuteNonQuery();
     }
 

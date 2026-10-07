@@ -40,7 +40,7 @@ while (true)
     builder.Services.AddHttpClient("auth", c => c.Timeout = TimeSpan.FromSeconds(30));
     builder.Services.AddHttpClient("docs", c => c.Timeout = TimeSpan.FromSeconds(15));
     builder.Services.AddSingleton(TimeProvider.System);
-    builder.Services.AddSingleton(sp => new DataStore(Path.Combine(dataDirectory, demo ? "demo" : "live"), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton(sp => new DataStore(Path.Combine(dataDirectory, demo ? "demo" : "live"), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger("Joule.Storage")));
     builder.Services.AddSingleton<IPredbatClient>(sp => new PredbatClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("predbat"), builder.Configuration));
     builder.Services.AddPredbatMcp(builder.Configuration);
     builder.Services.AddSingleton(sp => new StateService(sp.GetRequiredService<DataStore>(), sp.GetRequiredService<IPredbatClient>(), demo, sp.GetRequiredService<ConfigFileArchive>(), builder.Configuration, sampleHistory: demo));

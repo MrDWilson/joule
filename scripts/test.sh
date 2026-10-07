@@ -10,7 +10,7 @@ else
   printf '%s\n' 'Install the .NET 10 SDK or provide .tools/dotnet/dotnet.' >&2
   exit 1
 fi
-command -v npm >/dev/null 2>&1 || { printf '%s\n' 'Install Node.js 22 with npm.' >&2; exit 1; }
+command -v npm >/dev/null 2>&1 || { printf '%s\n' 'Install Node.js 24 with npm.' >&2; exit 1; }
 export DOTNET_CLI_HOME="$project_dir/.tools/dotnet-home"
 export NUGET_PACKAGES="$project_dir/.cache/nuget"
 mkdir -p "$DOTNET_CLI_HOME" "$NUGET_PACKAGES"

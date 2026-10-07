@@ -4,7 +4,7 @@ Joule is an ASP.NET Core 10 API with DuckDB storage (`src/Joule.Api`) and a Reac
 
 ## Run from source
 
-Install Node.js 22 and the .NET 10 SDK, then:
+Install Node.js 24 (the current LTS; 22.12 or later also works) and the .NET 10 SDK, then:
 
 ```sh
 ./scripts/dev.sh

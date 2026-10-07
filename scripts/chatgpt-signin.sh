@@ -13,7 +13,7 @@ cd "$project_dir"
 if command -v dotnet >/dev/null 2>&1; then dotnet_bin="$(command -v dotnet)"
 elif [[ -x "$project_dir/.tools/dotnet/dotnet" ]]; then dotnet_bin="$project_dir/.tools/dotnet/dotnet"
 else printf '%s\n' 'Install the .NET 10 SDK first: https://dotnet.microsoft.com/download' >&2; exit 1; fi
-command -v npm >/dev/null 2>&1 || { printf '%s\n' 'Install Node.js 22 with npm first.' >&2; exit 1; }
+command -v npm >/dev/null 2>&1 || { printf '%s\n' 'Install Node.js 24 with npm first.' >&2; exit 1; }
 if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:5080 -sTCP:LISTEN >/dev/null 2>&1; then
   printf '%s\n' 'Port 5080 is in use. Stop whatever is listening there (another Joule?) and try again; the ChatGPT callback must use 5080.' >&2
   exit 1

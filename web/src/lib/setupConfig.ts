@@ -96,7 +96,9 @@ export function useSetupConfig() {
  * A new access key: 24 random bytes as URL-safe base64 (32 characters), the same strength as `openssl rand -base64 24`
  * and safe to type, paste and send in a header.
  */
-export function generateAccessKey(random: (bytes: Uint8Array) => Uint8Array = (b) => crypto.getRandomValues(b)) {
+export function generateAccessKey(
+  random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array = (b) => crypto.getRandomValues(b),
+) {
   const bytes = random(new Uint8Array(24));
   let text = "";
   bytes.forEach((b) => (text += String.fromCharCode(b)));

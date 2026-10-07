@@ -49,8 +49,8 @@ function InboxRow({ item }: { item: InboxItem }) {
     titleId = useId();
   const { label, icon: Icon } = KIND[item.kind];
   const settings = data.state.settings;
-  let detail: ReactNode = null;
-  let meta = "";
+  let detail: ReactNode;
+  let meta: string;
   let chip: { label: string; tone: string } | null = null;
   if (item.kind === "proposal") {
     const p = item.proposal;

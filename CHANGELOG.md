@@ -2,6 +2,17 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **Joule names on disk.** The database is now `joule.duckdb` (it was `predbat.duckdb`) and the demo folder marker is `.joule-demo` (it was `.predbat-ai-demo`). The first start renames the old files in place, write-ahead log included, and logs one line saying so. Nothing is deleted: if the rename can't happen, Joule keeps using the old file under its old name and tries again at the next start. Going back to 1.0.0 afterwards would start with an empty database, so take a backup first if you might.
+- **Dependencies.** Node.js 24 (the current LTS) builds the dashboard; Vite 8, Vitest 5, ESLint 10, TypeScript 6, lucide-react 1, DuckDB.NET 1.5.6. This clears every open Dependabot alert (tinypool, vitest and @vitest/mocker, all development-only).
+
+### Upgrading
+
+- **Old `predbat-ai-data` volume?** Your data keeps working where it is. To move it into a volume with Joule's name, see [Moving to the joule-data volume](docs/configuration.md#moving-to-the-joule-data-volume).
+
 ## 1.0.0 (2026-10-07)
 
 The first public release, under the Joule name.
