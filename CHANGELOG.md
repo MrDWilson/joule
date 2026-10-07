@@ -2,7 +2,7 @@
 
 All notable changes to Joule are listed here. Versions follow [semantic versioning](https://semver.org/).
 
-## 1.0.0 (2026-10-06)
+## 1.0.0 (2026-10-07)
 
 The first public release, under the Joule name.
 
