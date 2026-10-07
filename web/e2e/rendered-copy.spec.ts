@@ -22,6 +22,7 @@ const routes = [
   "#/setup/settings",
   "#/setup/ai",
   "#/setup/sensors",
+  "#/setup/notifications",
   "#/setup/files",
   "#/setup/changes",
   "#/setup/about",
@@ -243,6 +244,38 @@ async function liveShaped(page: Page) {
       readAt: null,
     },
     ...(payload.state.notifications ?? []),
+  ];
+  // The bell reads the server's inbox: the same raw titles, as the server would store them.
+  const inboxItem = (id: string, event: string, label: string, title: string, link: string) => ({
+    id,
+    key: `${event}:${id}`,
+    event,
+    label,
+    title,
+    detail: text,
+    link,
+    tone: "accent",
+    at: now,
+    readAt: null,
+    dismissedAt: null,
+    resolvedAt: null,
+    open: true,
+  });
+  payload.state.inbox = [
+    inboxItem(
+      "lint-finding",
+      "problem",
+      "Found something",
+      "Battery sat in FrzExp while `load_scaling` was 1.08",
+      "#/insights/inv/lint-investigation",
+    ),
+    inboxItem(
+      "lint-report-item",
+      "report",
+      "Report",
+      "Missing export_today caused a warning every 5 minutes (FrzChg at 2026-10-05T01:00:00Z)",
+      "#/energy/reports?report=lint-report",
+    ),
   ];
   // A saved report with the same raw title and AI-written text: the Energy page must show both in plain English.
   const midnight = new Date(Date.now() - 86400000);

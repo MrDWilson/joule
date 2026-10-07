@@ -718,7 +718,7 @@ export default function App() {
                 refreshing={refreshing}
                 setup={setupProgress ? checklistCounts(setupProgress) : null}
               />
-              <NotificationsBell data={data} />
+              <NotificationsBell data={data} onChange={loadState} />
               <a
                 href="#/setup"
                 className="icon-button setup-link"

@@ -17,6 +17,7 @@ const routes = [
   "#/setup/settings",
   "#/setup/ai",
   "#/setup/sensors",
+  "#/setup/notifications",
   "#/setup/files",
   "#/setup/changes",
   "#/setup/about",

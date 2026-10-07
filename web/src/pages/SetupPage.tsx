@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Bot, Database, FileCog, History, Info, PlayCircle, Settings2 } from "lucide-react";
+import { ArrowRight, BellRing, Bot, Database, FileCog, History, Info, PlayCircle, Settings2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { Chip, type Tone } from "../components/ui/Chip";
@@ -19,6 +19,7 @@ import { dayTime } from "../lib/time";
 import SettingsPage from "./SettingsPage";
 import AiCostsPage from "./AiCostsPage";
 import SensorsPage from "./SensorsPage";
+import NotificationsPage from "./NotificationsPage";
 import FilesPage from "./FilesPage";
 import HistoryPage from "./HistoryPage";
 import AboutPage from "./AboutPage";
@@ -34,6 +35,8 @@ export default function SetupPage() {
       return <AiCostsPage />;
     case "sensors":
       return <SensorsPage />;
+    case "notifications":
+      return <NotificationsPage />;
     case "files":
       return <FilesPage />;
     case "changes":
@@ -182,6 +185,14 @@ function SetupOverview() {
       status: providerLabel(s.ai.provider),
       tone: "info",
       detail: s.ai.scheduled ? `Checks by itself, at most ${s.ai.maxRunsPerDay} a day.` : "Automatic checks off.",
+    },
+    {
+      href: "#/setup/notifications",
+      icon: BellRing,
+      title: "Notifications",
+      status: "",
+      tone: "neutral",
+      detail: "Get what needs you on your phone: ntfy, Pushover, Home Assistant, Telegram and more.",
     },
     {
       href: "#/setup/changes",

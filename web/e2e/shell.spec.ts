@@ -166,7 +166,8 @@ test("one status chip explains the connection, and the bell links to what needs 
   const bell = page.getByRole("button", { name: /^Notifications/ });
   await bell.click();
   const list = page.getByRole("dialog", { name: "Notifications" });
-  const suggestion = list.getByRole("link", { name: /^Needs you \(\d+\)/ });
+  // Each thing that needs you is its own notification, labelled with what it is.
+  const suggestion = list.locator('li[data-kind="needs_you"]').filter({ hasText: "Suggestion" }).getByRole("link");
   await expect(suggestion).toHaveAttribute("href", "#/insights/suggestions");
   await suggestion.click();
   await expect(page).toHaveURL(/#\/insights\/suggestions$/);

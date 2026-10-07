@@ -1,163 +1,161 @@
 import { useState } from "react";
-import { AlertCircle, Bell, FileText, ListChecks, Sparkles, type LucideIcon } from "lucide-react";
+import {
+  AlertCircle,
+  Bell,
+  FileText,
+  ListChecks,
+  Smartphone,
+  Sparkles,
+  WifiOff,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Popover } from "../ui/Popover";
-import { EmptyState } from "../ui/States";
+import { Button } from "../ui/Button";
 import { PlainText } from "../PlainText";
-import { investigationVerdict } from "../InvestigationText";
-import { headlineOf, needsYou } from "../../lib/insights";
-import { buildHash } from "../../lib/router";
+import { api } from "../../lib/api";
+import { plainError } from "../../lib/errors";
+import { textParts } from "../../lib/sanitize";
 import { dayTime } from "../../lib/time";
-import { plural, words } from "../../lib/copy";
+import { bellItems, isUnread, noPending as none, type PendingActions } from "../../lib/inbox";
 import type { Payload } from "../../types";
 
-const SEEN_KEY = "joule.notifications.seenAt";
-const DAY = 86400000;
+const icons: Record<string, LucideIcon> = {
+  needs_you: ListChecks,
+  problem: Sparkles,
+  unfinished: AlertCircle,
+  offline: WifiOff,
+  report: FileText,
+};
 
-export interface NotificationItem {
-  id: string;
-  icon: LucideIcon;
-  /** May be AI or server text (codes, keys, UTC times): render it through <PlainText>. */
-  title: string;
-  detail: string;
-  href: string;
-  /** Counts towards the badge until the bell is opened (findings) or until handled (suggestions, reports). */
-  unseen: boolean;
-  /** What kind of thing it is, as a small chip: "Needs you", "Found something", "Didn't finish", "Report". */
-  kind: string;
-  /** warn for a check that didn't finish; accent otherwise. */
-  tone: "accent" | "warn";
-}
+/** The title as words, for a button's accessible name ("Dismiss: Lower the reserve"). */
+const spoken = (text: string) =>
+  textParts(text)
+    .map((p) => p.value)
+    .join("");
 
 /**
- * Everything that wants your attention, from every part of Joule: what needs you (suggestions, to-dos, file edits and
- * trials due a decision, as one row whose count is the Insights badge's), new findings and checks that didn't finish
- * (since you last looked), and unread reports. Each links straight to it.
+ * Everything that wants your attention, from every part of Joule: each suggestion, to-do, file edit and trial due a decision,
+ * new findings, checks that keep not finishing, sensors or Predbat offline, and new reports. Opening an item marks it read;
+ * each can be dismissed, and the panel can mark everything read or clear it. All of it is kept on the server, so it sticks
+ * across browsers and restarts. Anything handled elsewhere in Joule drops out of the count by itself.
  */
-export function notificationItems(data: Payload, seenAt: number, now = Date.now()): NotificationItem[] {
-  const s = data.state;
-  const items: NotificationItem[] = [];
-  const waiting = needsYou(s, now);
-  if (waiting.length) {
-    const count = (kind: string) => waiting.filter((i) => i.kind === kind).length;
-    const parts = [
-      count("proposal") && plural(count("proposal"), words.suggestion),
-      count("todo") && plural(count("todo"), words.todo, words.todos),
-      count("file") && plural(count("file"), words.fileEdit),
-      count("trial") && plural(count("trial"), "trial to decide", "trials to decide"),
-    ].filter(Boolean);
-    items.push({
-      id: "needs-you",
-      icon: ListChecks,
-      title: `Needs you (${waiting.length})`,
-      detail: parts.join(", "),
-      href: buildHash("insights", "suggestions"),
-      unseen: true,
-      kind: "Needs you",
-      tone: "accent",
-    });
-  }
-  for (const inv of [...s.investigations].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))) {
-    const at = Date.parse(inv.at);
-    if (!(now - at < DAY)) break;
-    const status = (inv.status || "Completed").toLowerCase();
-    if (status === "failed" || status === "interrupted")
-      items.push({
-        id: `failed-${inv.id}`,
-        icon: AlertCircle,
-        title: headlineOf(inv) || `The ${words.aiCheck} ${words.didntFinish.toLowerCase()}`,
-        detail: dayTime(inv.at),
-        href: buildHash("insights", "", { id: inv.id }),
-        unseen: at > seenAt,
-        kind: words.didntFinish,
-        tone: "warn",
-      });
-    else if (status === "completed" && !inv.dismissedAt && investigationVerdict(inv) !== "no_change")
-      items.push({
-        id: `finding-${inv.id}`,
-        icon: Sparkles,
-        title: headlineOf(inv) || "New finding",
-        detail: dayTime(inv.at),
-        href: buildHash("insights", "", { id: inv.id }),
-        unseen: at > seenAt,
-        kind: words.foundSomething,
-        tone: "accent",
-      });
-    if (items.length > 12) break;
-  }
-  for (const n of s.notifications.filter((n) => !n.readAt).slice(0, 5))
-    items.push({
-      id: `report-${n.id}`,
-      icon: FileText,
-      title: n.title,
-      detail: dayTime(n.at),
-      href: buildHash("energy", "reports", {}, new URLSearchParams({ report: n.reportId })),
-      unseen: true,
-      kind: "Report",
-      tone: "accent",
-    });
-  return items;
-}
+export function NotificationsBell({ data, onChange }: { data: Payload; onChange: () => Promise<void> | void }) {
+  const [pending, setPending] = useState<PendingActions>(none);
+  const [error, setError] = useState("");
+  const { items, unread } = bellItems(data.state.inbox, pending);
 
-function readSeen() {
-  const v = Number(localStorage.getItem(SEEN_KEY));
-  return Number.isFinite(v) ? v : 0;
-}
+  async function act(path: string, optimistic: (p: PendingActions) => PendingActions) {
+    setError("");
+    setPending(optimistic);
+    try {
+      await api(path, {});
+      await onChange();
+    } catch (e) {
+      setError(plainError(e));
+    }
+    // The fresh state now carries the change (or it failed and the list goes back as it was).
+    setPending(none);
+  }
+  const read = (id: string) => act(`/inbox/${encodeURIComponent(id)}/read`, (p) => ({ ...p, read: [...p.read, id] }));
+  const dismiss = (id: string) =>
+    act(`/inbox/${encodeURIComponent(id)}/dismiss`, (p) => ({ ...p, dismissed: [...p.dismissed, id] }));
 
-export function NotificationsBell({ data }: { data: Payload }) {
-  const [seenAt, setSeenAt] = useState(readSeen);
-  const items = notificationItems(data, seenAt);
-  const count = items.filter((i) => i.unseen).length;
   return (
     <Popover
       label="Notifications"
-      onOpenChange={(open) => {
-        // Findings count as seen once the list has been opened.
-        if (!open && seenAt !== readSeen()) setSeenAt(readSeen());
-        if (open) localStorage.setItem(SEEN_KEY, String(Date.now()));
-      }}
+      className="notifications-popover"
       trigger={(props) => (
         <button
           type="button"
           className="icon-button"
-          aria-label={count ? `Notifications, ${count} new` : "Notifications"}
+          aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
           {...props}
         >
           <Bell size={20} aria-hidden="true" />
-          {count > 0 && (
+          {unread > 0 && (
             <span className="dot-count" aria-hidden="true">
-              {count > 9 ? "9+" : count}
+              {unread > 9 ? "9+" : unread}
             </span>
           )}
         </button>
       )}
     >
-      <h2>Notifications</h2>
+      <div className="notifications-head">
+        <h2>Notifications</h2>
+        {items.length > 0 && (
+          <span className="notifications-actions">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!unread}
+              onClick={() => act("/inbox/read-all", (p) => ({ ...p, allRead: true }))}
+            >
+              Mark all as read
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => act("/inbox/dismiss-all", (p) => ({ ...p, allDismissed: true }))}
+            >
+              Clear all
+            </Button>
+          </span>
+        )}
+      </div>
+      {error && (
+        <p className="sheet-warning" role="alert">
+          {error}
+        </p>
+      )}
       {items.length ? (
         <ul className="notification-list">
           {items.map((i) => {
-            const Icon = i.icon;
+            const Icon = icons[i.event] ?? Sparkles;
+            const unseen = isUnread(i);
             return (
-              <li key={i.id} className={`tone-${i.tone}`} data-kind={i.id.split("-")[0]}>
-                <a href={i.href}>
+              <li
+                key={i.id}
+                className={`tone-${i.tone}${unseen ? " unread" : ""}${i.open ? "" : " handled"}`}
+                data-kind={i.event}
+              >
+                <a href={i.link} onClick={() => void (i.readAt ? null : read(i.id))}>
                   <Icon size={18} aria-hidden="true" />
                   <span className="notification-head">
                     <strong>
+                      {unseen && <span className="sr-only">Unread: </span>}
                       <PlainText text={i.title} />
                     </strong>
-                    {/* The Needs you row's title already names its kind. */}
-                    {i.id !== "needs-you" && <em className="notification-kind">{i.kind}</em>}
+                    <em className="notification-kind">{i.open ? i.label : "Done"}</em>
                   </span>
                   <span className="notification-detail">
-                    <PlainText text={i.detail} />
+                    {i.detail && (
+                      <>
+                        <PlainText text={i.detail} />
+                        {" · "}
+                      </>
+                    )}
+                    {dayTime(i.at)}
                   </span>
                 </a>
+                <button
+                  type="button"
+                  className="notification-dismiss"
+                  aria-label={`Dismiss: ${spoken(i.title)}`}
+                  onClick={() => void dismiss(i.id)}
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <EmptyState quiet title="Nothing needs you right now" />
+        <p className="notifications-empty">Nothing new. Suggestions, findings and alerts show up here.</p>
       )}
+      <a className="notifications-phone" href="#/setup/notifications">
+        <Smartphone size={15} aria-hidden="true" /> Get these on your phone
+      </a>
     </Popover>
   );
 }

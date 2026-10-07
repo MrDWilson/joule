@@ -11,7 +11,8 @@ export interface SetupConfigField {
   key: string;
   /** e.g. Predbat__BaseUrl */
   envVar: string;
-  kind: "bool" | "url" | "entity" | "accessKey" | "token";
+  /** Notification settings add their own kinds (topic, events, quietHours…); see pushApi.ts. */
+  kind: "bool" | "url" | "entity" | "accessKey" | "token" | (string & {});
   secret: boolean;
   /** Never set for secrets. */
   value: string | null;

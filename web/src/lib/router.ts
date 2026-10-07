@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Hash routing: #/today, #/plan[/:planId], #/insights[/inv/:id | /suggestions | /experiments],
- * #/energy[/reports]?from&to, #/setup[/settings | /ai | /sensors | /files | /changes | /about], #/kit (development).
+ * #/energy[/reports]?from&to, #/setup[/settings | /ai | /sensors | /notifications | /files | /changes | /about], #/kit (development).
  *
  * The URL is the source of truth, so Back and Forward work, a refresh keeps the page and any page can be linked to.
  * The old page names (Overview, Data, Recommendations…) and their hashes redirect to the new routes.
@@ -75,6 +75,11 @@ export const destinations: Record<Destination, DestinationInfo> = {
       { key: "settings", label: "Predbat settings", description: "Predbat's settings, and what the AI may change." },
       { key: "ai", label: "AI checks", description: "Provider, schedule and usage." },
       { key: "sensors", label: "Sensors", description: "The Home Assistant sensors Joule reads." },
+      {
+        key: "notifications",
+        label: "Notifications",
+        description: "Get what needs you on your phone, and see what was sent.",
+      },
       { key: "files", label: "Files", description: "Saved copies of Predbat's configuration files." },
       { key: "changes", label: "Changes", description: "Every settings change, and which ones Joule can undo." },
       { key: "about", label: "About", description: "Version, documentation and the small print." },
