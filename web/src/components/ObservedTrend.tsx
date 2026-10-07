@@ -284,3 +284,81 @@ export function SocTrend({
     </div>
   );
 }
+
+/**
+ * The Grid tile's picture: today, midnight to midnight, one bar per half-hour of what was bought from the grid (up, in the
+ * grid colour) and sold to it (down, fainter), from the meters. The rest of the day stays empty: Joule measures the grid,
+ * it doesn't forecast it.
+ */
+export function GridTrend({
+  slots,
+  timeZone,
+  now: nowProp,
+}: {
+  slots: TimelineSlot[];
+  timeZone: string;
+  now?: number;
+}) {
+  const [ref, width, H] = useBox(240);
+  const now = nowProp ?? Date.now();
+  const today = zonedDay(new Date(now), timeZone);
+  const from = zonedDateMidnight(today, timeZone).getTime(),
+    to = endOfZonedDay(today, timeZone).getTime();
+  const bars = slots
+    .map((s) => ({
+      start: Date.parse(s.time),
+      end: Date.parse(s.time) + (s.durationMinutes || 30) * 60000,
+      bought: s.gridImportActual ?? null,
+      sold: s.gridExportActual ?? null,
+    }))
+    .filter((b) => b.start >= from && b.end <= Math.min(now, to) && (b.bought != null || b.sold != null));
+  const top = Math.max(0.05, ...bars.map((b) => b.bought ?? 0));
+  const bottom = Math.max(0, ...bars.map((b) => b.sold ?? 0));
+  const x = linear([from, to], [1, Math.max(2, width - 1)]);
+  // Selling has the lower 30% (on its own scale), so the bought bars (what the bill is made of) stay the picture.
+  const zero = bottom > 0.005 ? PAD + (H - 2 * PAD) * 0.7 : H - PAD;
+  const up = linear([0, top], [zero, PAD]);
+  const down = linear([0, Math.max(bottom, 0.05)], [zero, H - PAD]);
+  return (
+    <div title="Grid today: bought each half-hour (up) and sold (down).">
+      <div className="metric-trend grid-trend" ref={ref}>
+        {bars.length ? (
+          <svg
+            width={width}
+            height={H}
+            viewBox={`0 0 ${width} ${H}`}
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Grid import and export each half-hour today"
+          >
+            <line className="trend-zero" vectorEffect="non-scaling-stroke" x1={1} x2={width - 1} y1={zero} y2={zero} />
+            {bars.map((b) => {
+              const x0 = x(b.start) + 0.5,
+                w = Math.max(1, x(b.end) - x(b.start) - 1);
+              return (
+                <g key={b.start}>
+                  {(b.bought ?? 0) > 0.005 && (
+                    <rect className="grid-bought" x={x0} width={w} y={up(b.bought!)} height={zero - up(b.bought!)} />
+                  )}
+                  {(b.sold ?? 0) > 0.005 && (
+                    <rect className="grid-sold" x={x0} width={w} y={zero} height={down(b.sold!) - zero} />
+                  )}
+                </g>
+              );
+            })}
+            <line
+              className="trend-now-line"
+              vectorEffect="non-scaling-stroke"
+              x1={x(now)}
+              x2={x(now)}
+              y1={PAD}
+              y2={H - PAD}
+            />
+          </svg>
+        ) : (
+          <span>No grid readings yet today</span>
+        )}
+      </div>
+    </div>
+  );
+}

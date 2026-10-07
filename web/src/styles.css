@@ -1397,6 +1397,9 @@ main:focus {
 .accent-export {
   --tile-accent: var(--export);
 }
+.accent-grid {
+  --tile-accent: var(--series-grid, #d55181);
+}
 .accent-neutral {
   --tile-accent: var(--text-3);
 }

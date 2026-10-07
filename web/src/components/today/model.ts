@@ -302,6 +302,47 @@ export function costView(summary: SummaryDetail | null | undefined, timeZone?: s
   };
 }
 
+export interface GridView {
+  /** Bought from the grid so far today, kWh, and what it cost. */
+  importKwh: number | null;
+  importGbp: number | null;
+  /** Sold to the grid, kWh, and what it earned. */
+  exportKwh: number | null;
+  exportGbp: number | null;
+  /** "Exported 2.1 kWh · earned £0.32", or "Nothing exported yet". */
+  exported: string;
+  /** Which meter is short and when, below 95% coverage. */
+  note: string | null;
+}
+
+/** The Grid tile: what was bought and sold so far today, in kWh and pounds. */
+export function gridView(summary: SummaryDetail | null | undefined, timeZone?: string): GridView | null {
+  if (!summary) return null;
+  const imp = summary.metrics?.grid_import as MetricDetail | undefined,
+    exp = summary.metrics?.grid_export as MetricDetail | undefined;
+  const importKwh = finite(imp?.energyKwh) ? imp!.energyKwh : null,
+    exportKwh = finite(exp?.energyKwh) ? exp!.energyKwh : null;
+  if (importKwh == null && exportKwh == null) return null;
+  const exportGbp = finite(summary.exportCreditGbp) ? summary.exportCreditGbp : null;
+  const exported =
+    exportKwh == null
+      ? "Export not measured"
+      : exportKwh < 0.05
+        ? "Nothing exported yet"
+        : `Exported ${kwh(exportKwh)}${exportGbp != null ? ` · earned ${gbp(exportGbp)}` : ""}`;
+  const notes = [coverageNote("grid_import", imp, timeZone), coverageNote("grid_export", exp, timeZone)].filter(
+    Boolean,
+  );
+  return {
+    importKwh,
+    importGbp: finite(summary.importCostGbp) ? summary.importCostGbp : null,
+    exportKwh,
+    exportGbp,
+    exported,
+    note: notes.length ? notes.join("; ") : null,
+  };
+}
+
 const gapReasons: Record<string, string> = {
   offline: "offline",
   idle: "not reporting",

@@ -31,8 +31,21 @@
   color: var(--text-2);
 }
 .impact-chart-figure,
-.daily-chart .chart-daily-cost {
+.daily-chart .chart-daily-cost,
+.daily-chart .chart-daily-grid {
   margin-top: var(--space-4);
+}
+.daily-grid-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-1) 0 0;
+  color: var(--text-2);
+  font-size: var(--chart-fs-sm);
+}
+.daily-grid-key span {
+  display: inline-flex;
+  align-items: center;
 }
 .chart-caption {
   margin-top: var(--space-2);
@@ -733,6 +746,19 @@ rect.tl-wash {
   stroke: var(--text-3);
   stroke-width: 1px;
   opacity: 0.5;
+}
+/* The Grid tile: bought up in the grid colour, sold down and fainter, around a hairline zero. */
+.metric-trend .grid-bought {
+  fill: var(--series-grid, #d55181);
+  opacity: 0.85;
+}
+.metric-trend .grid-sold {
+  fill: var(--series-grid, #d55181);
+  opacity: 0.4;
+}
+.metric-trend .trend-zero {
+  stroke: var(--border-2);
+  stroke-width: 1px;
 }
 .trend-caption,
 .metric-trend {

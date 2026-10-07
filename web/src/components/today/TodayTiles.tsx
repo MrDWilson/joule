@@ -1,7 +1,7 @@
-import { Battery, House, Sun, Wallet } from "lucide-react";
+import { Battery, House, Sun, UtilityPole, Wallet } from "lucide-react";
 import { Chip, Stat } from "../ui";
 import { Hint } from "../Hint";
-import { ObservedTrend, SocTrend } from "../ObservedTrend";
+import { GridTrend, ObservedTrend, SocTrend } from "../ObservedTrend";
 import type { EnergySummary, ObservedMeterTrends } from "../../completion-types";
 import { gbp, kwh } from "../../lib/format";
 import { clock } from "../../lib/time";
@@ -9,6 +9,7 @@ import type { TimelineSlot } from "../charts/timeline";
 import {
   coverageNote,
   directionText,
+  gridView,
   homeUse,
   yesterdayByNow,
   type BatteryNow,
@@ -31,9 +32,12 @@ function PaidEarnedBar({ paid, earned }: { paid: number | null; earned: number |
 }
 
 const kwhValue = (n: number | null | undefined) => kwh(n, { unit: false });
+/** "≈" when more than 5% of a meter's figure rests on timing-estimated energy. */
+const approxOf = (m: MetricDetail | null | undefined) =>
+  !!m && m.energyKwh != null && (m.estimatedKwh ?? 0) > Math.max(0.05, 0.05 * m.energyKwh);
 
 /**
- * Today's four tiles, one anatomy each: label and icon, the figure, a small picture, one footnote and, only when it is
+ * Today's five tiles, one anatomy each: label and icon, the figure, a small picture, one footnote and, only when it is
  * comparable, "Yesterday by now". Coverage is mentioned only below 98%, as a chip naming the meter and the hours.
  */
 export function TodayTiles({
@@ -69,12 +73,13 @@ export function TodayTiles({
   solarAsleep: boolean;
 }) {
   const solar = daily?.metrics.pv as MetricDetail | undefined;
+  const grid = gridView(daily, timeZone);
+  const gridApprox = approxOf(daily?.metrics.grid_import as MetricDetail | undefined);
   const home = homeUse(daily);
   const prevHome = homeUse(yesterday);
   const solarNote = coverageNote("pv", solar, timeZone);
   const homeNote = home?.metric ? coverageNote(home.excludesCar ? "home" : "load", home.metric, timeZone) : null;
-  const approx = (m: MetricDetail | null | undefined) =>
-    !!m && m.energyKwh != null && (m.estimatedKwh ?? 0) > Math.max(0.05, 0.05 * m.energyKwh);
+  const approx = approxOf;
   const costDelta =
     cost && yesterdayCost != null
       ? yesterdayByNow(
@@ -118,6 +123,45 @@ export function TodayTiles({
         }
         footnote={costDelta}
         status={cost?.note ? <Chip tone="warn">{cost.note}</Chip> : undefined}
+      />
+      <Stat
+        ariaLabel="Grid"
+        className="stat-grid"
+        label={
+          <>
+            Grid import
+            <Hint label="What does the Grid tile show?">
+              Electricity bought from the grid since midnight and what it cost, from your import meter. Under it, what
+              you sold back. The bars are each half-hour: bought above the line, sold below.
+            </Hint>
+          </>
+        }
+        value={
+          <>
+            {gridApprox ? "≈ " : ""}
+            {kwhValue(grid?.importKwh)}
+          </>
+        }
+        unit="kWh"
+        icon={<UtilityPole />}
+        accent="grid"
+        sparkline={<GridTrend slots={chart} timeZone={timeZone} />}
+        delta={
+          grid ? (
+            <>
+              {grid.importGbp != null ? `Cost ${gbp(grid.importGbp)}` : "Cost not priced yet"}
+              <span className="stat-delta-line">{grid.exported}</span>
+            </>
+          ) : undefined
+        }
+        footnote={yesterdayByNow(
+          {
+            value: yesterday?.metrics.grid_import?.energyKwh,
+            coverage: yesterday?.metrics.grid_import?.coverageFraction,
+          },
+          (n) => `${kwh(n)}${yesterday?.importCostGbp != null ? ` for ${gbp(yesterday.importCostGbp)}` : ""}`,
+        )}
+        status={grid?.note ? <Chip tone="warn">{grid.note}</Chip> : undefined}
       />
       <Stat
         ariaLabel="Solar"

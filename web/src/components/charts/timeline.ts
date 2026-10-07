@@ -18,6 +18,9 @@ export interface TimelineSlot {
   pvActual?: number | null;
   homeActual?: number | null;
   evActual?: number | null;
+  /** Measured grid import and export in an elapsed slot, kWh. */
+  gridImportActual?: number | null;
+  gridExportActual?: number | null;
   loadActualMethod?: string | null;
   pvActualMethod?: string | null;
   carKwh?: number | null;
@@ -77,6 +80,8 @@ export function mergeTimeline(history: TimelineSlot[], plan: TimelineSlot[]): Ti
     pvActual: last.pvActual,
     homeActual: last.homeActual,
     evActual: last.evActual,
+    gridImportActual: last.gridImportActual,
+    gridExportActual: last.gridExportActual,
     loadActualMethod: last.loadActualMethod,
     pvActualMethod: last.pvActualMethod,
     socActual: last.socActual,
@@ -122,6 +127,8 @@ export interface Row {
   home: SeriesPoint;
   solar: SeriesPoint;
   ev: SeriesPoint;
+  /** Measured grid import and export (kWh per half-hour, and in the slot), elapsed slots only: Joule doesn't forecast the grid. */
+  grid: { import: number | null; export: number | null; importRaw: number | null; exportRaw: number | null };
   soc: {
     start: number | null;
     end: number | null;
@@ -207,6 +214,12 @@ export function buildRows(
         ev: car
           ? point(slot.evActual, null, slot.carKwh ?? (phase === "future" ? 0 : null), "ev")
           : { actual: null, actualRaw: null, state: "none", approx: false, forecast: null, forecastRaw: null },
+        grid: {
+          import: phase === "past" ? perHalfHour(slot.gridImportActual, minutes) : null,
+          export: phase === "past" ? perHalfHour(slot.gridExportActual, minutes) : null,
+          importRaw: phase === "past" && finite(slot.gridImportActual) ? slot.gridImportActual : null,
+          exportRaw: phase === "past" && finite(slot.gridExportActual) ? slot.gridExportActual : null,
+        },
         soc: {
           start: phase !== "future" && finite(slot.socActualStart) ? slot.socActualStart : null,
           end: socEnd,
@@ -275,6 +288,9 @@ export interface HistorySlot {
   pv?: number | null;
   pvEstimate?: number | null;
   ev?: number | null;
+  /** Grid import and export in the slot, kWh. */
+  gridImport?: number | null;
+  gridExport?: number | null;
 }
 /**
  * The earlier period's home use by slot start, read the same way as the main line: home without the car when the server
@@ -385,10 +401,18 @@ export function describeTimeline(
     const home = total("home"),
       solar = total("solar"),
       ev = car ? total("ev") : null;
+    const gridTotal = (key: "importRaw" | "exportRaw") => {
+      const measured = past.filter((r) => r.grid[key] != null);
+      return measured.length ? measured.reduce((t, r) => t + (r.grid[key] ?? 0), 0) : null;
+    };
+    const bought = gridTotal("importRaw"),
+      sold = gridTotal("exportRaw");
     const bits = [
       home != null ? `home used ${kwhText(home)}` : "",
       ev != null && ev > 0.05 ? `the car took ${kwhText(ev)}` : "",
       solar != null ? `solar made ${kwhText(solar)}` : "",
+      bought != null ? `${kwhText(bought)} came from the grid` : "",
+      sold != null && sold > 0.05 ? `${kwhText(sold)} went back to it` : "",
     ].filter(Boolean);
     if (bits.length) parts.push(`${pastLabel ?? `Last ${hoursText(span)}`}: ${bits.join(", ")}.`);
   }
