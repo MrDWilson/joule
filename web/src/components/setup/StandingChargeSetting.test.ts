@@ -38,6 +38,9 @@ describe("standingChargeSource", () => {
     expect(standingChargeSource({ ...base, todayPencePerDay: 61, todaySource: "manual", manualPencePerDay: 61 })).toBe(
       "61p a day (£0.61), the figure you entered.",
     );
+    expect(standingChargeSource({ ...base, todayPencePerDay: 48, todaySource: "predbat" })).toBe(
+      "48p a day (£0.48), from metric_standing_charge in Predbat’s apps.yaml. A figure entered below replaces it.",
+    );
     expect(standingChargeSource(base)).toMatch(/^Joule doesn’t know it yet\./);
   });
 

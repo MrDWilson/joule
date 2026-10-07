@@ -305,6 +305,70 @@ public sealed class StandingChargeTests : IDisposable
         Assert.Contains("Standing charge not known", InvestigationBrief.MoneyBrief(summary with { StandingChargeGbp = null, StandingChargePencePerDay = null }, London, "Today"));
     }
 
+    [Fact]
+    public void AnOctopusImportRateFoundFromPredbatBringsItsStandingChargeSensorUnlessOneWasChosenOrDeclined()
+    {
+        const string rate = "sensor.octopus_energy_electricity_21l1234567_1900012345678_current_rate";
+        const string standing = "sensor.octopus_energy_electricity_21l1234567_1900012345678_current_standing_charge";
+        var options = Options(new() { ["Load"] = "sensor.house_energy" });
+        Assert.False(options.Entities.ContainsKey("standing_charge"));
+
+        // Detection finds the import rate: the standing charge sensor on the same meter is worked out from it.
+        options.ApplyDetected(new Dictionary<string, DetectedSensor> { ["import_tariff"] = new(rate, "metric_octopus_import in apps.yaml") }, [], null);
+        Assert.Equal(standing, options.Entities["standing_charge"]);
+        Assert.Contains("standing_charge", options.DerivedEntities);
+        Assert.False(options.Detected.ContainsKey("standing_charge"));
+
+        // A later run that finds the standing charge itself (metric_standing_charge) replaces the worked-out one.
+        options.ApplyDetected(new Dictionary<string, DetectedSensor> { ["import_tariff"] = new(rate, "x"), ["standing_charge"] = new("sensor.predbat_standing", "metric_standing_charge in apps.yaml") }, [], null);
+        Assert.Equal("sensor.predbat_standing", options.Entities["standing_charge"]);
+        Assert.Empty(options.DerivedEntities);
+
+        // And one that loses the import rate drops the worked-out sensor with it.
+        options.ApplyDetected(new Dictionary<string, DetectedSensor> { ["import_tariff"] = new(rate, "x") }, [], null);
+        Assert.Contains("standing_charge", options.DerivedEntities);
+        options.ApplyDetected(new Dictionary<string, DetectedSensor>(), [], null);
+        Assert.False(options.Entities.ContainsKey("standing_charge"));
+        Assert.Empty(options.DerivedEntities);
+        Assert.Equal("sensor.house_energy", options.Entities["load"]);
+
+        // "none" keeps the standing charge unmapped: never worked out, whether the rate is configured or found.
+        var declined = Options(new() { ["ImportTariff"] = rate, ["StandingCharge"] = "none" });
+        Assert.False(declined.Entities.ContainsKey("standing_charge"));
+        Assert.Empty(declined.DerivedEntities);
+        var declinedFound = Options(new() { ["StandingCharge"] = "none" });
+        declinedFound.ApplyDetected(new Dictionary<string, DetectedSensor> { ["import_tariff"] = new(rate, "x") }, [], null);
+        Assert.False(declinedFound.Entities.ContainsKey("standing_charge"));
+    }
+
+    [Fact]
+    public void ANumberInPredbatsAppsYamlIsTheRateWithoutASensorOrATypedFigure()
+    {
+        var clock = new ManualClock(Midnight.AddHours(6));
+        using var db = new DataStore(path, clock);
+        Day(db, Midnight, 6, null);
+        db.RecordManualStandingCharge(48);
+        var s = db.ReadEnergySummary(Midnight, Midnight.AddDays(1));
+        Assert.Equal(.12, s.StandingChargeGbp!.Value, 6); Assert.Equal("predbat", s.StandingChargeSource);
+        Assert.Equal("predbat", db.ReadStandingCharge(null, null).TodaySource);
+        Assert.Contains("the figure in Predbat's apps.yaml", InvestigationBrief.MoneyBrief(s, London, "Today"));
+
+        // The owner's own figure wins over Predbat's; clearing it brings Predbat's back.
+        db.SaveStandingChargePreferences(new(55, null));
+        db.RecordManualStandingCharge(48);
+        Assert.Equal("manual", db.ReadStandingCharge(null, null).TodaySource);
+        db.SaveStandingChargePreferences(new(null, null, ClearManual: true));
+        db.RecordManualStandingCharge(48);
+        var view = db.ReadStandingCharge(null, null);
+        Assert.Equal("predbat", view.TodaySource); Assert.Equal(48, view.TodayPencePerDay);
+
+        // A sensor reading still wins over both.
+        clock.Now = Midnight.AddHours(7);
+        db.SaveTelemetry([Standing(clock.Now, 53.68)]);
+        db.RecordManualStandingCharge(48);
+        Assert.Equal("sensor", db.ReadStandingCharge(null, null).TodaySource);
+    }
+
     sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(respond(request));
