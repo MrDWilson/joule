@@ -28,7 +28,7 @@ Joule uses OpenAI's [Sign in with ChatGPT open-source flow](https://developers.o
 The sign-in must finish at exactly `http://127.0.0.1:5080/auth/callback` on the computer whose browser you sign in with. That is an OpenAI requirement, and it means a Joule running in Docker or on another server cannot complete the sign-in itself. Instead:
 
 1. **Start the server's Joule once** so it creates its host ID (`/data/auth/chatgpt-host.json`), then leave it running.
-2. **On your own computer**, in a checkout of this repository (Node.js 22 and the .NET 10 SDK needed), run:
+2. **On your own computer**, in a checkout of this repository (Node.js 24 and the .NET 10 SDK needed), run:
 
    ```sh
    ./scripts/chatgpt-signin.sh

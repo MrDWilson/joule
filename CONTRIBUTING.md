@@ -13,7 +13,7 @@ Never paste access keys, API keys, ChatGPT credentials, Home Assistant tokens, M
 
 ## Development setup
 
-You need Node.js 22 and the .NET 10 SDK.
+You need Node.js 24 (the current LTS; 22.12 or later also works) and the .NET 10 SDK.
 
 ```sh
 cd web && npm ci && cd ..

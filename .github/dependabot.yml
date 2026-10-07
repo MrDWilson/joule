@@ -9,6 +9,15 @@ updates:
       npm:
         patterns: ["*"]
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 is the native (Go) compiler and has no JavaScript API yet, so typescript-eslint (which supports
+      # TypeScript below 6.1) can't lint with it. Stay on 6.x until typescript-eslint supports 7, then remove this.
+      - dependency-name: typescript
+        versions: [">= 7.0.0"]
+      # The Node.js type definitions follow the Node version the dashboard is built with (the LTS in the Dockerfile
+      # and CI). Raise this together with that Node version.
+      - dependency-name: "@types/node"
+        versions: [">= 25.0.0"]
 
   - package-ecosystem: nuget
     directory: /
@@ -34,3 +43,8 @@ updates:
     groups:
       docker:
         patterns: ["*"]
+    ignore:
+      # Build with long-term-support Node only: odd-numbered majors are short-lived "current" releases that never
+      # become LTS. Even majors (26, 28, ...) still come through.
+      - dependency-name: node
+        versions: [">= 25, < 26", ">= 27, < 28", ">= 29, < 30", ">= 31, < 32"]
