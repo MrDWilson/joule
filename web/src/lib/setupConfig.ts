@@ -51,12 +51,51 @@ export interface MeterSuggestion {
   state: string | null;
   unit: string | null;
   alternatives: { entity: string; name: string | null; unit: string | null; state: string | null }[];
+  /** Sure enough that Joule uses it without asking. */
+  confident?: boolean;
+  /** The current mapping was found automatically from Predbat. */
+  auto?: boolean;
+  /** Left unmapped on purpose ("none"). */
+  declined?: boolean;
 }
 export interface MeterDetection {
   appsSource: string | null;
   appsError: string | null;
   haveEntities: boolean;
   meters: MeterSuggestion[];
+  /** Predbat's metric_standing_charge when apps.yaml gives a number, in pence a day. */
+  standingChargePence?: number | null;
+}
+
+/** The value that leaves a meter unmapped on purpose, so Joule doesn't fill it in from Predbat either. */
+export const NOT_MAPPED_VALUE = "none";
+
+/**
+ * What saving the mapper would change: each meter whose choice differs from what is in use now, except those set in the
+ * environment. Choosing "Not mapped" for a meter that has a sensor (chosen or found automatically) saves "none", so Joule
+ * doesn't find it again; for a meter with nothing in use it changes nothing.
+ */
+export function meterChanges(
+  meters: MeterSuggestion[],
+  choice: Record<string, string>,
+  fromEnvironment: (key: string) => boolean,
+): Record<string, string | null> {
+  const changes: Record<string, string | null> = {};
+  for (const m of meters) {
+    if (fromEnvironment(m.key) || !(m.key in choice)) continue;
+    const chosen = choice[m.key];
+    const current = m.current ?? "";
+    if (chosen === current) continue;
+    changes[m.key] = chosen || NOT_MAPPED_VALUE;
+  }
+  return changes;
+}
+
+/** Where an automatically found sensor came from, in words: "load_today in apps.yaml" → "Predbat's apps.yaml (load_today)". */
+export function foundFromLabel(from: string | null | undefined) {
+  if (!from) return "Found automatically from Predbat";
+  const key = /^([a-z0-9_]+) in apps\.yaml$/.exec(from)?.[1];
+  return key ? `Found automatically in Predbat's apps.yaml (${key})` : "Found automatically among Predbat's sensors";
 }
 
 export const getSetupConfig = () => api<SetupConfig>("/setup/config");

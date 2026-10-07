@@ -11,8 +11,11 @@ import {
   normaliseAddress,
   saveAndRestart,
   findPredbat,
+  foundFromLabel,
+  meterChanges,
   testPredbat,
   type MeterDetection,
+  type MeterSuggestion,
   type PredbatProbe,
   type SetupConfig,
 } from "../../lib/setupConfig";
@@ -300,7 +303,7 @@ export function GoLiveForm({ config }: { config: SetupConfig }) {
               label="Predbat's MCP secret (optional)"
               value={mcp}
               onChange={setMcp}
-              note="The mcp_secret from Predbat's apps.yaml (with mcp_enable: True). It lets Joule find your meters in apps.yaml and lets the AI read Predbat's logs. You can add it later."
+              note="The mcp_secret from Predbat's apps.yaml (with mcp_enable: True). It lets the AI read Predbat's logs and entity history. Joule finds your meters without it. You can add it later."
             />
           </li>
         )}
@@ -471,10 +474,24 @@ export function SwitchSetting({
 const NOT_MAPPED = "";
 
 /**
- * Finds the sensor for each meter (from Predbat's apps.yaml first, then by name and unit) and lets the person confirm or
- * change each one before saving. Meters set in the environment are shown but can't be changed here.
+ * Every meter with the sensor Joule would use and the others it could be, so the person can confirm or change any of them
+ * before saving. Joule already uses the ones it is sure of (found in Predbat's apps.yaml or among its sensors); this is for
+ * changing those and choosing where Predbat offers more than one. Meters set in the environment are shown but can't be changed.
  */
-export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto: boolean }) {
+export function MeterMapper({
+  config,
+  auto,
+  focus = null,
+  onClose,
+}: {
+  config: SetupConfig | null;
+  /** Look straight away instead of waiting for "Find my meters". */
+  auto: boolean;
+  /** The meter to put the cursor on once the choices are shown. */
+  focus?: string | null;
+  /** Shows a Close button. */
+  onClose?: () => void;
+}) {
   const [detection, setDetection] = useState<MeterDetection | null>(null);
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -486,22 +503,25 @@ export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto
     try {
       const d = await detectMeters();
       setDetection(d);
-      setChoice(Object.fromEntries(d.meters.map((m) => [m.key, m.current ?? m.entity ?? NOT_MAPPED])));
+      // What is in use now; for a meter with nothing in use, Joule's suggestion (unless it was left unmapped on purpose).
+      setChoice(
+        Object.fromEntries(
+          d.meters.map((m) => [m.key, m.current ?? (m.declined ? NOT_MAPPED : m.entity) ?? NOT_MAPPED]),
+        ),
+      );
     } catch (e) {
       setError((e as Error).message);
     }
     setLoading(false);
   }
   useEffect(() => {
-    if (auto) void detect();
-  }, [auto]);
+    if (auto || focus) void detect();
+  }, [auto, focus]);
+  useEffect(() => {
+    if (detection && focus) document.getElementById(`meter-${focus}`)?.focus();
+  }, [detection, focus]);
   if (!config) return null;
-  const changes = Object.fromEntries(
-    (detection?.meters ?? [])
-      .filter((m) => field(config, m.key)?.source !== "environment")
-      .filter((m) => (choice[m.key] ?? NOT_MAPPED) !== (m.current ?? NOT_MAPPED))
-      .map((m) => [m.key, choice[m.key] || null]),
-  );
+  const changes = meterChanges(detection?.meters ?? [], choice, (key) => field(config, key)?.source === "environment");
   const count = Object.keys(changes).length;
   return (
     <div className="meter-mapper">
@@ -526,7 +546,7 @@ export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto
         >
           <p className="muted">
             {detection.appsSource
-              ? `Suggestions come from your Predbat apps.yaml (read through ${detection.appsSource}), then by name and unit. Check each one.`
+              ? `Joule reads your Predbat apps.yaml (through ${detection.appsSource}), then sensor names and units. Change any that are wrong.`
               : "Suggested by name and unit from the sensors Predbat sees. Add Predbat's MCP secret to use your apps.yaml instead. Check each one."}
             {detection.appsError ? ` (apps.yaml: ${detection.appsError})` : ""}
           </p>
@@ -560,17 +580,7 @@ export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto
                         </option>
                       ))}
                     </select>
-                    <span className="muted">
-                      {env
-                        ? `Set by ${m.envVar}`
-                        : selected && selected === m.entity && m.from
-                          ? `${m.from}${m.state != null ? ` · now ${m.state} ${m.unit ?? ""}` : ""}`
-                          : selected && selected === m.current
-                            ? "Mapped now"
-                            : !options.length
-                              ? "Nothing that looks like it"
-                              : ""}
-                    </span>
+                    <span className="muted">{choiceNote(m, selected, env)}</span>
                   </span>
                 </li>
               );
@@ -584,6 +594,11 @@ export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto
             <Button type="button" variant="ghost" size="sm" disabled={loading || save.busy} onClick={detect}>
               Look again
             </Button>
+            {onClose && (
+              <Button type="button" variant="ghost" size="sm" disabled={save.busy} onClick={onClose}>
+                Close
+              </Button>
+            )}
           </span>
         </form>
       )}
@@ -594,4 +609,24 @@ export function MeterMapper({ config, auto }: { config: SetupConfig | null; auto
       )}
     </div>
   );
+}
+
+/** The line under a meter's choice: where the sensor came from, or what choosing means. */
+function choiceNote(m: MeterSuggestion, selected: string, env: boolean) {
+  const reading = m.state != null ? ` · now ${m.state} ${m.unit ?? ""}`.trimEnd() : "";
+  if (env) return `Set by ${m.envVar}`;
+  if (!selected) {
+    if (m.current || m.auto) return "Joule won't look for this one again";
+    if (m.declined) return "Left unmapped";
+    return m.entity || m.alternatives.length ? "" : "Nothing that looks like it";
+  }
+  if (selected === m.current && m.auto)
+    return selected === m.entity ? `${foundFromLabel(m.from)}${reading}` : foundFromLabel(null);
+  if (selected === m.current) return "Mapped now";
+  if (selected === m.entity && m.from) {
+    if (m.confident) return `${foundFromLabel(m.from)}${reading}`;
+    const key = /^([a-z0-9_]+) in apps\.yaml$/.exec(m.from)?.[1];
+    return `A guess from ${key ? `Predbat's ${key} setting` : "the sensor's name and unit"}: check it${reading}`;
+  }
+  return "";
 }

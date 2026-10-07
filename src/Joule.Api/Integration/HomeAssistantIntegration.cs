@@ -9,6 +9,16 @@ public record TelemetryStatus(bool Demo,bool Configured,string TimeZone,DateTime
     public Dictionary<string,string> Profiles { get; init; } = [];
     public List<TelemetryIssue> Issues { get; init; } = [];
     public bool? LoadIncludesEv { get; init; }
+    /// <summary>Mappings found automatically from Predbat (and in use), by metric, with where each came from. Chosen mappings are not listed.</summary>
+    public Dictionary<string,DetectedSensor> Detected { get; init; } = [];
+    /// <summary>Metrics where Predbat offers more than one possible sensor, so Setup asks.</summary>
+    public List<string> NeedsChoice { get; init; } = [];
+    /// <summary>Metrics deliberately left unmapped ("none").</summary>
+    public List<string> Declined { get; init; } = [];
+    /// <summary>When Predbat was last looked at for sensors.</summary>
+    public DateTimeOffset? DetectedAt { get; init; }
+    /// <summary>Predbat's metric_standing_charge when it is a number rather than a sensor, in pence a day.</summary>
+    public double? FixedStandingChargePence { get; init; }
 }
 /// <summary>An unexpected sensor problem: metric, plain-English message, and since when.</summary>
 public record TelemetryIssue(string Metric,string Message,DateTimeOffset? Since);
@@ -16,23 +26,30 @@ public record TelemetryIssue(string Metric,string Message,DateTimeOffset? Since)
 public sealed class TelemetryCollectionService
 {
     /// <summary>Sensors that are legitimately idle or absent for long periods (an EV charger between sessions, optional forecast feeds). Their gaps are recorded per metric but never fail a collection.</summary>
-    public static readonly string[] OptionalMetrics=["ev","intelligent_slots","alternative_forecast"];
+    public static readonly string[] OptionalMetrics=["ev","standing_charge","intelligent_slots","alternative_forecast"];
     /// <summary>An unexpected outage becomes a collection error only after this long: brief Home Assistant restarts are normal.</summary>
     public static readonly TimeSpan CounterOutageGrace=TimeSpan.FromMinutes(30),StateOutageGrace=TimeSpan.FromMinutes(15);
     readonly DataStore db;readonly HomeAssistantClient client;readonly HomeAssistantOptions options;
     readonly SemaphoreSlim collecting=new(1,1);
     readonly bool demo;
     readonly TimeProvider clock;
+    readonly SensorAutoDetect? autoDetect;
     DateTimeOffset? last;string? error;string? lastSource;bool intervalRulesChecked;List<TelemetryIssue> issues=[];
-    public TelemetryCollectionService(DataStore db,HomeAssistantClient client,HomeAssistantOptions options,IConfiguration config,TimeProvider? clock=null)
+    public TelemetryCollectionService(DataStore db,HomeAssistantClient client,HomeAssistantOptions options,IConfiguration config,TimeProvider? clock=null,SensorAutoDetect? autoDetect=null)
     {
-        this.db=db;this.client=client;this.options=options;this.clock=clock??db.Clock;demo=config.GetValue("App:Demo",true);
+        this.db=db;this.client=client;this.options=options;this.clock=clock??db.Clock;this.autoDetect=autoDetect;demo=config.GetValue("App:Demo",true);
         db.ConfigureTelemetry(options.TelemetrySettings);
     }
-    public TelemetryStatus Status()=>new(demo,client.Configured,options.TimeZone,last,error,new(options.Entities),TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!options.Entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,db.ReadLatestTelemetry(options.MaxGap),options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
+    public TelemetryStatus Status()
     {
-        Profiles=db.ReadSensorProfiles(),Issues=issues,LoadIncludesEv=db.LoadIncludesEv()
-    };
+        var entities=options.Entities;
+        return new(demo,client.Configured,options.TimeZone,last,error,new(entities),TelemetrySchema.EnergyMetrics.Concat(["soc","import_tariff","export_tariff"]).Where(m=>!entities.ContainsKey(m)).ToArray(),options.MaxGap.TotalMinutes,db.ReadLatestTelemetry(options.MaxGap),options.DirectConfigured,lastSource,db.ReadFirstObservationAt())
+        {
+            Profiles=db.ReadSensorProfiles(),Issues=issues,LoadIncludesEv=db.LoadIncludesEv(),
+            Detected=options.Detected.ToDictionary(x=>x.Key,x=>x.Value),NeedsChoice=[..options.NeedsChoice],Declined=[..options.Declined.Order(StringComparer.Ordinal)],
+            DetectedAt=autoDetect?.LastDetected,FixedStandingChargePence=options.FixedStandingChargePence
+        };
+    }
     public async Task CollectAsync(CancellationToken ct)
     {
         await collecting.WaitAsync(ct);
@@ -42,7 +59,9 @@ public sealed class TelemetryCollectionService
             if(demo)DemoTelemetry.Seed(db,clock.GetUtcNow());
             else
             {
-                if(!client.Configured)throw new DomainException("Configure explicit Home Assistant entity mappings, plus either the Home Assistant URL and server token or the Predbat URL for mirrored readings.",503);
+                // Sensors nobody chose are found from Predbat on the first poll and refreshed every few hours; never fatal to a poll.
+                if(autoDetect is not null)await autoDetect.RunIfDueAsync(ct);
+                if(!client.Configured)throw new DomainException("No meters yet: Joule finds them from Predbat once it can read Predbat, or choose them in Setup. Readings need either the Home Assistant URL and token or the Predbat URL.",503);
                 var readings=await client.CollectAsync(ct);lastSource=readings.FirstOrDefault()?.Source;db.SaveTelemetry(readings,options.MaxGap,alignToSource:true);
                 // Readings are persisted and the poll recorded before per-sensor health is judged, so partial data and LastCollection survive a failing sensor.
                 last=clock.GetUtcNow();

@@ -17,6 +17,7 @@ const metricLabels: Record<string, string> = {
   soc: "Battery level",
   import_tariff: "Import price",
   export_tariff: "Export price",
+  standing_charge: "Standing charge",
   intelligent_slots: "Octopus smart-charge slots",
 };
 /** "load" → "Home use", "grid_export" → "Grid export"; an unknown key reads as words, never snake_case. */

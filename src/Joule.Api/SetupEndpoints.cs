@@ -5,9 +5,17 @@ namespace Joule;
 public sealed record SetupPredbat(bool Configured, string? Address, DateTimeOffset? LastCollection, string? Error, string? Version, bool WritesEnabled);
 /// <summary>One meter: its environment variable, what it is mapped to (if anything), the latest reading and, when it isn't
 /// mapped, the Home Assistant sensors that look like it.</summary>
-public sealed record SetupMeter(string Metric, string EnvVar, bool Required, string? Entity, string? Status, string? Unit, double? Value, string? Profile, List<SensorCandidate> Candidates);
+public sealed record SetupMeter(string Metric, string EnvVar, bool Required, string? Entity, string? Status, string? Unit, double? Value, string? Profile, List<SensorCandidate> Candidates)
+{
+    /// <summary>Where the sensor came from when Joule found it in Predbat ("load_today in apps.yaml", "name and unit match"); null when chosen or unmapped.</summary>
+    public string? FoundFrom { get; init; }
+    /// <summary>Predbat offers more than one sensor that could be this meter, or one Joule isn't sure of: the person chooses.</summary>
+    public bool NeedsChoice { get; init; }
+    /// <summary>Left unmapped on purpose (the value "none").</summary>
+    public bool Declined { get; init; }
+}
 public sealed record SetupSensors(bool Configured, bool Direct, bool ViaPredbat, string? Address, DateTimeOffset? LastCollection, string? Error, List<SetupMeter> Meters);
-public sealed record SetupMcp(bool Configured, bool Connected, int Tools, bool CanReadApps, string? Error, DateTimeOffset? CheckedAt);
+public sealed record SetupMcp(bool Configured, bool Connected, int Tools, bool CanReadApps, string? Error, DateTimeOffset? CheckedAt, string? SignIn = null);
 /// <summary>GET /api/setup: the setup checklist's progress (the same steps as the state header) plus what each step needs.</summary>
 public sealed record SetupStatus(bool Demo, SetupProgress Progress, SetupPredbat Predbat, SetupSensors Sensors, SetupMcp Mcp);
 /// <summary>GET /api/setup/predbat-apps: Predbat's apps.yaml as Predbat's MCP returns it (already masked by Predbat), with any
@@ -62,7 +70,12 @@ public static class SetupEndpoints
             var reading = telemetry?.LatestReadings.GetValueOrDefault(x.Key);
             var profile = options is not null && SensorProfiles.Override(options.Profiles, x.Key) is { } p ? p : profiles.GetValueOrDefault(x.Key);
             return new SetupMeter(x.Key, $"HomeAssistant__Entities__{x.Value}", SensorCandidates.Required.Contains(x.Key), entity, reading?.Status, reading?.Unit, reading?.Value,
-                entity is null ? null : profile, entity is null ? candidates.GetValueOrDefault(x.Key) ?? [] : []);
+                entity is null ? null : profile, entity is null ? candidates.GetValueOrDefault(x.Key) ?? [] : [])
+            {
+                FoundFrom = entity is not null && telemetry?.Detected.GetValueOrDefault(x.Key) is { } found && found.Entity == entity ? found.From : null,
+                NeedsChoice = entity is null && (telemetry?.NeedsChoice.Contains(x.Key) ?? false),
+                Declined = telemetry?.Declined.Contains(x.Key) ?? false,
+            };
         }).ToList();
         var direct = telemetry?.HomeAssistantDirect ?? false;
         var sensors = new SetupSensors(telemetry?.Configured ?? false, direct, !direct && client.Configured, SafeAddress(configuration["HomeAssistant:BaseUrl"]),
@@ -70,7 +83,7 @@ public static class SetupEndpoints
 
         var discovery = mcp?.Status;
         var mcpStatus = new SetupMcp(mcp?.Configured ?? false, discovery?.Connected ?? false, discovery?.Tools.Count ?? 0, discovery?.Tools.Any(t => t.Name == "get_apps") ?? false,
-            discovery?.Error, discovery?.CheckedAt);
+            discovery?.Error, discovery?.CheckedAt, discovery?.SignIn);
         return new(demo, progress, predbat, sensors, mcpStatus);
     }
 

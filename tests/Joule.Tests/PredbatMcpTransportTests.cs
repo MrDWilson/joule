@@ -23,8 +23,11 @@ public class PredbatMcpTransportTests
         public List<(string Method, Uri Uri, JsonElement Body)> Requests { get; } = [];
         public Func<HttpRequestMessage, JsonElement, HttpResponseMessage>? Reply { get; set; }
         public Func<HttpRequestMessage, JsonElement, Task<HttpResponseMessage?>>? AsyncReply { get; set; }
+        /// <summary>Token-endpoint requests. This stand-in is a Predbat from before OAuth: the endpoint is not there.</summary>
+        public int TokenRequests { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            if (request.RequestUri!.AbsolutePath == "/oauth/token") { TokenRequests++; Assert.Null(request.Headers.Authorization); return new(HttpStatusCode.NotFound); }
             var body = request.Content is null ? Args() : Args(await request.Content.ReadAsStringAsync(ct));
             Requests.Add((request.Method.Method, request.RequestUri!, body));
             Assert.Equal("Bearer", request.Headers.Authorization?.Scheme); Assert.Equal(Token,request.Headers.Authorization?.Parameter);

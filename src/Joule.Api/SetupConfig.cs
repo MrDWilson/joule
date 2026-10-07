@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -20,8 +21,20 @@ public sealed record PredbatTestRequest(string? Url);
 /// <summary>The result of asking an address for Predbat's /api/state.</summary>
 public sealed record PredbatProbe(string Url, bool Ok, string? Version, int Entities, string? Error, long Milliseconds);
 /// <summary>A meter Setup can map: the current mapping, and the suggested sensor with where the suggestion came from.</summary>
-public sealed record MeterSuggestion(string Metric, string Key, string EnvVar, string? Current, string? Entity, string? From, string? State, string? Unit, List<SensorCandidate> Alternatives);
-public sealed record MeterDetection(string? AppsSource, string? AppsError, bool HaveEntities, List<MeterSuggestion> Meters);
+public sealed record MeterSuggestion(string Metric, string Key, string EnvVar, string? Current, string? Entity, string? From, string? State, string? Unit, List<SensorCandidate> Alternatives)
+{
+    /// <summary>Sure enough for Joule to use without asking (see <see cref="SetupConfigEndpoints.Detect"/>).</summary>
+    public bool Confident { get; init; }
+    /// <summary>The current mapping was found automatically from Predbat rather than chosen.</summary>
+    public bool Auto { get; init; }
+    /// <summary>The person chose to leave this meter unmapped (the value "none").</summary>
+    public bool Declined { get; init; }
+}
+public sealed record MeterDetection(string? AppsSource, string? AppsError, bool HaveEntities, List<MeterSuggestion> Meters)
+{
+    /// <summary>Predbat's metric_standing_charge when apps.yaml gives it as a number of pounds a day, in pence a day.</summary>
+    public double? StandingChargePence { get; init; }
+}
 
 /// <summary>
 /// Setup's write side: save settings into the data directory (environment variables still win), test and find Predbat, and
@@ -45,6 +58,7 @@ public static class SetupConfigEndpoints
     {
         ["load"] = ["load_today"], ["pv"] = ["pv_today"], ["grid_import"] = ["import_today"], ["grid_export"] = ["export_today"],
         ["soc"] = ["soc_percent"], ["ev"] = ["car_charging_energy"], ["import_tariff"] = ["metric_octopus_import"], ["export_tariff"] = ["metric_octopus_export"],
+        ["standing_charge"] = ["metric_standing_charge"],
     };
 
     public static WebApplication MapSetupConfigEndpoints(this WebApplication app, bool inContainer)
@@ -84,9 +98,7 @@ public static class SetupConfigEndpoints
             var results = await Task.WhenAll(guesses.Distinct().Select(u => Probe(http, u, null, TimeSpan.FromSeconds(4), ct)));
             return results.OrderByDescending(r => r.Ok).ToList();
         });
-        app.MapGet("/api/setup/meters/detect", async (IServiceProvider services, IConfiguration configuration, IHttpClientFactory clients, CancellationToken ct) =>
-            await Detect(services.GetRequiredService<DataStore>(), services.GetService<IPredbatMcpClient>(), configuration, services.GetService<HomeAssistantOptions>(), ct,
-                await ReadPredbatState(clients.CreateClient("predbat-probe"), configuration, ct)));
+        app.MapGet("/api/setup/meters/detect", async (IServiceProvider services, CancellationToken ct) => await DetectLive(services, ct));
         return app;
     }
 
@@ -209,15 +221,16 @@ public static class SetupConfigEndpoints
         };
     }
 
+
     // ---- Meter suggestions --------------------------------------------------------------------------------------------------
 
     /// <summary>
     /// Predbat's whole /api/state, which mirrors every Home Assistant entity, read now from the configured address. Joule stores only
     /// Predbat's own entities, so suggestions need this live copy; it is used here and never stored or sent to the browser whole.
     /// </summary>
-    static async Task<string?> ReadPredbatState(HttpClient http, IConfiguration configuration, CancellationToken ct)
+    internal static async Task<string?> ReadPredbatState(HttpClient http, IConfiguration configuration, CancellationToken ct)
     {
-        if (!Uri.TryCreate(configuration["Predbat:BaseUrl"]?.TrimEnd('/') + "/", UriKind.Absolute, out var root) || root.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(root.UserInfo)) return null;
+        if (PredbatRoot(configuration) is not { } root) return null;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(20));
         try
@@ -231,8 +244,27 @@ public static class SetupConfigEndpoints
         catch (Exception e) when (e is HttpRequestException or IOException || e is OperationCanceledException && !ct.IsCancellationRequested) { return null; }
     }
 
+    static Uri? PredbatRoot(IConfiguration configuration) =>
+        Uri.TryCreate(configuration["Predbat:BaseUrl"]?.TrimEnd('/') + "/", UriKind.Absolute, out var root) && root.Scheme is "http" or "https" && string.IsNullOrEmpty(root.UserInfo) ? root : null;
+
+    /// <summary>Detection against the live Predbat: its whole entity list now, and its apps.yaml from MCP, its web interface or a mounted copy.</summary>
+    public static async Task<MeterDetection> DetectLive(IServiceProvider services, CancellationToken ct)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var http = services.GetRequiredService<IHttpClientFactory>().CreateClient("predbat-probe");
+        return await Detect(services.GetRequiredService<DataStore>(), services.GetService<IPredbatMcpClient>(), configuration, services.GetService<HomeAssistantOptions>(), ct,
+            await ReadPredbatState(http, configuration, ct), http);
+    }
+
+    /// <summary>
+    /// The sensor for each meter. Predbat's apps.yaml comes first (the key that names it, resolved the way Predbat resolves it),
+    /// then a name-and-unit match. A suggestion is <see cref="MeterSuggestion.Confident"/>, so Joule can use it without asking,
+    /// when apps.yaml names exactly one sensor that Predbat sees with a unit Joule can read, or when one name match is clearly
+    /// ahead; and never when the same sensor would be two meters. Several sensors (Predbat adds up one per inverter) are a choice.
+    /// </summary>
     /// <param name="liveState">Predbat's /api/state read now; without it, the newest stored copy (which holds only Predbat's own entities).</param>
-    public static async Task<MeterDetection> Detect(DataStore db, IPredbatMcpClient? mcp, IConfiguration configuration, HomeAssistantOptions? options, CancellationToken ct, string? liveState = null)
+    /// <param name="predbat">For reading apps.yaml from Predbat's web interface when MCP isn't set up.</param>
+    public static async Task<MeterDetection> Detect(DataStore db, IPredbatMcpClient? mcp, IConfiguration configuration, HomeAssistantOptions? options, CancellationToken ct, string? liveState = null, HttpClient? predbat = null)
     {
         // Every Home Assistant entity Predbat sees.
         JsonDocument? state = null;
@@ -240,35 +272,61 @@ public static class SetupConfigEndpoints
         catch (Exception e) when (e is JsonException or InvalidOperationException or IOException) { }
         using var _ = state;
         var root = state?.RootElement ?? default;
-        var (apps, source, error) = await AppsYaml(mcp, configuration, ct);
-        var fromApps = apps is null ? [] : AppsValues(apps);
-        var guesses = state is null ? [] : SensorCandidates.Find(root, 4);
+        var (apps, source, error) = await AppsYaml(mcp, configuration, predbat, ct);
+        var args = apps is null ? [] : AppsArgs(apps);
+        var ranked = state is null ? [] : SensorCandidates.Ranked(root);
         var current = options?.Entities ?? [];
-        var meters = SensorCandidates.EnvNames.Select(x =>
+        var picks = SensorCandidates.EnvNames.Keys.Select(metric =>
         {
-            var metric = x.Key; var key = "HomeAssistant:Entities:" + x.Value;
-            string? entity = null, from = null;
+            string? entity = null, from = null; var confident = false; List<string> others = [];
             foreach (var appsKey in AppsKeys.GetValueOrDefault(metric) ?? [])
             {
-                if (!fromApps.TryGetValue(appsKey, out var values)) continue;
-                foreach (var value in values)
-                {
-                    if (Resolve(value, root) is { } resolved) { entity = resolved; from = $"{appsKey} in apps.yaml"; break; }
-                }
-                if (entity is not null) break;
+                if (!args.TryGetValue(appsKey, out var values)) continue;
+                var resolved = values.Select(v => ResolveAll(v, root, args)).ToList();
+                // Like Predbat, the first match of each value; one value per inverter.
+                var named = resolved.Where(r => r.Count > 0).Select(r => r[0]).Distinct(StringComparer.Ordinal).ToList();
+                if (named.Count == 0) continue;
+                entity = named[0]; from = $"{appsKey} in apps.yaml"; others = named.Skip(1).ToList();
+                confident = named.Count == 1 && resolved.All(r => r.Count <= 1) && Has(root, entity) && SensorCandidates.UnitFits(metric, Text(root, entity, "attributes", "unit_of_measurement"));
+                break;
             }
-            var alternatives = guesses.GetValueOrDefault(metric) ?? [];
-            if (entity is null && alternatives.Count > 0) { entity = alternatives[0].Entity; from = "name and unit match"; }
-            var reading = entity is not null && root.ValueKind == JsonValueKind.Object && root.TryGetProperty(entity, out var e) ? e : default;
-            return new MeterSuggestion(metric, key, key.Replace(":", "__"), current.GetValueOrDefault(metric), entity, from,
-                reading.ValueKind == JsonValueKind.Object ? Text(reading, "state") : null, reading.ValueKind == JsonValueKind.Object ? Text(reading, "attributes", "unit_of_measurement") : null,
-                alternatives.Where(a => a.Entity != entity).ToList());
+            var guesses = ranked.GetValueOrDefault(metric) ?? [];
+            if (entity is null && guesses.Count > 0) { entity = guesses[0].Candidate.Entity; from = "name and unit match"; confident = SensorCandidates.Clear(guesses); }
+            var alternatives = others.Select(e => Candidate(root, e)).Concat(guesses.Select(g => g.Candidate))
+                .Where(a => a.Entity != entity).DistinctBy(a => a.Entity).Take(4).ToList();
+            return (Metric: metric, Entity: entity, From: from, Confident: confident, Alternatives: alternatives);
         }).ToList();
-        return new(source, error, state is not null, meters);
+        // One sensor can't be two meters: a clash is the person's choice.
+        var clashes = picks.Where(p => p.Confident && p.Entity is not null).GroupBy(p => p.Entity!).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
+        var meters = picks.Select(p =>
+        {
+            var key = "HomeAssistant:Entities:" + SensorCandidates.EnvNames[p.Metric];
+            var reading = p.Entity is not null && root.ValueKind == JsonValueKind.Object && root.TryGetProperty(p.Entity, out var e) ? e : default;
+            return new MeterSuggestion(p.Metric, key, key.Replace(":", "__"), current.GetValueOrDefault(p.Metric), p.Entity, p.From,
+                reading.ValueKind == JsonValueKind.Object ? Text(reading, "state") : null, reading.ValueKind == JsonValueKind.Object ? Text(reading, "attributes", "unit_of_measurement") : null,
+                p.Alternatives)
+            {
+                Confident = p.Confident && !clashes.Contains(p.Entity!),
+                Auto = options?.Detected.ContainsKey(p.Metric) ?? false,
+                Declined = options?.Declined.Contains(p.Metric) ?? false,
+            };
+        }).ToList();
+        return new(source, error, state is not null, meters) { StandingChargePence = FixedStandingCharge(args) };
     }
 
-    /// <summary>apps.yaml as text: from Predbat's MCP when it's set up, otherwise from a mounted copy under ConfigFiles:Root.</summary>
-    static async Task<(string? Text, string? Source, string? Error)> AppsYaml(IPredbatMcpClient? mcp, IConfiguration configuration, CancellationToken ct)
+    /// <summary>metric_standing_charge given as a number of pounds a day (Predbat allows 0.50 for 50p), in pence; null when it names a sensor.</summary>
+    static double? FixedStandingCharge(Dictionary<string, List<string>> args) =>
+        args.TryGetValue("metric_standing_charge", out var values) && values is [var only] && double.TryParse(only, NumberStyles.Float, CultureInfo.InvariantCulture, out var pounds) && pounds is >= 0 and < 10
+            ? Math.Round(pounds * 100, 3) : null;
+
+    static bool Has(JsonElement entities, string entity) => entities.ValueKind == JsonValueKind.Object && entities.TryGetProperty(entity, out var e) && e.ValueKind == JsonValueKind.Object;
+    static SensorCandidate Candidate(JsonElement entities, string entity) => Has(entities, entity)
+        ? new(entity, Text(entities, entity, "attributes", "friendly_name"), Text(entities, entity, "attributes", "unit_of_measurement"), Text(entities, entity, "state"))
+        : new(entity, null, null, null);
+
+    /// <summary>apps.yaml as text: from Predbat's MCP when it's set up, else Predbat's web interface (the live settings, credentials
+    /// masked by Predbat), else a mounted copy under ConfigFiles:Root.</summary>
+    static async Task<(string? Text, string? Source, string? Error)> AppsYaml(IPredbatMcpClient? mcp, IConfiguration configuration, HttpClient? predbat, CancellationToken ct)
     {
         string? error = null;
         if (mcp?.Configured == true)
@@ -282,6 +340,7 @@ public static class SetupConfigEndpoints
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { error = "Predbat's MCP didn't answer."; }
         }
+        if (predbat is not null && await LiveApps(predbat, configuration, ct) is { } live) return (live, "Predbat's web interface", null);
         var rootDir = configuration["ConfigFiles:Root"];
         if (!string.IsNullOrWhiteSpace(rootDir))
             foreach (var name in new[] { "apps.yaml", "apps.yml" })
@@ -294,29 +353,60 @@ public static class SetupConfigEndpoints
     }
 
     /// <summary>
-    /// The values of the meter keys in Predbat's apps.yaml (or its JSON form), as written: a single entity, a list (one per inverter),
-    /// a {template} or a re:regex. A small reader for the flat key: value / key: [- item] shape apps.yaml uses; nothing else is parsed.
+    /// Predbat's /debug_apps_live: apps.yaml rebuilt from its live settings, with patterns already resolved to the entities Predbat
+    /// uses and credentials masked (Predbat masks unless asked not to). Null when this Predbat doesn't serve it.
     /// </summary>
+    static async Task<string?> LiveApps(HttpClient http, IConfiguration configuration, CancellationToken ct)
+    {
+        if (PredbatRoot(configuration) is not { } root) return null;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(15));
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(root, "debug_apps_live"));
+            if (configuration["Predbat:AccessToken"] is { Length: > 0 } token) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > 4_000_000) return null;
+            var text = await response.Content.ReadAsStringAsync(deadline.Token);
+            return text.Length < 4_000_000 && AppsArgs(text).Keys.Any(k => AppsKeys.Values.Any(keys => keys.Contains(k))) ? text : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException || e is OperationCanceledException && !ct.IsCancellationRequested) { return null; }
+    }
+
+    /// <summary>The values of the meter keys in Predbat's apps.yaml (or its JSON form). See <see cref="AppsArgs"/>.</summary>
     public static Dictionary<string, List<string>> AppsValues(string text)
     {
         var wanted = AppsKeys.Values.SelectMany(x => x).ToHashSet(StringComparer.Ordinal);
+        return AppsArgs(text).Where(x => wanted.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Every simple setting in Predbat's apps.yaml (or its JSON form from MCP), as written: a single value, a list (one per inverter),
+    /// a {template} or a re:regex. The first occurrence of a key wins. A small reader for the flat key: value / key: [- item] shape
+    /// apps.yaml uses; nothing else is parsed. Empty and null values are left out.
+    /// </summary>
+    public static Dictionary<string, List<string>> AppsArgs(string text)
+    {
         var result = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        void Add(string key, List<string> values)
+        {
+            values = values.Where(v => v.Length > 0 && v is not ("null" or "~" or "None")).ToList();
+            if (values.Count > 0) result.TryAdd(key, values);
+        }
         if (text.TrimStart().StartsWith('{'))
         {
             try
             {
                 using var json = JsonDocument.Parse(text);
+                static string? Value(JsonElement v) => v.ValueKind switch { JsonValueKind.String => v.GetString(), JsonValueKind.Number => v.GetRawText(), JsonValueKind.True => "True", JsonValueKind.False => "False", _ => null };
                 void Walk(JsonElement e, int depth)
                 {
                     if (depth > 4 || e.ValueKind != JsonValueKind.Object) return;
                     foreach (var p in e.EnumerateObject())
                     {
-                        if (wanted.Contains(p.Name) && !result.ContainsKey(p.Name))
-                        {
-                            var values = p.Value.ValueKind == JsonValueKind.String ? [p.Value.GetString()!] : p.Value.ValueKind == JsonValueKind.Array ? p.Value.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String).Select(v => v.GetString()!).ToList() : [];
-                            if (values.Count > 0) result[p.Name] = values;
-                        }
-                        else Walk(p.Value, depth + 1);
+                        if (p.Value.ValueKind == JsonValueKind.Object) Walk(p.Value, depth + 1);
+                        else if (p.Value.ValueKind == JsonValueKind.Array) Add(p.Name, p.Value.EnumerateArray().Select(Value).OfType<string>().ToList());
+                        else if (Value(p.Value) is { } single) Add(p.Name, [single]);
                     }
                 }
                 Walk(json.RootElement, 0);
@@ -328,11 +418,11 @@ public static class SetupConfigEndpoints
         for (var i = 0; i < lines.Length; i++)
         {
             var m = Regex.Match(lines[i], @"^(\s*)([A-Za-z0-9_]+)\s*:\s*(.*)$");
-            if (!m.Success || !wanted.Contains(m.Groups[2].Value) || result.ContainsKey(m.Groups[2].Value)) continue;
+            if (!m.Success || result.ContainsKey(m.Groups[2].Value)) continue;
             var indent = m.Groups[1].Value.Length;
             var inline = Scalar(m.Groups[3].Value);
             var values = new List<string>();
-            if (inline.StartsWith('[') && inline.EndsWith(']')) values.AddRange(inline[1..^1].Split(',').Select(Scalar).Where(v => v.Length > 0));
+            if (inline.StartsWith('[') && inline.EndsWith(']')) values.AddRange(inline[1..^1].Split(',').Select(Scalar));
             else if (inline.Length > 0) values.Add(inline);
             else
                 for (var j = i + 1; j < lines.Length; j++)
@@ -342,7 +432,7 @@ public static class SetupConfigEndpoints
                     if (!item.Success || item.Groups[1].Value.Length < indent) break;
                     values.Add(Scalar(item.Groups[2].Value));
                 }
-            if (values.Count > 0) result[m.Groups[2].Value] = values;
+            Add(m.Groups[2].Value, values);
         }
         return result;
     }
@@ -360,28 +450,49 @@ public static class SetupConfigEndpoints
         return (hash >= 0 ? v[..hash] : v).Trim();
     }
 
+    static readonly Regex EntityShape = new("^[a-z_]+\\.[a-z0-9_]+$", RegexOptions.CultureInvariant);
+
+    /// <summary>The first entity an apps.yaml value names, or null. See <see cref="ResolveAll"/>.</summary>
+    public static string? Resolve(string value, JsonElement entities, IReadOnlyDictionary<string, List<string>>? args = null) =>
+        ResolveAll(value, entities, args).FirstOrDefault();
+
     /// <summary>
-    /// The entity an apps.yaml value names, checked against the entities Predbat sees: a plain entity id as is, a {template} (such as
-    /// {geserial}) or a re:regex (matched from the start, as Predbat does) against the entity list, first match in order. Null when nothing matches.
+    /// The entities an apps.yaml value names, checked against the entities Predbat sees, in Predbat's own order: a plain entity id as
+    /// is; a re:regex matched the way Predbat matches it (the whole name, keeping the first group when there is one); a {template}
+    /// filled from the other settings (such as geserial, itself often a regex whose group is the inverter serial) or, failing that,
+    /// with a wildcard. More than one match means Predbat's choice depends on its entity order, so it isn't a sure answer.
     /// </summary>
-    public static string? Resolve(string value, JsonElement entities)
+    public static List<string> ResolveAll(string value, JsonElement entities, IReadOnlyDictionary<string, List<string>>? args = null)
     {
         var v = value.Trim();
-        var plain = Regex.IsMatch(v, "^[a-z_]+\\.[a-z0-9_]+$");
-        if (entities.ValueKind != JsonValueKind.Object) return plain ? v : null;
-        if (plain) return v;
-        Regex pattern;
+        if (EntityShape.IsMatch(v)) return [v];
+        if (entities.ValueKind != JsonValueKind.Object) return [];
+        var names = entities.EnumerateObject().Select(e => e.Name).Where(n => EntityShape.IsMatch(n)).ToList();
         try
         {
-            pattern = v.StartsWith("re:", StringComparison.Ordinal)
-                ? new Regex("^(?:" + v[3..] + ")", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
-                : v.Contains('{') && Regex.IsMatch(v, "^[a-z_]+\\.[a-z0-9_{}]+$")
-                    ? new Regex("^" + Regex.Replace(Regex.Escape(v), @"\\\{[a-z0-9_]+}", "[a-z0-9_]+?") + "$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
-                    : null!;
+            if (v.StartsWith("re:", StringComparison.Ordinal)) return Matches(v[3..], names).Where(n => EntityShape.IsMatch(n)).Distinct(StringComparer.Ordinal).ToList();
+            if (!v.Contains('{') || !Regex.IsMatch(v, "^[a-z_]+\\.[a-z0-9_{}]+$")) return [];
+            // Fill each {name} from the setting of that name, as Predbat does.
+            var filled = Regex.Replace(v, @"\{([a-z0-9_]+)\}", m =>
+            {
+                if (args?.GetValueOrDefault(m.Groups[1].Value) is not [var setting]) return m.Value;
+                return setting.StartsWith("re:", StringComparison.Ordinal) ? Matches(setting[3..], names).FirstOrDefault() ?? m.Value : setting;
+            });
+            if (EntityShape.IsMatch(filled)) return [filled];
+            var pattern = new Regex("^" + Regex.Replace(Regex.Escape(filled), @"\\\{[a-z0-9_]+}", "[a-z0-9_]+?") + "$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+            return names.Where(n => pattern.IsMatch(n)).ToList();
         }
-        catch (ArgumentException) { return null; }
-        if (pattern is null) return null;
-        try { return entities.EnumerateObject().Select(e => e.Name).Where(n => Regex.IsMatch(n, "^[a-z_]+\\.[a-z0-9_]+$") && pattern.IsMatch(n)).Order(StringComparer.Ordinal).FirstOrDefault(); }
-        catch (RegexMatchTimeoutException) { return null; }
+        catch (Exception e) when (e is ArgumentException or RegexMatchTimeoutException) { return []; }
+    }
+
+    /// <summary>Predbat's resolve_arg_re: re.search("^" + pattern + "$", name), keeping group 1 when the pattern has a group.</summary>
+    static IEnumerable<string> Matches(string pattern, List<string> names)
+    {
+        var regex = new Regex("^" + pattern + "$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        foreach (var name in names)
+        {
+            var m = regex.Match(name);
+            if (m.Success) yield return m.Groups.Count > 1 ? m.Groups[1].Value : m.Value;
+        }
     }
 }

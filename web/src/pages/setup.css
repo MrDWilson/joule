@@ -1317,6 +1317,22 @@ button.setting-line:focus-visible {
 .meter-detail .muted {
   font-size: var(--fs-xs);
 }
+/* "Found automatically from Predbat · Change": its own line under the reading. */
+.meter-found {
+  display: inline-flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.meter-found > svg {
+  flex: none;
+}
+.meter-found .button-link {
+  font-size: var(--fs-xs);
+}
 @media (max-width: 700px) {
   .setup-hero {
     padding: var(--space-4);

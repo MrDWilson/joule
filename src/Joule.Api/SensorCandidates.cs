@@ -8,8 +8,8 @@ public sealed record SensorCandidate(string Entity, string? Name, string? Unit, 
 
 /// <summary>
 /// Suggests Home Assistant sensors for each meter from the entities Predbat already sees (Predbat's /api/state mirrors every
-/// Home Assistant entity, and Joule keeps the latest copy). These are suggestions only: a mapping is used once you confirm it
-/// in Setup (or set it as an environment variable), because Joule never guesses which meter is which.
+/// Home Assistant entity). Predbat's own apps.yaml comes first (see SetupConfigEndpoints.Detect); these name-and-unit matches
+/// fill the gaps. A match is used without asking only when it is clear (<see cref="Clear"/>); otherwise Setup asks.
 /// </summary>
 public static class SensorCandidates
 {
@@ -18,11 +18,12 @@ public static class SensorCandidates
     {
         ["load"] = "Load", ["pv"] = "Pv", ["grid_import"] = "GridImport", ["grid_export"] = "GridExport", ["battery_charge"] = "BatteryCharge",
         ["battery_discharge"] = "BatteryDischarge", ["ev"] = "Ev", ["soc"] = "Soc", ["import_tariff"] = "ImportTariff", ["export_tariff"] = "ExportTariff",
+        ["standing_charge"] = "StandingCharge",
     };
     /// <summary>The meters a usable setup needs: without home use there is nothing to compare Predbat's plan against.</summary>
     public static readonly string[] Required = ["load"];
 
-    enum Unit { Energy, Percent, Price }
+    enum Unit { Energy, Percent, Price, Money }
     sealed record Rule(Unit Unit, string[] Any, string[] All, string[] Not);
     static readonly string[] NotEnergy = ["forecast", "predict", "cost", "rate", "price", "tariff", "power", "limit", "target"];
     static readonly Dictionary<string, Rule> Rules = new()
@@ -37,12 +38,29 @@ public static class SensorCandidates
         ["soc"] = new(Unit.Percent, ["soc", "battery_level", "state_of_charge", "battery_percent"], [], ["target", "reserve", "limit", "max", "min", "car", "_ev", "ev_", "predbat", "forecast", "best"]),
         ["import_tariff"] = new(Unit.Price, ["import", "current_rate", "electricity_current", "unit_rate"], [], ["export", "standing", "forecast", "previous", "next"]),
         ["export_tariff"] = new(Unit.Price, ["export"], [], ["import", "standing", "forecast", "previous", "next"]),
+        // The daily standing charge in pounds (Octopus: sensor.octopus_energy_electricity_…_current_standing_charge, unit GBP).
+        ["standing_charge"] = new(Unit.Money, ["standing_charge"], [], ["gas", "previous", "next", "forecast", "export"]),
     };
 
+    /// <summary>True when <paramref name="unit"/> is one Joule can read for <paramref name="metric"/>: energy for the meters, % for the
+    /// battery level, a price per kWh for the tariffs and money for the standing charge.</summary>
+    public static bool UnitFits(string metric, string? unit) => Rules.TryGetValue(metric, out var rule) && UnitKind(unit) == rule.Unit;
+
+    /// <summary>
+    /// A name match clear enough to use without asking: the only sensor that fits, or one that scores well ahead of the next
+    /// (a daily counter over its running total scores 3 more). Anything closer is a choice for the person.
+    /// </summary>
+    public static bool Clear(IReadOnlyList<(int Score, SensorCandidate Candidate)> ranked) =>
+        ranked.Count == 1 || ranked.Count > 1 && ranked[0].Score - ranked[1].Score >= 3;
+
     /// <summary>Up to <paramref name="limit"/> candidates per metric, best first. <paramref name="state"/> is Predbat's /api/state object.</summary>
-    public static Dictionary<string, List<SensorCandidate>> Find(JsonElement state, int limit = 3)
+    public static Dictionary<string, List<SensorCandidate>> Find(JsonElement state, int limit = 3) =>
+        Ranked(state).ToDictionary(x => x.Key, x => x.Value.Take(limit).Select(c => c.Candidate).ToList());
+
+    /// <summary>Every candidate per metric with its score, best first.</summary>
+    public static Dictionary<string, List<(int Score, SensorCandidate Candidate)>> Ranked(JsonElement state)
     {
-        var result = Rules.Keys.ToDictionary(k => k, _ => new List<SensorCandidate>());
+        var result = Rules.Keys.ToDictionary(k => k, _ => new List<(int Score, SensorCandidate Candidate)>());
         if (state.ValueKind != JsonValueKind.Object) return result;
         var scored = Rules.Keys.ToDictionary(k => k, _ => new List<(int Score, SensorCandidate Candidate)>());
         foreach (var entity in state.EnumerateObject())
@@ -78,7 +96,7 @@ public static class SensorCandidates
             }
         }
         foreach (var (metric, list) in scored)
-            result[metric] = list.OrderByDescending(x => x.Score).ThenBy(x => x.Candidate.Entity, StringComparer.Ordinal).Take(limit).Select(x => x.Candidate).ToList();
+            result[metric] = list.OrderByDescending(x => x.Score).ThenBy(x => x.Candidate.Entity, StringComparer.Ordinal).ToList();
         return result;
     }
 
@@ -89,6 +107,7 @@ public static class SensorCandidates
         if (u is "kwh" or "wh" or "mwh") return Unit.Energy;
         if (u == "%") return Unit.Percent;
         if (u.EndsWith("/kwh", StringComparison.Ordinal)) return Unit.Price;
+        if (u is "gbp" or "£" or "p" or "pence" or "gbp/day" or "£/day" or "p/day" or "pence/day") return Unit.Money;
         return null;
     }
 }

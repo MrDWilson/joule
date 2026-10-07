@@ -31,16 +31,21 @@ interface Step {
   body: ReactNode;
 }
 
-function MeterRow({ meter }: { meter: SetupMeter }) {
+/**
+ * One meter in the checklist. A sensor Joule found in Predbat by itself says so, with Change to pick another; a meter where
+ * Predbat offers more than one sensor asks the person to choose.
+ */
+function MeterRow({ meter, onChange }: { meter: SetupMeter; onChange?: (metric: string) => void }) {
   const ok = !!meter.entity && (meter.status === "observed" || meter.status === "idle");
   const top = meter.candidates[0];
+  const label = metricLabel(meter.metric);
   return (
     <li className={`meter ${meter.entity ? "mapped" : "missing"}`}>
-      <span className={`meter-tick ${ok ? "ok" : meter.entity ? "warn" : ""}`} aria-hidden="true">
+      <span className={`meter-tick ${ok ? "ok" : meter.entity || meter.needsChoice ? "warn" : ""}`} aria-hidden="true">
         {ok ? <Check size={13} /> : <CircleDashed size={13} />}
       </span>
       <span className="meter-name">
-        {metricLabel(meter.metric)}
+        {label}
         {meter.required && !meter.entity && <span className="meter-required"> · needed</span>}
       </span>
       <span className="meter-detail">
@@ -52,7 +57,34 @@ function MeterRow({ meter }: { meter: SetupMeter }) {
               {meter.value != null ? ` · ${meter.value} ${meter.unit ?? ""}` : ""}
               {meter.profile ? ` · ${PROFILE_LABELS[meter.profile] ?? meter.profile}` : ""}
             </span>
+            {meter.foundFrom && (
+              <span className="meter-found">
+                <PlugZap size={12} aria-hidden="true" />
+                <span title={meter.foundFrom}>Found automatically from Predbat</span>
+                {onChange && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => onChange(meter.metric)}
+                    aria-label={`Change ${label}`}
+                  >
+                    Change
+                  </Button>
+                )}
+              </span>
+            )}
           </>
+        ) : meter.needsChoice ? (
+          <span className="meter-found">
+            <span className="muted">Predbat has more than one sensor that could be this.</span>
+            {onChange && (
+              <Button variant="link" size="sm" onClick={() => onChange(meter.metric)} aria-label={`Choose ${label}`}>
+                Choose
+              </Button>
+            )}
+          </span>
+        ) : meter.declined ? (
+          <span className="muted">Left unmapped</span>
         ) : top ? (
           <span className="muted">
             Not mapped. Looks like <code className="entity-id">{top.entity}</code>
@@ -97,7 +129,21 @@ export function SetupChecklist({
   const ai = data.state.ai;
   const missing = sensors.meters.filter((m) => !m.entity);
   const suggested = missing.filter((m) => m.candidates.length).map((m) => `${m.envVar}=${m.candidates[0].entity}`);
+  const found = sensors.meters.filter((m) => m.entity && m.foundFrom).length;
+  const toChoose = sensors.meters.filter((m) => m.needsChoice).length;
   const [testing, setTesting] = useState(false);
+  // The meter chooser: opened by Change/Choose (focus on that meter) or by "Change meters". It opens by itself only when
+  // Predbat has been read and nothing could be found or offered, so the person isn't left with an empty list.
+  const [mapper, setMapper] = useState<{ focus: string | null } | null>(null);
+  const [mapperClosed, setMapperClosed] = useState(false);
+  const mapperWanted =
+    missing.some((m) => m.required && !m.needsChoice) && found === 0 && !!p.lastCollection && !mapperClosed;
+  const mapperOpen = !!config && (mapper !== null || mapperWanted);
+  const openMapper = (metric: string | null) => setMapper({ focus: metric });
+  const closeMapper = () => {
+    setMapper(null);
+    setMapperClosed(true);
+  };
 
   const list: Step[] = [
     {
@@ -171,13 +217,21 @@ export function SetupChecklist({
       title: "Map your Home Assistant meters",
       required: true,
       done: done("meters"),
-      summary: missing.length
-        ? `${sensors.meters.length - missing.length} of ${sensors.meters.length} meters mapped${missing.some((m) => m.required) ? " · Home use is needed" : ""}`
-        : "Every meter is mapped",
+      summary: [
+        missing.length
+          ? `${sensors.meters.length - missing.length} of ${sensors.meters.length} meters mapped`
+          : "Every meter is mapped",
+        found ? `${found} found automatically` : "",
+        toChoose ? `${toChoose} to choose` : "",
+        missing.some((m) => m.required) ? "Home use is needed" : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
       body: (
         <>
           <p className="body-copy">
-            Joule compares Predbat's plan with what your meters measured. Readings come{" "}
+            Joule compares Predbat's plan with what your meters measured, and finds the meters from Predbat by itself.
+            Readings come{" "}
             {sensors.direct
               ? "straight from Home Assistant"
               : sensors.viaPredbat
@@ -185,15 +239,22 @@ export function SetupChecklist({
                 : "from Home Assistant"}
             {sensors.lastCollection ? `, last ${ago(sensors.lastCollection)}` : ""}.
           </p>
-          {/* While meters are missing, the mapper lists every meter with its choices instead. */}
-          {(!config || missing.length === 0) && (
+          {/* While the chooser is open it lists every meter with its choices instead. */}
+          {!mapperOpen && (
             <ul className="meters">
               {sensors.meters.map((m) => (
-                <MeterRow key={m.metric} meter={m} />
+                <MeterRow key={m.metric} meter={m} onChange={config ? openMapper : undefined} />
               ))}
             </ul>
           )}
-          {config && <MeterMapper config={config} auto={missing.length > 0 && !!p.lastCollection} />}
+          {config &&
+            (mapperOpen ? (
+              <MeterMapper config={config} auto focus={mapper?.focus ?? null} onClose={closeMapper} />
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => openMapper(null)}>
+                {missing.length === sensors.meters.length ? "Find my meters" : "Change meters"}
+              </Button>
+            ))}
           {missing.length > 0 && (
             <Disclosure
               summary={config ? "Or set them in Joule's environment" : "Set them in Joule's environment"}
@@ -279,6 +340,12 @@ export function SetupChecklist({
             Files.
           </p>
           {mcp.error && <p className="sheet-warning">{mcp.error}</p>}
+          {mcp.connected && mcp.signIn === "secret" && (
+            <p className="muted">
+              This Predbat doesn't issue sign-in tokens, so Joule sends the MCP secret itself. That works; Predbat's log
+              just notes it on each request. Updating Predbat lets Joule sign in with a token instead.
+            </p>
+          )}
           {config && (
             <SecretSetting
               config={config}

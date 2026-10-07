@@ -310,6 +310,91 @@ test("a fresh unconfigured install opens the setup checklist, with what to set a
   await expect(page).toHaveURL(/#\/today$/);
 });
 
+test("meters found from Predbat say so, a choice is asked for, and an older Predbat's MCP sign-in is explained", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await rewriteState(page, (payload) => {
+    payload.connection.demo = false;
+  });
+  const meter = (metric: string, extra: Record<string, unknown>) => ({
+    metric,
+    envVar: `HomeAssistant__Entities__${metric}`,
+    required: metric === "load",
+    entity: null,
+    status: null,
+    unit: null,
+    value: null,
+    profile: null,
+    candidates: [],
+    ...extra,
+  });
+  const steps = [
+    ["predbat", "Connect to Predbat", true, true],
+    ["meters", "Map your Home Assistant meters", false, true],
+    ["mcp", "Let the AI read Predbat's logs (MCP)", true, false],
+  ].map(([key, label, done, required]) => ({ key, label, done, required }));
+  await page.route(/\/api\/setup$/, (route) =>
+    route.fulfill({
+      json: {
+        demo: false,
+        progress: { done: 2, total: 3, requiredDone: false, steps },
+        predbat: {
+          configured: true,
+          address: "http://predbat:5052",
+          lastCollection: new Date().toISOString(),
+          error: null,
+          version: "8.30.1",
+          writesEnabled: false,
+        },
+        sensors: {
+          configured: true,
+          direct: false,
+          viaPredbat: true,
+          address: null,
+          lastCollection: new Date().toISOString(),
+          error: null,
+          meters: [
+            meter("load", { needsChoice: true }),
+            meter("pv", {
+              entity: "sensor.givtcp_pv_energy_today_kwh",
+              status: "observed",
+              unit: "kWh",
+              value: 9,
+              foundFrom: "pv_today in apps.yaml",
+            }),
+            meter("ev", { declined: true }),
+          ],
+        },
+        mcp: {
+          configured: true,
+          connected: true,
+          tools: 11,
+          canReadApps: true,
+          error: null,
+          checkedAt: new Date().toISOString(),
+          signIn: "secret",
+        },
+      },
+    }),
+  );
+  await page.goto("/#/setup");
+  await expect(
+    page.getByText("1 of 3 meters mapped · 1 found automatically · 1 to choose · Home use is needed"),
+  ).toBeVisible();
+  const rows = page.locator("li.meter");
+  await expect(rows.filter({ hasText: "Home use" })).toContainText(
+    "Predbat has more than one sensor that could be this.",
+  );
+  await expect(rows.filter({ hasText: "Solar" })).toContainText("Found automatically from Predbat");
+  await expect(rows.filter({ hasText: "Car charging" })).toContainText("Left unmapped");
+  await page.getByText("Let the AI read Predbat's logs (MCP)").click();
+  await expect(page.getByText(/This Predbat doesn't issue sign-in tokens/)).toBeVisible();
+  // Nothing in the step runs off the side of a phone.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await axe(page, "setup meters found automatically");
+});
+
 test("demo Setup offers to connect your own Predbat, and Files shows keys with values masked", async ({ page }) => {
   await page.goto("/#/setup");
   await expect(page.getByRole("heading", { name: "You're looking at the demo" })).toBeVisible();

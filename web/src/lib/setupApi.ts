@@ -25,6 +25,12 @@ export interface SetupMeter {
   /** daily_counter, solar_daily, session_counter, lifetime_counter, price or state; null when not mapped. */
   profile: string | null;
   candidates: SensorCandidate[];
+  /** Set when Joule found the sensor in Predbat by itself: "load_today in apps.yaml" or "name and unit match". Older servers omit it. */
+  foundFrom?: string | null;
+  /** Predbat offers more than one sensor that could be this meter (or one Joule isn't sure of): the person chooses. */
+  needsChoice?: boolean;
+  /** Left unmapped on purpose ("none"). */
+  declined?: boolean;
 }
 export interface SetupStatus {
   demo: boolean;
@@ -52,6 +58,8 @@ export interface SetupStatus {
     tools: number;
     canReadApps: boolean;
     error: string | null;
+    /** "token": signed in with an access token Predbat issued. "secret": an older Predbat, sent its mcp_secret directly. */
+    signIn?: "token" | "secret" | null;
     checkedAt: string | null;
   };
 }

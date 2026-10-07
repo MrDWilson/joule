@@ -11,7 +11,7 @@ Variable names use double underscores, for example `App__Demo`. When running fro
 | Setup step | Saved as | Notes |
 | --- | --- | --- |
 | Connect my Predbat | `App__Demo`, `Predbat__BaseUrl`, `App__AccessKey` | **Find Predbat** tries `http://predbat:5052`, `http://host.docker.internal:5052`, `http://homeassistant.local:5052` and a few more; **Test** asks the address for Predbat's state and names what answered. |
-| Map your meters | `HomeAssistant__Entities__*` | **Find my meters** reads the sensors in Predbat's `apps.yaml` (`load_today`, `pv_today`, `import_today`, `export_today`, `soc_percent`, `car_charging_energy`, `metric_octopus_import`/`export`), through Predbat's MCP or a mounted copy, and matches the rest by name and unit. You confirm each one. |
+| Map your meters | `HomeAssistant__Entities__*` (optional) | Nothing to do in most installs: Joule finds the meters from Predbat's `apps.yaml` (`load_today`, `pv_today`, `import_today`, `export_today`, `soc_percent`, `car_charging_energy`, `metric_octopus_import`/`export`, `metric_standing_charge`) and the sensors Predbat sees. Setup shows what it found, with **Change**, and asks only where Predbat offers more than one sensor. See [Measurements](measurements.md#which-sensors-to-map). |
 | MCP | `Predbat__McpToken` | Predbat's `mcp_secret`. |
 | AI provider | `Ai__ApiKey` | Or sign in with ChatGPT under AI checks. |
 | Allow changes | `Predbat__WritesEnabled` | |
@@ -60,13 +60,14 @@ ChatGPT plan sign-in has no variables; see [AI providers](ai-providers.md#chatgp
 
 ### Home Assistant
 
-These settings map your energy meters so Joule can measure what really happened. [Measurements](measurements.md) explains which sensors to pick.
+Joule finds your energy meters from Predbat by itself, so these are optional overrides: a meter set here always wins, and `none` leaves it unmapped. [Measurements](measurements.md) explains how detection works and which sensors to pick.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `HomeAssistant__Entities__Load`, `Pv`, `GridImport`, `GridExport`, `BatteryCharge`, `BatteryDischarge`, `Ev` | (none) | Cumulative energy sensors (kWh, Wh or MWh), not power sensors (W). |
 | `HomeAssistant__Entities__Soc` | (none) | Battery state of charge (%). |
 | `HomeAssistant__Entities__ImportTariff`, `ExportTariff` | (none) | Current import and export rates. |
+| `HomeAssistant__Entities__StandingCharge` | (none) | The daily standing charge sensor (pounds or pence). |
 | `HomeAssistant__Entities__IntelligentSlots`, `AlternativeForecast` | (none) | Optional: Octopus Intelligent dispatch slots, and a second load forecast to compare. |
 | `HomeAssistant__BaseUrl`, `HomeAssistant__AccessToken` | (none) | Optional. Without them, mapped sensors are read through Predbat's copy of Home Assistant state. With them, Joule reads Home Assistant directly and falls back to Predbat. |
 | `HomeAssistant__TimeZone` | `Europe/London` | Your household's timezone. "Today", daily reports and AI budgets use it. |

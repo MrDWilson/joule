@@ -95,11 +95,11 @@ docker compose up -d
 
 - **Predbat's address.** Press **Find Predbat** to try the usual places, or type it and press **Test**. Joule says in plain words what answered.
 - **Your access key.** Joule makes one; copy it to your password manager. Each new browser asks for it once.
-- **Predbat's MCP secret** (optional). Lets Joule find your meters in `apps.yaml` and lets the AI read Predbat's logs.
+- **Predbat's MCP secret** (optional). Lets the AI read Predbat's logs and entity history. Joule finds your meters without it.
 
 Press **Switch to my Predbat**. Joule saves your choices in its data volume, restarts in a few seconds and opens the checklist, still signed in.
 
-**4. Follow the checklist.** **Find my meters** suggests your Home Assistant energy sensors from Predbat's own `apps.yaml` (`load_today`, `pv_today`, `import_today`, …); check them and save. Then choose an AI provider: sign in with your ChatGPT plan or paste an OpenAI-compatible API key. Optional steps add Predbat's logs (MCP), automatic checks, and letting Joule apply the changes you approve.
+**4. Follow the checklist.** Joule finds your Home Assistant energy meters from Predbat's own `apps.yaml` (`load_today`, `pv_today`, `import_today`, …) and the sensors Predbat sees, so there is nothing to map. The checklist shows what it found, with **Change** on each, and asks only where Predbat offers more than one sensor. Then choose an AI provider: sign in with your ChatGPT plan or paste an OpenAI-compatible API key. Optional steps add Predbat's logs (MCP), automatic checks, and letting Joule apply the changes you approve.
 
 That's it: no `.env` to edit. Joule reads Predbat every five minutes and never changes anything in Predbat unless you allow changes **and** approve each one.
 
@@ -167,7 +167,7 @@ Setup covers what most installs need and saves it in the data volume (`settings.
 | `Predbat__WritesEnabled` | `false` | Allow approved setting changes to be written to Predbat. |
 | `Predbat__McpToken` | (none) | Predbat's `mcp_secret`, so the AI can read logs and entity history. |
 | `Ai__ApiKey`, `Ai__ApiBaseUrl` | (none), OpenAI | An OpenAI-compatible chat-completions API. |
-| `HomeAssistant__Entities__*` | (none) | Your energy meters: `Load`, `Pv`, `GridImport`, `GridExport`, `BatteryCharge`, `BatteryDischarge`, `Ev`, `Soc`, tariffs. |
+| `HomeAssistant__Entities__*` | (found from Predbat) | Optional overrides for your energy meters: `Load`, `Pv`, `GridImport`, `GridExport`, `BatteryCharge`, `BatteryDischarge`, `Ev`, `Soc`, tariffs, `StandingCharge`. `none` leaves one unmapped. |
 | `HomeAssistant__BaseUrl`, `HomeAssistant__AccessToken` | (none) | Optional: read Home Assistant directly instead of through Predbat. |
 | `HomeAssistant__TimeZone` | `Europe/London` | Your household's timezone, for "today" and reports. |
 | `ConfigFiles__Root`, `ConfigFiles__AllowedFiles__0` | (off) | Keep versioned snapshots of mounted Predbat files such as `apps.yaml`. |
