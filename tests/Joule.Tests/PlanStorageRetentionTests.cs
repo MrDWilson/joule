@@ -178,7 +178,7 @@ public class PlanStorageRetentionTests(ITestOutputHelper output) : IDisposable
             return state.ToJsonString();
         }
         db.Checkpoint();
-        var before = new FileInfo(Path.Combine(directory, "predbat.duckdb")).Length;
+        var before = new FileInfo(Path.Combine(directory, DataFiles.Database)).Length;
         for (var poll = 0; poll < 288; poll++)
         {
             var planNumber = poll / 2;
@@ -187,7 +187,7 @@ public class PlanStorageRetentionTests(ITestOutputHelper output) : IDisposable
             db.SavePlan(plan, BigState(poll), Plan(planNumber));
         }
         db.Checkpoint();
-        var after = new FileInfo(Path.Combine(directory, "predbat.duckdb")).Length;
+        var after = new FileInfo(Path.Combine(directory, DataFiles.Database)).Length;
         var report = db.ReadStorageReport(DataStore.RetentionDryRun, 14);
         output.WriteLine($"Simulated day: {(after - before) / 1048576.0:0.0} MB on disk, {report.Snapshots} snapshots ({report.SnapshotBytes / 1048576.0:0.0} MB stored; state {Count("SELECT CAST(coalesce(sum(octet_length(state_gz)),0)+coalesce(sum(strlen(state_json)),0) AS BIGINT) FROM source_snapshots") / 1048576.0:0.0} MB, plan {Count("SELECT CAST(coalesce(sum(octet_length(plan_gz)),0)+coalesce(sum(strlen(plan_json)),0) AS BIGINT) FROM source_snapshots") / 1048576.0:0.0} MB), {report.Observations} observations, {report.Plans} plans ({Count("SELECT CAST(sum(length(payload)) AS BIGINT) FROM plans") / 1048576.0:0.0} MB payload), {report.PlanSlots} slots.");
         Assert.True(after - before < 30L * 1024 * 1024, $"Grew {(after - before) / 1048576.0:0.0} MB");
@@ -227,12 +227,12 @@ public class PlanStorageRetentionTests(ITestOutputHelper output) : IDisposable
 
     long Count(string sql)
     {
-        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, "predbat.duckdb")}"); connection.Open();
+        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, DataFiles.Database)}"); connection.Open();
         using var command = connection.CreateCommand(); command.CommandText = sql; return Convert.ToInt64(command.ExecuteScalar());
     }
     void Execute(string sql)
     {
-        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, "predbat.duckdb")}"); connection.Open();
+        using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, DataFiles.Database)}"); connection.Open();
         using var command = connection.CreateCommand(); command.CommandText = sql; command.ExecuteNonQuery();
     }
     public void Dispose() { if (Directory.Exists(directory)) Directory.Delete(directory, true); }

@@ -27,7 +27,7 @@ public sealed class HistoryStorageTests : IDisposable
         using (var db = new DataStore(directory))
         {
             db.Save(state);
-            using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, "predbat.duckdb")}"); connection.Open();
+            using var connection = new DuckDBConnection($"Data Source={Path.Combine(directory, DataFiles.Database)}"); connection.Open();
             using var cmd = connection.CreateCommand(); cmd.CommandText = "SELECT length(payload) FROM application_state WHERE id=1";
             Assert.True(Convert.ToInt64(cmd.ExecuteScalar()) < 200_000, "Frequently saved state must omit archived result bodies.");
         }
@@ -42,7 +42,7 @@ public sealed class HistoryStorageTests : IDisposable
         var seed = DemoData.Create();
         var investigation = new Investigation { ToolEvidence = [new("legacy", "query", "SELECT fixture", DateTimeOffset.UtcNow, true, "historical result", [])] };
         seed.Investigations.Add(investigation);
-        using (var old = new DuckDBConnection($"Data Source={Path.Combine(directory, "predbat.duckdb")}"))
+        using (var old = new DuckDBConnection($"Data Source={Path.Combine(directory, DataFiles.LegacyDatabase)}"))
         {
             old.Open(); using var command = old.CreateCommand();
             command.CommandText = "CREATE TABLE application_state (id INTEGER PRIMARY KEY, payload VARCHAR NOT NULL)"; command.ExecuteNonQuery();

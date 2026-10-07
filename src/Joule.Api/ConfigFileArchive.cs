@@ -64,10 +64,12 @@ public sealed class ConfigFileArchive
             {
                 if(options.AllowedFiles.Length!=1 || options.AllowedFiles[0]!="runtime-settings.json")throw new DomainException("Demo mirror requires only runtime-settings.json.",400);
                 Directory.CreateDirectory(root!);CheckNoLinks(root!);
-                if(Directory.EnumerateFileSystemEntries(root!).Any(p=>Path.GetFileName(p) is not ("runtime-settings.json" or ".predbat-ai-demo")))throw new DomainException("Demo mirror root must be a dedicated owned demo directory.",400);
-                // The marker keeps its pre-rename name so existing demo directories stay recognised as Joule's own.
-                var marker=Path.Combine(root!,".predbat-ai-demo");CheckNoLinks(marker);
-                if(!File.Exists(marker))WriteProtected(marker,Encoding.UTF8.GetBytes("Joule owned demo configuration directory\n"));
+                if(Directory.EnumerateFileSystemEntries(root!).Any(p=>Path.GetFileName(p) is not ("runtime-settings.json" or DataFiles.DemoMarker or DataFiles.LegacyDemoMarker)))throw new DomainException("Demo mirror root must be a dedicated owned demo directory.",400);
+                var marker=Path.Combine(root!,DataFiles.DemoMarker);CheckNoLinks(marker);
+                var legacyMarker=Path.Combine(root!,DataFiles.LegacyDemoMarker);CheckNoLinks(legacyMarker);
+                // A demo folder from before the rename carries the old marker: rename it once, or keep it if that fails.
+                if(!File.Exists(marker) && File.Exists(legacyMarker)){ try{File.Move(legacyMarker,marker);} catch(Exception e) when(e is IOException or UnauthorizedAccessException){} }
+                if(!File.Exists(marker) && !File.Exists(legacyMarker))WriteProtected(marker,Encoding.UTF8.GetBytes("Joule owned demo configuration directory\n"));
             }
             Directory.CreateDirectory(archive); ProtectDirectory(archive);
             quarantined=ReadJournals().Any(x=>x.Status is "pending" or "partial" or "uncertain" or "awaiting_state");

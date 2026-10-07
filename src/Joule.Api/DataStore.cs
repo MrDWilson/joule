@@ -11,12 +11,21 @@ public partial class DataStore : IDisposable
     public string DirectoryPath { get; }
     /// <summary>The store's "now" (retention, freshness, completed intervals). The app uses the system clock; tests pin it.</summary>
     public TimeProvider Clock { get; }
-    public DataStore(string directory, TimeProvider? clock = null)
+    /// <summary>The database file: joule.duckdb, or the pre-rename predbat.duckdb when it couldn't be renamed (see <see cref="DataFiles"/>).</summary>
+    public string DatabasePath { get; }
+    public DataStore(string directory, TimeProvider? clock = null, ILogger? logger = null)
     {
         Clock = clock ?? TimeProvider.System;
+        Logger = logger;
         DirectoryPath = Path.GetFullPath(directory);
         Directory.CreateDirectory(DirectoryPath);
-        db = new DuckDBConnection($"Data Source={Path.Combine(DirectoryPath, "predbat.duckdb")}"); db.Open();
+        var choice = DataFiles.ChooseDatabase(DirectoryPath);
+        DatabasePath = choice.Path;
+        if (choice.Note is { } note)
+        {
+            if (choice.Warning) Logger?.LogWarning("{Note}", note); else Logger?.LogInformation("{Note}", note);
+        }
+        db = new DuckDBConnection($"Data Source={DatabasePath}"); db.Open();
         Execute("SET enable_external_access=false; SET memory_limit='256MB'; SET threads=2");
         Execute("""
             CREATE TABLE IF NOT EXISTS application_state (id INTEGER PRIMARY KEY, payload VARCHAR NOT NULL);

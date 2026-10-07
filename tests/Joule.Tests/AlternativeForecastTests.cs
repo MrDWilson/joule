@@ -133,7 +133,7 @@ public sealed class AlternativeForecastTests : IDisposable
     {
         var plan=Plan();plan.Source="Predbat";plan.CollectedAt=start.AddMinutes(-10);
         using(var db=new DataStore(directory,clock))db.SavePlan(plan,NativeState(start),"{}");
-        using(var connection=new DuckDB.NET.Data.DuckDBConnection($"Data Source={Path.Combine(directory,"predbat.duckdb")}"))
+        using(var connection=new DuckDB.NET.Data.DuckDBConnection($"Data Source={Path.Combine(directory,DataFiles.Database)}"))
         {
             connection.Open();using var command=connection.CreateCommand();command.CommandText="UPDATE source_snapshots SET state_json='{broken'";command.ExecuteNonQuery();
         }
