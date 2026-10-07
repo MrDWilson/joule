@@ -138,7 +138,8 @@ public static class InvestigationFileChanges
         }
         if (keep is null) return;
         foreach (var prior in s.Investigations.Where(i => i.Id != current.Id))
-            foreach (var change in prior.FileChanges.Where(x => IsOpen(x) && !keep.Contains(x.Id)))
+            // An edit Joule made whose reload check is still running stays open: the check may yet put the file back.
+            foreach (var change in prior.FileChanges.Where(x => IsOpen(x) && !keep.Contains(x.Id) && x.Edit is not { Check: "checking" }))
             {
                 var applied = change.Status == "applied";
                 change.Status = applied ? "verified" : "retired"; change.ClosedAt = DateTimeOffset.UtcNow;

@@ -55,9 +55,12 @@ public sealed class ConfigFileEditService(ConfigFileArchive archive, StateServic
         return (investigation, investigation.FileChanges.FirstOrDefault(x => x.Id == changeId) ?? throw new DomainException("Configuration file change not found.", 404));
     }
 
+    /// <summary>The mounted apps.yaml (or apps.yml) the change is for. Joule edits only that file: permission and write access are checked
+    /// for it, and other listed files (secrets.yaml, the demo's runtime settings) are never edited.</summary>
     string FileFor(ConfigFileChange change) =>
-        archive.Allows(change.File) ? change.File
-        : change.File is "apps.yaml" or "apps.yml" && Status().File is { } mounted ? mounted
+        change.File.Trim().ToLowerInvariant() is not ("apps.yaml" or "apps.yml")
+            ? throw new DomainException($"Joule only edits Predbat's apps.yaml itself. Make the {change.File} change by hand.", 409)
+        : Status().File is { } mounted ? mounted
         : throw new DomainException($"Joule can only edit the files you've mounted for it, and {change.File} isn't one of them.", 409);
 
     /// <summary>The masked diff of the file as it is now against the file with the edit made, or the plain reason it can't be made.</summary>
@@ -113,30 +116,31 @@ public sealed class ConfigFileEditService(ConfigFileArchive archive, StateServic
             foreach (var trial in next.Experiments.Where(ChangeEngine.IsOpen)) { trial.Status = "Needs review"; trial.Result = $"An edit to {file} confounds this trial."; }
             ChangeEngine.Log(next, "configuration", $"Joule edited {file} for “{summary}” ({plan.Placement.ToLowerInvariant()}). A copy of the previous file is kept.");
         }, ct);
-        var watch = Watch(investigationId, changeId, made!.At);
+        var reviewedSnippet = Find(state.Read(false), investigationId, changeId).Change.Snippet;
+        var watch = Watch(investigationId, changeId, made!.At, ReloadContext.For(made.Keys, reviewedSnippet));
         // The demo has no Predbat to wait for, so its check finishes before the reply and the card shows the outcome at once.
         if (state.Demo) await watch;
         return made;
     }
 
-    Task Watch(string investigationId, string changeId, DateTimeOffset writtenAt)
+    Task Watch(string investigationId, string changeId, DateTimeOffset writtenAt, ReloadContext edit)
     {
         lock (gate)
         {
             if (!watching.Add(changeId)) return Task.CompletedTask;
             watches.RemoveAll(t => t.IsCompleted);
-            var task = Task.Run(() => WatchAsync(investigationId, changeId, writtenAt));
+            var task = Task.Run(() => WatchAsync(investigationId, changeId, writtenAt, edit));
             watches.Add(task);
             return task;
         }
     }
 
-    async Task WatchAsync(string investigationId, string changeId, DateTimeOffset writtenAt)
+    async Task WatchAsync(string investigationId, string changeId, DateTimeOffset writtenAt, ReloadContext edit)
     {
         try
         {
             ReloadOutcome outcome;
-            try { outcome = await watcher.WatchAsync(writtenAt, Stopping); }
+            try { outcome = await watcher.WatchAsync(writtenAt, edit, Stopping); }
             catch (OperationCanceledException) { return; }
             catch (Exception e) { logger?.LogWarning("Reload check failed: {Type}", e.GetType().Name); outcome = new(true, false, "Joule couldn't finish checking that Predbat reloaded apps.yaml. Check Predbat if the change doesn't take effect."); }
             if (outcome.Ok)
@@ -195,17 +199,21 @@ public sealed class ConfigFileEditService(ConfigFileArchive archive, StateServic
                 At = now, Kind = SettingKind.File, Key = "file:" + file, Name = file, Before = "", After = "",
                 Title = automatic ? $"Joule put {file} back: Predbat had a problem with “{summary}”" : $"You put {file} back as it was before “{summary}”",
             });
-            change.Status = "pending"; change.AppliedAt = null;
+            // Back on your list: the edit is no longer in the file. One closed as verified by a later check is reopened too; one you
+            // dismissed stays dismissed.
+            change.AppliedAt = null;
+            if (change.Status is "applied" or "verified") { change.Status = "pending"; change.ClosedAt = null; change.ClosedReason = null; }
             ChangeEngine.Log(next, automatic ? "error" : "configuration", automatic ? $"{why} Joule put the previous {file} back." : $"You restored {file} to the copy taken before Joule's edit.");
         }, ct);
     }
 
-    /// <summary>On start: edits whose reload check was cut short by a restart are checked again from now.</summary>
+    /// <summary>On start: edits whose reload check was cut short by a restart are checked again, from the time of the edit (so a reload
+    /// Predbat already logged still counts).</summary>
     public void ResumeChecks()
     {
         foreach (var investigation in state.Read(false).Investigations)
             foreach (var change in investigation.FileChanges.Where(c => c.Edit is { Check: "checking" }))
-                Watch(investigation.Id, change.Id, DateTimeOffset.UtcNow);
+                Watch(investigation.Id, change.Id, change.Edit!.At, ReloadContext.For(change.Edit.Keys, change.Snippet));
     }
 
     static string Cut(string text, int max) => text.Length <= max ? text : text[..max] + "…";

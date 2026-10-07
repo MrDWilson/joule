@@ -297,7 +297,8 @@ public sealed class ConfigFileArchive
     {
         var mode=OperatingSystem.IsWindows()?default:File.GetUnixFileMode(destination);
         var owner=UnixOwner.Get(destination);
-        if(!ForceInPlaceWrite)
+        // A new file would lose an ACL or SELinux label the owner set on this one, so those are rewritten in place.
+        if(!ForceInPlaceWrite && !UnixOwner.HasExtendedAttributes(destination))
         {
             var temporary=destination+".joule-"+Guid.NewGuid().ToString("N")+".tmp";
             var created=false;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editOutcome, jouleEditInPlace } from "./configEdits";
+import { canRestoreJouleEdit, editOutcome, jouleEditInPlace } from "./configEdits";
 import { buildTimeline } from "./changes";
 import type { ConfigFileEdit, SettingEvent } from "../types";
 
@@ -51,6 +51,16 @@ describe("apps.yaml edits Joule makes", () => {
     expect(jouleEditInPlace({ edit: edit("restored") })).toBe(false);
     expect(jouleEditInPlace({ edit: edit("attention") })).toBe(false);
     expect(jouleEditInPlace({ edit: null })).toBe(false);
+  });
+
+  it("keeps Restore on an edit a later check closed as verified, while it is still in the file", () => {
+    expect(canRestoreJouleEdit({ status: "applied", edit: edit("checking") })).toBe(true);
+    expect(canRestoreJouleEdit({ status: "verified", edit: edit("confirmed") })).toBe(true);
+    expect(canRestoreJouleEdit({ status: "verified", edit: edit("unconfirmed") })).toBe(true);
+    expect(canRestoreJouleEdit({ status: "dismissed", edit: edit("confirmed") })).toBe(true);
+    expect(canRestoreJouleEdit({ status: "verified", edit: null })).toBe(false);
+    expect(canRestoreJouleEdit({ status: "pending", edit: edit("restored") })).toBe(false);
+    expect(canRestoreJouleEdit({ status: "pending", edit: edit("rolled_back") })).toBe(false);
   });
 
   it("shows file edits in the Changes timeline as Joule's, with the settings they touched", () => {

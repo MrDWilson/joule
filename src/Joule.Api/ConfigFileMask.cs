@@ -195,7 +195,13 @@ public static class ConfigFileMask
     static string Comment(string comment)
     {
         var text = PredbatMcpSafety.CleanText(comment, []);
-        return Regex.Replace(text, @"(?<![\w.])(?=[A-Za-z0-9+/=\-]*\d)(?=[A-Za-z0-9+/=\-]*[A-Za-z])[A-Za-z0-9+/=\-]{32,}", Hidden, RegexOptions.None, RegexBudget);
+        text = Regex.Replace(text, @"(?<![\w.])(?=[A-Za-z0-9+/=\-]*\d)(?=[A-Za-z0-9+/=\-]*[A-Za-z])[A-Za-z0-9+/=\-]{32,}", Hidden, RegexOptions.None, RegexBudget);
+        // A short credential noted in a comment ("# api key abc123", "# password: hunter22"): after a word like key, token or password,
+        // hide each word with a digit in it or 16 or more characters long. Ordinary words and !secret references stay.
+        var word = Regex.Match(text, @"\b(api[ _-]?key|key|token|password|passwd|pass(word)?|secret|pin|auth\w*|bearer)\b", RegexOptions.IgnoreCase, RegexBudget);
+        if (!word.Success) return text;
+        var rest = Regex.Replace(text[(word.Index + word.Length)..], @"(?<![!\w])(?=[^\s,;]*\d|[^\s,;]{16,})[^\s,;'""]+", m => m.Value.StartsWith("secret", StringComparison.Ordinal) ? m.Value : Hidden, RegexOptions.None, RegexBudget);
+        return text[..(word.Index + word.Length)] + rest;
     }
     static string YamlValue(string key, string value, bool keepSafeValues) => ShowValue(key, value, keepSafeValues) is { Length: > 0 } shown ? shown : Hidden;
 

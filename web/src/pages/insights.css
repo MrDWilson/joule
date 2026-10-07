@@ -1893,6 +1893,7 @@ a.usage-link:hover {
   .closed-actions {
     grid-column: 2;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
   }
   .friendly-diff li {

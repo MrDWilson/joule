@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openPage } from "./support/navigation";
+import { fetchFresh, fulfillRewritten } from "./support/routes";
 
 /*
  * "Apply for me": the demo keeps a sample apps.yaml in its own folder, so the AI's file edit can be reviewed as a real diff,
@@ -85,6 +86,47 @@ test("an apps.yaml edit is reviewed as a real diff, applied with a copy kept, re
   await openPage(page, "Suggestions");
   await page.getByRole("article", { name: TITLE }).getByRole("button", { name: "Review and apply" }).click();
   await expect(page.getByRole("dialog").getByRole("button", { name: "Apply to apps.yaml" })).toBeEnabled();
+});
+
+test("an edit a later check closed as verified can still be put back from Closed", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await open(page, "#/insights/suggestions");
+  const card = page.getByRole("article", { name: TITLE });
+  await card.getByRole("button", { name: "Review and apply" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Apply to apps.yaml" }).click();
+  await expect(card).toContainText("File edit · Joule applied this");
+
+  // What the next AI check does to an edit it sees working: close it as verified (shown here without running a check).
+  await page.route("**/api/state", async (route) => {
+    const response = await fetchFresh(route);
+    const payload = await response.json();
+    for (const investigation of payload.state.investigations)
+      for (const change of investigation.fileChanges ?? [])
+        if (change.edit && change.status === "applied")
+          Object.assign(change, {
+            status: "verified",
+            closedAt: new Date().toISOString(),
+            closedReason: "Verified by the 14:00 check",
+          });
+    await fulfillRewritten(route, response, payload);
+  });
+  await page.goto("/#/insights/suggestions?view=closed");
+  await page.reload();
+  const row = page.locator("li.closed-row").filter({ hasText: "Add export_today" });
+  await expect(row).toContainText("Checked: it took effect");
+  await expect(row.getByRole("button", { name: "Reopen" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await row.getByRole("button", { name: "Restore previous version" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "apps.yaml is back as it was before Joule's edit." }),
+  ).toBeVisible();
+
+  // Back on your list, ready to apply again.
+  await page.goto("/#/insights/suggestions");
+  const back = page.getByRole("article", { name: TITLE });
+  await expect(back).toContainText("File edit · Waiting for you");
+  await expect(back.getByRole("button", { name: "Review and apply" })).toBeVisible();
 });
 
 test("an edit Joule can't place safely says why and offers the snippet instead", async ({ page, context }) => {

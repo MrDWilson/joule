@@ -16,6 +16,8 @@ static class UnixOwner
     static extern int Stat([MarshalAs(UnmanagedType.LPUTF8Str)] string path, byte[] buffer);
     [DllImport("libc", EntryPoint = "chown", SetLastError = true)]
     static extern int Chown([MarshalAs(UnmanagedType.LPUTF8Str)] string path, uint uid, uint gid);
+    [DllImport("libc", EntryPoint = "listxattr", SetLastError = true)]
+    static extern nint ListXattr([MarshalAs(UnmanagedType.LPUTF8Str)] string path, nint list, nuint size);
     [DllImport("libc", EntryPoint = "geteuid")]
     static extern uint GetEuid();
 
@@ -43,6 +45,15 @@ static class UnixOwner
     {
         if (Offsets() is null) return false;
         try { return Chown(path, uid, gid) == 0; }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { return false; }
+    }
+
+    /// <summary>True when the file carries extended attributes on Linux (a POSIX ACL such as "setfacl -m u:1654:rw", or an SELinux
+    /// label). Replacing the file with a new one would drop them, so Joule rewrites it in place instead.</summary>
+    public static bool HasExtendedAttributes(string path)
+    {
+        if (!OperatingSystem.IsLinux()) return false;
+        try { return ListXattr(path, 0, 0) > 0; }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { return false; }
     }
 

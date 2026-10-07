@@ -48,7 +48,11 @@ while (true)
     builder.Services.AddSingleton(sp => new AiModelClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("ai"), sp.GetRequiredService<ChatGptAuth>(), builder.Configuration, sp.GetRequiredService<ILogger<AiModelClient>>()));
     builder.Services.AddSingleton<AnalysisService>(); builder.Services.AddSingleton<RecommendationReplyService>(); builder.Services.AddSingleton<ExperimentEvaluator>();
     builder.Services.AddSingleton<InvestigationScheduler>();
-    builder.Services.AddSingleton<IPredbatReloadWatcher>(sp => demo ? new DemoReloadWatcher() : new PredbatReloadWatcher(sp.GetRequiredService<IHttpClientFactory>(), builder.Configuration, () => sp.GetRequiredService<AnalysisService>().Zone, sp.GetService<IPredbatMcpClient>()));
+    builder.Services.AddSingleton<IPredbatReloadWatcher>(sp => demo ? new DemoReloadWatcher() : new PredbatReloadWatcher(sp.GetRequiredService<IHttpClientFactory>(), builder.Configuration, () => sp.GetRequiredService<AnalysisService>().Zone, sp.GetService<IPredbatMcpClient>())
+    {
+        // ConfigFiles__ReloadWaitSeconds: how long Predbat may take to start again after an edit before Joule puts the file back (slow hosts).
+        ComeBackWindow = TimeSpan.FromSeconds(Math.Clamp(int.TryParse(builder.Configuration["ConfigFiles:ReloadWaitSeconds"], out var wait) ? wait : 180, 30, 1800)),
+    });
     builder.Services.AddSingleton(sp => new ConfigFileEditService(sp.GetRequiredService<ConfigFileArchive>(), sp.GetRequiredService<StateService>(), builder.Configuration, sp.GetRequiredService<IPredbatReloadWatcher>(), sp.GetRequiredService<ILogger<ConfigFileEditService>>()));
     builder.Services.AddSingleton<DocumentationService>();
     builder.Services.AddSingleton<ReportService>();

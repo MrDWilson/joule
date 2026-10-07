@@ -12,7 +12,7 @@ import { closedStatus, isOpenFileChange } from "../lib/insights";
 import { dayTime } from "../lib/time";
 import { plainText } from "../lib/sanitize";
 import { ConfigEditReviewDialog } from "./ConfigEditReview";
-import { editOutcome, jouleEditInPlace, restorePath, useConfigEditStatus } from "../lib/configEdits";
+import { canRestoreJouleEdit, editOutcome, restorePath, useConfigEditStatus } from "../lib/configEdits";
 
 export const isOpenConfigFileChange = isOpenFileChange;
 
@@ -150,8 +150,8 @@ export function ConfigFileChangeCard({
   const appsFile = isAppsFile(change.file);
   // Joule can make the edit itself: the file is mounted, editing is switched on, and the edit is waiting for you.
   const offerApply = open && change.status === "pending" && appsFile && !!editStatus?.canApply;
-  // Joule's edit is still in the file, so its copy of the previous file can go back.
-  const inPlace = open && change.status === "applied" && jouleEditInPlace(change);
+  // Joule's edit is still in the file, so its copy of the previous file can go back (also once a later check verified it).
+  const inPlace = canRestoreJouleEdit(change);
   const outcome = change.edit ? editOutcome(change.edit, change.file || "apps.yaml", dayTime(change.edit.at)) : null;
   const copy = async () => setCopied((await copyText(change.snippet)) ? "yes" : "no");
   // While Joule watches Predbat reload the file (a minute or two), refresh sooner than the usual poll to show the outcome.

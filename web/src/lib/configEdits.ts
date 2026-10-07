@@ -109,6 +109,13 @@ export const restorePath = (investigationId: string, changeId: string) => `${bas
 export const jouleEditInPlace = (change: Pick<ConfigFileChange, "edit">) =>
   !!change.edit && ["checking", "confirmed", "unconfirmed"].includes(change.edit.check);
 
+/**
+ * "Restore previous version" is offered whenever Joule's edit is still in the file, open or not: a later check closes an edit it
+ * sees working as verified, and you may still want it undone.
+ */
+export const canRestoreJouleEdit = (change: Pick<ConfigFileChange, "edit" | "status">) =>
+  change.status !== "pending" && jouleEditInPlace(change);
+
 /** One plain sentence about how Predbat took Joule's edit. */
 export function editOutcome(
   edit: ConfigFileEdit,

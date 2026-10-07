@@ -37,7 +37,10 @@ public static class InsightsDecisions
     {
         var change = InvestigationFileChanges.Find(s, investigationId, changeId);
         if (InvestigationFileChanges.IsOpen(change)) throw new DomainException("This file edit is already open.");
-        change.Status = "pending"; change.AppliedAt = null; change.ClosedAt = null; change.ClosedReason = null; change.DecidedAt = null; change.DecisionNote = null;
+        // An edit Joule made that is still in the file reopens as applied (so Restore previous version stays the way to undo it).
+        var inFile = change.Edit is { Check: "checking" or "confirmed" or "unconfirmed" };
+        change.Status = inFile ? "applied" : "pending"; change.AppliedAt = inFile ? change.AppliedAt ?? change.Edit!.At : null;
+        change.ClosedAt = null; change.ClosedReason = null; change.DecidedAt = null; change.DecisionNote = null;
         ChangeEngine.Log(s, "decision", $"You reopened the {change.File} edit “{change.Summary}”.");
     }
 

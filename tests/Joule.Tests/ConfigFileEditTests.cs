@@ -15,7 +15,8 @@ public class ConfigFileEditTests : IDisposable
     sealed class FakeWatcher(ReloadOutcome outcome) : IPredbatReloadWatcher
     {
         public Action? During;
-        public Task<ReloadOutcome> WatchAsync(DateTimeOffset writtenAt, CancellationToken ct) { During?.Invoke(); return Task.FromResult(outcome); }
+        public ReloadContext? Seen;
+        public Task<ReloadOutcome> WatchAsync(DateTimeOffset writtenAt, ReloadContext edit, CancellationToken ct) { Seen = edit; During?.Invoke(); return Task.FromResult(outcome); }
     }
 
     static IConfiguration Settings(bool allow) => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ConfigFiles:AllowEdits"] = allow ? "true" : "false" }).Build();
@@ -259,6 +260,99 @@ public class ConfigFileEditTests : IDisposable
         var text = File.ReadAllText(AppsPath);
         Assert.Contains("  ha_key: eyJhbGciOiJIUzI1NiJ9.literal-token-value-1234567890\n  battery_rate_max_scaling: 0.8\n", text);
         Assert.DoesNotContain("sk-made-up", text);
+    }
+
+    [Fact]
+    public void ALaterCheckLeavesAnEditStillBeingCheckedOpenAndVerifiesOneThatIsDone()
+    {
+        var s = new AppState();
+        ConfigFileChange Joule(string id, string check) => new() { Id = id, Status = "applied", File = "apps.yaml", Summary = id, Location = "pred_bat", Snippet = id + ": 1", Reason = "r", AppliedAt = DateTimeOffset.UtcNow, Edit = new() { At = DateTimeOffset.UtcNow, Check = check } };
+        var older = new Investigation { Id = "older", FileChanges = [Joule("checking", "checking"), Joule("confirmed", "confirmed")] };
+        var current = new Investigation { Id = "current" };
+        s.Investigations.AddRange([older, current]);
+        InvestigationFileChanges.Reconcile(s, current, []);
+        Assert.Equal(("applied", null), (older.FileChanges[0].Status, older.FileChanges[0].ClosedAt));
+        Assert.Equal("verified", older.FileChanges[1].Status);
+    }
+
+    [Fact]
+    public async Task AVerifiedEditCanStillBeRestoredAndComesBackOnYourList()
+    {
+        var watcher = new FakeWatcher(new(true, true, "Predbat reloaded apps.yaml and logged no errors."));
+        var (state, _, edits, db) = Live(default!, watcher: watcher);
+        using var _ = db;
+        var ids = await Suggest(state, "pred_bat, after import_today", "  export_today:\n    - sensor.export_today");
+        await edits.ApplyAsync(ids.Investigation, ids.Change, edits.Review(ids.Investigation, ids.Change).Hash);
+        await edits.Watching;
+        // The watcher is told what the edit touched, to tie Predbat's errors to it.
+        Assert.Equal(["export_today"], watcher.Seen!.Keys);
+        Assert.Equal(["sensor.export_today"], watcher.Seen.Terms);
+
+        // The next check closes it as verified.
+        await state.MutateAsync(s => { var later = new Investigation { Id = "later" }; s.Investigations.Add(later); InvestigationFileChanges.Reconcile(s, later, []); });
+        var change = Change(state, ids);
+        Assert.Equal(("verified", "confirmed"), (change.Status, change.Edit!.Check));
+        Assert.NotNull(change.ClosedReason);
+
+        // Reopening it while it is still in the file brings it back as applied, so Restore stays the way to undo it.
+        await state.MutateAsync(s => InsightsDecisions.ReopenFileChange(s, ids.Investigation, ids.Change));
+        Assert.Equal("applied", Change(state, ids).Status);
+        await state.MutateAsync(s => { var later = new Investigation { Id = "later2" }; s.Investigations.Add(later); InvestigationFileChanges.Reconcile(s, later, []); });
+        Assert.Equal("verified", Change(state, ids).Status);
+
+        await edits.RestoreAsync(ids.Investigation, ids.Change);
+        Assert.Equal(LiveApps, File.ReadAllText(AppsPath));
+        change = Change(state, ids);
+        Assert.Equal(("pending", "restored", null, null), (change.Status, change.Edit!.Check, change.ClosedAt, change.ClosedReason));
+    }
+
+    [Fact]
+    public async Task AnAutomaticRollbackReopensTheEditFully()
+    {
+        var watcher = new FakeWatcher(new(false, true, "Predbat stopped to reload apps.yaml and hadn't started again 3 minutes later."));
+        var (state, _, edits, db) = Live(default!, watcher: watcher);
+        using var _ = db;
+        var ids = await Suggest(state, "pred_bat", "  battery_rate_max_scaling: 0.7", "  battery_rate_max_scaling: 1.0");
+        // However it came to be closed while Predbat was being watched, putting the file back reopens it with no leftover reason.
+        watcher.During = () => state.MutateAsync(s =>
+        {
+            var c = s.Investigations.Single(i => i.Id == ids.Investigation).FileChanges.Single();
+            c.Status = "verified"; c.ClosedAt = DateTimeOffset.UtcNow; c.ClosedReason = "Verified by the 14:00 check";
+        }).GetAwaiter().GetResult();
+        await edits.ApplyAsync(ids.Investigation, ids.Change, edits.Review(ids.Investigation, ids.Change).Hash);
+        await edits.Watching;
+        Assert.Equal(LiveApps, File.ReadAllText(AppsPath));
+        var change = Change(state, ids);
+        Assert.Equal(("pending", "rolled_back", null, null), (change.Status, change.Edit!.Check, change.ClosedAt, change.ClosedReason));
+    }
+
+    [Fact]
+    public async Task OnlyAppsYamlIsEditedEvenWhenOtherFilesAreListed()
+    {
+        Directory.CreateDirectory(Config);
+        File.WriteAllText(AppsPath, LiveApps);
+        File.WriteAllText(Path.Combine(Config, "other.yaml"), "a: 1\n");
+        var files = new ConfigFileArchive(new() { Root = Config, ArchiveDirectory = Path.Combine(path, "archive"), AllowedFiles = ["apps.yaml", "other.yaml"] });
+        using var db = new DataStore(Path.Combine(path, "db"));
+        var state = new StateService(db, null!, false, files, Settings(true));
+        var edits = new ConfigFileEditService(files, state, Settings(true), new FakeWatcher(new(true, true, "ok")));
+        var change = new ConfigFileChange { Id = "c", File = "other.yaml", Summary = "s", Location = "top level", Snippet = "b: 2", Reason = "r" };
+        var investigation = new Investigation { Title = "t", Summary = "s", Status = "Completed", FileChanges = [change] };
+        await state.MutateAsync(s => s.Investigations.Add(investigation));
+        var refused = Assert.Throws<DomainException>(() => edits.Review(investigation.Id, "c"));
+        Assert.Contains("only edits Predbat's apps.yaml", refused.Message);
+        await Assert.ThrowsAsync<DomainException>(() => edits.ApplyAsync(investigation.Id, "c", "hash"));
+        Assert.Equal("a: 1\n", File.ReadAllText(Path.Combine(Config, "other.yaml")));
+    }
+
+    [Fact]
+    public void AShortCredentialNotedInACommentIsHiddenInTheReview()
+    {
+        var masked = ConfigFileMask.Mask("apps.yaml", "pred_bat:\n  # api key abc123, see secrets.yaml\n  # Sensors for the inverter\n  # password: hunter22\n  a: 1\n", keepSafeValues: true, keepComments: true)
+            .Select(l => l.Text).ToList();
+        Assert.Contains("  # api key •••, see secrets.yaml", masked);
+        Assert.Contains("  # Sensors for the inverter", masked);
+        Assert.DoesNotContain(masked, l => l.Contains("hunter22") || l.Contains("abc123"));
     }
 
     public void Dispose() { if (Directory.Exists(path)) Directory.Delete(path, true); }
