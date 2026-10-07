@@ -211,8 +211,8 @@ function SetupOverview() {
       status: s.lastFileVersionId ? "Copies saved" : "Not set up",
       tone: s.lastFileVersionId ? "success" : "neutral",
       detail: s.lastFileVersionId
-        ? "Copies of apps.yaml, compared setting by setting."
-        : "Optional · keep copies of apps.yaml",
+        ? "Copies of apps.yaml, compared setting by setting. Joule can also make the AI's edits to it."
+        : "Optional · keep copies of apps.yaml and let Joule make the AI's edits to it",
     },
     {
       href: "#/setup/about",

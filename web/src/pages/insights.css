@@ -141,6 +141,8 @@
 }
 .inbox {
   display: grid;
+  /* One column that can shrink: an opened row with a wide file diff scrolls inside itself instead of widening the list. */
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1891,6 +1893,7 @@ a.usage-link:hover {
   .closed-actions {
     grid-column: 2;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
   }
   .friendly-diff li {

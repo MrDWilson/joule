@@ -9,6 +9,8 @@ namespace Joule;
 public sealed record MaskedLine(string Text, string? Key, string Raw);
 /// <summary>A setting that differs between two copies of a file: added, removed or changed. Values are never included.</summary>
 public sealed record ConfigKeyChange(string Key, string Name, string Change);
+/// <summary>One line of a review diff (masked text only). Kind: " ", "-", "+" or "…" for unchanged lines left out.</summary>
+public sealed record DiffLine(string Kind, int? Old, int? New, string Text);
 
 /// <summary>
 /// Shows the shape of a YAML, JSON, TOML or INI configuration file without its contents: keys, nesting and indentation stay,
@@ -29,14 +31,14 @@ public static class ConfigFileMask
     static readonly Regex SecretValue = new("""Bearer\s+\S+|https?://[^\s"'<>]*[@?][^\s"'<>]*|\[redacted|^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9+/=\-]{32,}$|^ey[A-Za-z0-9_\-]{16,}\.""", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, RegexBudget);
 
     /// <summary>Masks a whole file; the format follows the extension (.json, .toml/.cfg/.conf, otherwise YAML).</summary>
-    public static List<MaskedLine> Mask(string path, string text, bool keepSafeValues = false)
+    public static List<MaskedLine> Mask(string path, string text, bool keepSafeValues = false, bool keepComments = false)
     {
         try
         {
             var extension = Path.GetExtension(path).ToLowerInvariant();
             if (extension == ".json") return Json(text, keepSafeValues) ?? HideAll(text);
             if (extension is ".toml" or ".cfg" or ".conf" or ".ini") return Ini(text, keepSafeValues);
-            return Yaml(text, keepSafeValues);
+            return Yaml(text, keepSafeValues, keepComments);
         }
         catch (RegexMatchTimeoutException) { return HideAll(text); }
     }
@@ -111,7 +113,7 @@ public static class ConfigFileMask
     }
 
     // ------------------------------------------------------------------ YAML
-    static List<MaskedLine> Yaml(string text, bool keepSafeValues)
+    static List<MaskedLine> Yaml(string text, bool keepSafeValues, bool keepComments = false)
     {
         var result = new List<MaskedLine>();
         var stack = new List<(int Column, string Name)>();
@@ -143,7 +145,7 @@ public static class ConfigFileMask
             }
             if (string.IsNullOrWhiteSpace(line)) { result.Add(new("", null, line)); continue; }
             var trimmed = line.Trim();
-            if (trimmed.StartsWith('#')) { result.Add(new(indent + "# " + Hidden, null, line)); continue; }
+            if (trimmed.StartsWith('#')) { result.Add(new(indent + (keepComments ? Comment(trimmed) : "# " + Hidden), null, line)); continue; }
             if (trimmed is "---" or "..." && indent.Length == 0) { stack.Clear(); result.Add(new(trimmed, null, line)); continue; }
 
             string? value; string key; string prefix; int keyColumn;
@@ -187,6 +189,19 @@ public static class ConfigFileMask
             result.Add(new(prefix + " " + (multiLine ? Hidden : YamlValue(key, value, keepSafeValues)), key, line));
         }
         return result;
+    }
+    /// <summary>A comment shown for review: anything that reads like a credential ("token: abc", a bearer value) is redacted, and a
+    /// long random-looking word (a key pasted into a comment) is hidden too.</summary>
+    static string Comment(string comment)
+    {
+        var text = PredbatMcpSafety.CleanText(comment, []);
+        text = Regex.Replace(text, @"(?<![\w.])(?=[A-Za-z0-9+/=\-]*\d)(?=[A-Za-z0-9+/=\-]*[A-Za-z])[A-Za-z0-9+/=\-]{32,}", Hidden, RegexOptions.None, RegexBudget);
+        // A short credential noted in a comment ("# api key abc123", "# password: hunter22"): after a word like key, token or password,
+        // hide each word with a digit in it or 16 or more characters long. Ordinary words and !secret references stay.
+        var word = Regex.Match(text, @"\b(api[ _-]?key|key|token|password|passwd|pass(word)?|secret|pin|auth\w*|bearer)\b", RegexOptions.IgnoreCase, RegexBudget);
+        if (!word.Success) return text;
+        var rest = Regex.Replace(text[(word.Index + word.Length)..], @"(?<![!\w])(?=[^\s,;]*\d|[^\s,;]{16,})[^\s,;'""]+", m => m.Value.StartsWith("secret", StringComparison.Ordinal) ? m.Value : Hidden, RegexOptions.None, RegexBudget);
+        return text[..(word.Index + word.Length)] + rest;
     }
     static string YamlValue(string key, string value, bool keepSafeValues) => ShowValue(key, value, keepSafeValues) is { Length: > 0 } shown ? shown : Hidden;
 
@@ -312,6 +327,34 @@ public static class ConfigFileMask
     {
         var (keepBefore, keepAfter) = Common(before.Select(x => x.Raw).ToArray(), after.Select(x => x.Raw).ToArray());
         return (string.Join('\n', before.Select((l, i) => (keepBefore[i] ? "  " : "- ") + l.Text)), string.Join('\n', after.Select((l, i) => (keepAfter[i] ? "  " : "+ ") + l.Text)));
+    }
+
+    /// <summary>
+    /// The lines that differ between two masked copies with up to <paramref name="context"/> unchanged lines around each change, like a
+    /// unified diff. Kind is " " (unchanged), "-" (removed), "+" (added) or "…" (unchanged lines left out). Line numbers are 1-based.
+    /// </summary>
+    public static List<DiffLine> Hunks(IReadOnlyList<MaskedLine> before, IReadOnlyList<MaskedLine> after, int context = 3, int maxLines = 400)
+    {
+        var (keepA, keepB) = Common(before.Select(x => x.Raw).ToArray(), after.Select(x => x.Raw).ToArray());
+        var ops = new List<DiffLine>();
+        for (int i = 0, j = 0; i < before.Count || j < after.Count;)
+        {
+            if (i < before.Count && !keepA[i]) { ops.Add(new("-", i + 1, null, before[i].Text)); i++; }
+            else if (j < after.Count && !keepB[j]) { ops.Add(new("+", null, j + 1, after[j].Text)); j++; }
+            else if (i < before.Count && j < after.Count) { ops.Add(new(" ", i + 1, j + 1, after[j].Text)); i++; j++; }
+            else break;
+        }
+        var changed = ops.Select((o, index) => (o, index)).Where(x => x.o.Kind != " ").Select(x => x.index).ToList();
+        var result = new List<DiffLine>();
+        var shownUpTo = -1;
+        for (var index = 0; index < ops.Count && result.Count < maxLines; index++)
+        {
+            if (!changed.Any(c => Math.Abs(c - index) <= context)) continue;
+            if (index > shownUpTo + 1) result.Add(new("…", null, null, ""));
+            result.Add(ops[index]); shownUpTo = index;
+        }
+        if (shownUpTo >= 0 && shownUpTo < ops.Count - 1) result.Add(new("…", null, null, ""));
+        return result;
     }
 
     static (bool[] A, bool[] B) Common(string[] a, string[] b)

@@ -50,7 +50,10 @@ public static class InsightsDecisions
         foreach (var i in s.Investigations)
             foreach (var twin in i.FileChanges.Where(x => ReferenceEquals(x, change) || (!InvestigationFileChanges.IsOpen(x) && closedAt != null && x.ClosedAt == closedAt && x.ClosedReason == reason && InvestigationFileChanges.SameChange(x, change))))
             {
-                twin.Status = "pending"; twin.AppliedAt = null; twin.ClosedAt = null; twin.ClosedReason = null; twin.DecidedAt = null; twin.DecisionNote = null;
+                // An edit Joule made that is still in the file reopens as applied (so Restore previous version stays the way to undo it).
+                var inFile = twin.Edit is { Check: "checking" or "confirmed" or "unconfirmed" };
+                twin.Status = inFile ? "applied" : "pending"; twin.AppliedAt = inFile ? twin.AppliedAt ?? twin.Edit!.At : null;
+                twin.ClosedAt = null; twin.ClosedReason = null; twin.DecidedAt = null; twin.DecisionNote = null;
                 RecommendationDecisions.ReopenResolvedFinding(s, i.Id);
             }
         ChangeEngine.Log(s, "decision", $"You reopened the {change.File} edit “{change.Summary}”.");
@@ -61,6 +64,8 @@ public static class InsightsDecisions
     {
         var change = InvestigationFileChanges.Find(s, investigationId, changeId);
         if (change.Status != "applied") throw new DomainException("This file edit isn't marked as applied.");
+        if (change.Edit is { Check: not ("restored" or "rolled_back") })
+            throw new DomainException("Joule made this edit in the file. Use Restore previous version to undo it.");
         change.Status = "pending"; change.AppliedAt = null;
         ChangeEngine.Log(s, "decision", $"You took back “applied” on the {change.File} edit “{change.Summary}”.");
     }

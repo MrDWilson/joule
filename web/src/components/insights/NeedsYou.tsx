@@ -219,7 +219,7 @@ export function NeedsYou({ limit, closedCount = 0 }: { limit?: number; closedCou
       {confirming > 0 && (
         <p className="inbox-confirming">
           <a className="text-link" href="#/insights/suggestions">
-            {confirming === 1 ? "1 file edit you made" : `${confirming} file edits you made`}
+            {confirming === 1 ? "1 applied file edit" : `${confirming} applied file edits`}
           </a>{" "}
           · Joule confirms {confirming === 1 ? "it" : "them"} at the next check
         </p>

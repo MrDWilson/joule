@@ -62,14 +62,16 @@ public sealed class ConfigFileArchive
             if(archive==root || archive.StartsWith(root+Path.DirectorySeparatorChar,StringComparison.Ordinal)) throw new DomainException("Archive storage must be outside the mounted configuration root.",400);
             if(options.DemoRuntimeMirror)
             {
-                if(options.AllowedFiles.Length!=1 || options.AllowedFiles[0]!="runtime-settings.json")throw new DomainException("Demo mirror requires only runtime-settings.json.",400);
+                // The demo mirrors its runtime settings, and may keep a sample apps.yaml so "Apply for me" can be tried safely.
+                if(options.AllowedFiles.Length is <1 or >2 || options.AllowedFiles[0]!="runtime-settings.json" || options.AllowedFiles.Skip(1).Any(f=>f!=DemoAppsFile))throw new DomainException("Demo mirror requires runtime-settings.json (and optionally apps.yaml) only.",400);
                 Directory.CreateDirectory(root!);CheckNoLinks(root!);
-                if(Directory.EnumerateFileSystemEntries(root!).Any(p=>Path.GetFileName(p) is not ("runtime-settings.json" or DataFiles.DemoMarker or DataFiles.LegacyDemoMarker)))throw new DomainException("Demo mirror root must be a dedicated owned demo directory.",400);
+                if(Directory.EnumerateFileSystemEntries(root!).Any(p=>!DemoEntry(Path.GetFileName(p))))throw new DomainException("Demo mirror root must be a dedicated owned demo directory.",400);
                 var marker=Path.Combine(root!,DataFiles.DemoMarker);CheckNoLinks(marker);
                 var legacyMarker=Path.Combine(root!,DataFiles.LegacyDemoMarker);CheckNoLinks(legacyMarker);
                 // A demo folder from before the rename carries the old marker: rename it once, or keep it if that fails.
                 if(!File.Exists(marker) && File.Exists(legacyMarker)){ try{File.Move(legacyMarker,marker);} catch(Exception e) when(e is IOException or UnauthorizedAccessException){} }
                 if(!File.Exists(marker) && !File.Exists(legacyMarker))WriteProtected(marker,Encoding.UTF8.GetBytes("Joule owned demo configuration directory\n"));
+                if(options.AllowedFiles.Contains(DemoAppsFile) && !File.Exists(Path.Combine(root!,DemoAppsFile)))WriteProtected(Path.Combine(root!,DemoAppsFile),Encoding.UTF8.GetBytes(DemoData.AppsYaml));
             }
             Directory.CreateDirectory(archive); ProtectDirectory(archive);
             quarantined=ReadJournals().Any(x=>x.Status is "pending" or "partial" or "uncertain" or "awaiting_state");
@@ -208,6 +210,130 @@ public sealed class ConfigFileArchive
             try{WriteProtected(tmp,bytes);CheckNoLinks(destination);File.Move(tmp,destination,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}
         }
     }
+    public const string DemoAppsFile="apps.yaml";
+    /// <summary>What the demo's own directory may hold: its files, the ownership marker and an interrupted write's temporary file.</summary>
+    static bool DemoEntry(string name)=>name is "runtime-settings.json" or DemoAppsFile or DataFiles.DemoMarker or DataFiles.LegacyDemoMarker || Regex.IsMatch(name,@"^(runtime-settings\.json|apps\.yaml)\.(joule-)?[a-f0-9]{32}\.tmp$");
+    /// <summary>Demo reset: the sample apps.yaml goes back to how it started (the next capture records it).</summary>
+    public void ResetDemoAppsYaml()
+    {
+        lock(gate)
+        {
+            if(!options.DemoRuntimeMirror || !options.AllowedFiles.Contains(DemoAppsFile))return;
+            RequireEnabled();if(quarantined)throw new DomainException("Reconcile the demo file restore first.");
+            var destination=Resolve(DemoAppsFile);var tmp=destination+"."+Guid.NewGuid().ToString("N")+".tmp";
+            try{WriteProtected(tmp,Encoding.UTF8.GetBytes(DemoData.AppsYaml));CheckNoLinks(destination);File.Move(tmp,destination,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}
+        }
+    }
+
+    // ------------------------------------------------------------------ edits Joule makes itself (apps.yaml "Apply for me")
+
+    /// <summary>The current text of one allowed file and its hash. Server-side only: callers mask it before it leaves the service.</summary>
+    public (string Text, string Hash) ReadText(string file)
+    {
+        lock(gate){RequireEnabled();var current=ReadOne(file);return (new UTF8Encoding(false,true).GetString(current.Bytes),current.File.Hash);}
+    }
+    /// <summary>One file's exact bytes as stored in a version (for putting a snapshot back). Never sent to the browser.</summary>
+    public byte[] ReadVersionFile(string id,string file)
+    {
+        lock(gate){RequireEnabled();var version=ReadVersion(id);var index=version.Files.FindIndex(x=>x.Path==file);if(index<0)throw new DomainException("File is not in this version.",404);return ReadArchived(version,index);}
+    }
+    public bool Allows(string file)=>Enabled && options.AllowedFiles.Contains(file,StringComparer.Ordinal);
+    /// <summary>Whether Joule's process may change the file: it can open it for writing (the folder needn't be writable, see <see cref="ReplaceFile"/>).</summary>
+    public bool CanWrite(string file)
+    {
+        lock(gate)
+        {
+            if(!Allows(file))return false;
+            try{var path=Resolve(file);if(!File.Exists(path))return false;using var _=new FileStream(path,FileMode.Open,FileAccess.Write,FileShare.ReadWrite);return true;}
+            catch(Exception e) when (e is UnauthorizedAccessException or IOException or DomainException){return false;}
+        }
+    }
+    /// <summary>Test hook: always rewrite in place instead of writing a temporary file and renaming it.</summary>
+    public bool ForceInPlaceWrite { get; set; }
+
+    /// <summary>
+    /// Replaces one allowed file with new contents: first a snapshot of the exact current bytes (the "before" version), then a durable
+    /// journal, then an atomic write (a temporary file in the same folder renamed over the original, with the original's permissions and
+    /// owner), then a re-read that confirms the bytes and a new "after" version. When the owner can't be kept (Joule runs as a different
+    /// user) or the folder isn't writable, the file is rewritten in place instead, which keeps owner, permissions and links exactly.
+    /// <paramref name="expectedHash"/> is the file the person reviewed: anything else is refused before a byte is written.
+    /// </summary>
+    public FileReplaceResult ReplaceFile(string file,byte[] bytes,string expectedHash,int revision,string reason,string beforeReason)
+    {
+        lock(gate)
+        {
+            RequireEnabled(); if(quarantined)throw new DomainException("A file operation needs reviewing in Files before Joule changes files again.");
+            if(reason==null || reason.Length>4000 || beforeReason.Length>4000)throw new DomainException("Archive reason is too long.",400);
+            if(bytes.Length>options.MaxFileBytes)throw new DomainException("The edited file would exceed the archive size limit.",400);
+            ValidateText(bytes);
+            var current=ReadOne(file);
+            if(current.File.Hash!=expectedHash)throw new DomainException($"{file} has changed since you reviewed this edit. Review it again.");
+            var before=Capture(revision,beforeReason,onlyIfChanged:true);
+            if(before.Files.FirstOrDefault(x=>x.Path==file)?.Hash!=expectedHash)throw new DomainException($"{file} changed while Joule was saving a copy. Review it again.");
+            var journal=new FileRestoreJournal{TargetVersion="",BeforeVersion=before.Id,Notes=reason};
+            WriteJournal(journal); // Durable before the mounted file is touched.
+            var destination=Resolve(file); var written=false;
+            try
+            {
+                written=WriteFile(destination,file,bytes,expectedHash);
+                var after=ReadCurrent();
+                if(after.First(x=>x.File.Path==file).File.Hash!=Hash(bytes))throw new DomainException($"{file} didn't read back as written.");
+                var version=WriteVersion(revision,reason,after,null);
+                journal.CompletedFiles.Add(file); journal.CreatedVersion=version.Id; journal.Status="verified"; WriteJournal(journal);
+                return new(before,version,expectedHash,Hash(bytes));
+            }
+            catch
+            {
+                // Nothing reached the file: close the journal without quarantine. Otherwise the outcome needs a person to look.
+                var unchanged=false; try{unchanged=ReadOne(file).File.Hash==expectedHash;}catch{}
+                if(unchanged && !written){journal.Status="rejected";}
+                else{quarantined=true;journal.Status="uncertain";}
+                try{WriteJournal(journal);}catch{quarantined=true;}
+                throw;
+            }
+        }
+    }
+
+    /// <summary>Returns true once the destination has been replaced.</summary>
+    bool WriteFile(string destination,string file,byte[] bytes,string expectedHash)
+    {
+        var mode=OperatingSystem.IsWindows()?default:File.GetUnixFileMode(destination);
+        var owner=UnixOwner.Get(destination);
+        // A new file would lose an ACL or SELinux label the owner set on this one, so those are rewritten in place.
+        if(!ForceInPlaceWrite && !UnixOwner.HasExtendedAttributes(destination))
+        {
+            var temporary=destination+".joule-"+Guid.NewGuid().ToString("N")+".tmp";
+            var created=false;
+            try
+            {
+                try{WriteProtected(temporary,bytes);created=true;}
+                catch(Exception e) when (e is UnauthorizedAccessException or IOException){/* Folder not writable: rewrite in place below. */}
+                if(created && (OperatingSystem.IsWindows() || KeepOwnerAndMode(temporary,mode,owner)))
+                {
+                    if(ReadOne(file).File.Hash!=expectedHash)throw new DomainException($"{file} changed just before Joule saved it. Nothing was changed.");
+                    CheckNoLinks(destination); File.Move(temporary,destination,true); return true;
+                }
+            }
+            finally{if(File.Exists(temporary))File.Delete(temporary);}
+        }
+        // In place: the same file (owner, permissions, links) with new contents. The journal and snapshot cover an interruption.
+        if(ReadOne(file).File.Hash!=expectedHash)throw new DomainException($"{file} changed just before Joule saved it. Nothing was changed.");
+        CheckNoLinks(destination);
+        using(var stream=new FileStream(destination,new FileStreamOptions{Mode=FileMode.Open,Access=FileAccess.Write,Share=FileShare.None,Options=FileOptions.WriteThrough}))
+        {
+            stream.SetLength(0);stream.Write(bytes);stream.Flush(true);
+        }
+        return true;
+    }
+    static bool KeepOwnerAndMode(string temporary,UnixFileMode mode,(uint Uid,uint Gid)? owner)
+    {
+        // Owner unknown on this platform, or it can't be kept (Joule runs as another user): rewrite in place instead.
+        if(owner is not { } o || UnixOwner.Get(temporary) is not { } mine)return false;
+        if(mine!=o && !UnixOwner.Set(temporary,o.Uid,o.Gid))return false;
+        if(!OperatingSystem.IsWindows())File.SetUnixFileMode(temporary,mode);
+        return true;
+    }
+
     public void Quarantine(string reason)
     {
         lock(gate){RequireEnabled();quarantined=true;WriteJournal(new FileRestoreJournal{Status="uncertain",Notes=reason,BeforeVersion=List().LastOrDefault()?.Id??""});}

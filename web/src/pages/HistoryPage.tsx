@@ -5,6 +5,7 @@ import {
   Camera,
   Check,
   Download,
+  FilePen,
   FlaskConical,
   Hand,
   History as HistoryIcon,
@@ -44,6 +45,7 @@ const ICONS: Record<ChangeIcon, LucideIcon> = {
   override: Hand,
   control: Power,
   list: ListPlus,
+  file: FilePen,
 };
 const TONES: Partial<Record<ChangeIcon, string>> = {
   software: "info",
@@ -52,6 +54,7 @@ const TONES: Partial<Record<ChangeIcon, string>> = {
   approved: "accent",
   you: "accent",
   auto: "accent",
+  file: "accent",
 };
 
 interface Pending {

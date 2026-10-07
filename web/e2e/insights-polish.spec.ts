@@ -31,6 +31,23 @@ const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOSt
 test("a file edit with a hidden credential never offers broken YAML to copy, and a replacement says Replace", async ({
   page,
 }) => {
+  // An install where Joule may not edit apps.yaml, so the edit is made by hand (config-edits.spec.ts covers "Apply for me").
+  await page.route("**/api/config-edits/status", (route) =>
+    route.fulfill({
+      json: {
+        demo: false,
+        configured: false,
+        file: null,
+        writable: false,
+        allowed: false,
+        allowedSource: null,
+        quarantined: false,
+        canApply: false,
+        reason: "Joule can't see Predbat's apps.yaml.",
+        root: null,
+      },
+    }),
+  );
   await rewriteState(page, (p) => {
     const change = exportCheck(p).fileChanges[0];
     Object.assign(change, {

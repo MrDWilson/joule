@@ -31,7 +31,7 @@ while (true)
         Root = demo ? Path.Combine(dataDirectory, "demo-config") : builder.Configuration["ConfigFiles:Root"],
         DemoRuntimeMirror = demo,
         ArchiveDirectory = Path.Combine(dataDirectory, demo ? "demo-config-archive" : "config-archive"),
-        AllowedFiles = demo ? ["runtime-settings.json"] : (builder.Configuration.GetSection("ConfigFiles:AllowedFiles").Get<string[]>() ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+        AllowedFiles = demo ? ["runtime-settings.json", ConfigFileArchive.DemoAppsFile] : (builder.Configuration.GetSection("ConfigFiles:AllowedFiles").Get<string[]>() ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
     };
     builder.Services.AddSingleton(new ConfigFileArchive(fileOptions));
     builder.Services.AddHttpClient("predbat", c => c.Timeout = TimeSpan.FromSeconds(25)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
@@ -49,6 +49,12 @@ while (true)
     builder.Services.AddSingleton(sp => new AiModelClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("ai"), sp.GetRequiredService<ChatGptAuth>(), builder.Configuration, sp.GetRequiredService<ILogger<AiModelClient>>()));
     builder.Services.AddSingleton<AnalysisService>(); builder.Services.AddSingleton<RecommendationReplyService>(); builder.Services.AddSingleton<ExperimentEvaluator>();
     builder.Services.AddSingleton<InvestigationScheduler>();
+    builder.Services.AddSingleton<IPredbatReloadWatcher>(sp => demo ? new DemoReloadWatcher() : new PredbatReloadWatcher(sp.GetRequiredService<IHttpClientFactory>(), builder.Configuration, () => sp.GetRequiredService<AnalysisService>().Zone, sp.GetService<IPredbatMcpClient>())
+    {
+        // ConfigFiles__ReloadWaitSeconds: how long Predbat may take to start again after an edit before Joule puts the file back (slow hosts).
+        ComeBackWindow = TimeSpan.FromSeconds(Math.Clamp(int.TryParse(builder.Configuration["ConfigFiles:ReloadWaitSeconds"], out var wait) ? wait : 180, 30, 1800)),
+    });
+    builder.Services.AddSingleton(sp => new ConfigFileEditService(sp.GetRequiredService<ConfigFileArchive>(), sp.GetRequiredService<StateService>(), builder.Configuration, sp.GetRequiredService<IPredbatReloadWatcher>(), sp.GetRequiredService<ILogger<ConfigFileEditService>>()));
     builder.Services.AddSingleton<DocumentationService>();
     builder.Services.AddSingleton<ReportService>();
     builder.Services.AddHostedService<ReportWorker>();
@@ -143,6 +149,7 @@ while (true)
     app.MapRecommendationReplyEndpoints();
     app.MapAiQualityEndpoints();
     app.MapInsightsEndpoints();
+    app.MapConfigFileEditEndpoints();
     app.MapHomeAssistantTelemetry();
     app.MapStorageEndpoints();
     app.MapChangeEndpoints();
@@ -154,6 +161,9 @@ while (true)
     var readMethods = new HttpMethodMetadata(["GET", "HEAD"]);
     app.MapFallback("/api/{**rest}", () => Results.NotFound(new { error = "Not found." })).WithMetadata(readMethods);
     app.MapFallbackToFile("index.html", WebSecurity.SpaFallback()).WithMetadata(readMethods);
+    var configEdits = app.Services.GetRequiredService<ConfigFileEditService>();
+    configEdits.Stopping = app.Lifetime.ApplicationStopping;
+    app.Lifetime.ApplicationStarted.Register(configEdits.ResumeChecks);
     app.Run();
     if (!JouleRestart.Consume()) return 0;
     // Setup saved new settings: build the whole app again from the updated configuration, in this same process.

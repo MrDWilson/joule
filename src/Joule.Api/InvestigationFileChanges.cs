@@ -4,9 +4,9 @@ using System.Text.RegularExpressions;
 namespace Joule;
 
 /// <summary>
-/// A reviewable edit to a Predbat configuration file (for example apps.yaml) that the user applies by hand.
-/// The app never writes these files; it shows the snippet, records whether the user applied it, and asks
-/// the next review to verify it.
+/// A reviewable edit to a Predbat configuration file (for example apps.yaml). The user copies it by hand and marks it
+/// applied, or, when the file is mounted and they've allowed it in Setup, lets Joule make it (<see cref="ConfigFileEditService"/>,
+/// which keeps a copy to restore). Either way the next review verifies it.
 /// </summary>
 public sealed class ConfigFileChange
 {
@@ -27,6 +27,33 @@ public sealed class ConfigFileChange
     public DateTimeOffset? DecidedAt { get; set; }
     List<ReplyMessage> thread = [];
     public List<ReplyMessage> Thread { get => thread; set => thread = value ?? []; }
+    /// <summary>Set when Joule made the edit itself ("Apply for me"): the snapshot it took first and how Predbat took it.</summary>
+    public ConfigFileEdit? Edit { get; set; }
+}
+
+/// <summary>
+/// An edit Joule wrote to a configuration file. SnapshotVersion holds the exact file as it was (in the file archive), so it can always
+/// be put back. Check: checking (watching Predbat reload), confirmed (Predbat reloaded without errors), unconfirmed (Predbat kept
+/// running but Joule couldn't see the reload), rolled_back (Predbat had a problem, so Joule put the file back), restored (you put it
+/// back) or attention (it couldn't be put back automatically because the file changed again).
+/// </summary>
+public sealed class ConfigFileEdit
+{
+    public DateTimeOffset At { get; set; } = DateTimeOffset.UtcNow;
+    public string SnapshotVersion { get; set; } = "";
+    public string AppliedVersion { get; set; } = "";
+    public string BeforeHash { get; set; } = "";
+    public string AfterHash { get; set; } = "";
+    public string Placement { get; set; } = "";
+    /// <summary>The settings the edit added, changed or removed, by name ("pred_bat › export_today"). Never values.</summary>
+    public List<string> Keys { get; set; } = [];
+    public string Check { get; set; } = "checking";
+    public string? CheckNote { get; set; }
+    public DateTimeOffset? CheckedAt { get; set; }
+    public DateTimeOffset? RestoredAt { get; set; }
+    public string? RestoredVersion { get; set; }
+    /// <summary>The Changes timeline event recording the edit (marked undone when the file is put back).</summary>
+    public string? EventId { get; set; }
 }
 
 public partial class Investigation
@@ -111,7 +138,8 @@ public static class InvestigationFileChanges
         }
         if (keep is null) return;
         foreach (var prior in s.Investigations.Where(i => i.Id != current.Id))
-            foreach (var change in prior.FileChanges.Where(x => IsOpen(x) && !keep.Contains(x.Id)))
+            // An edit Joule made whose reload check is still running stays open: the check may yet put the file back.
+            foreach (var change in prior.FileChanges.Where(x => IsOpen(x) && !keep.Contains(x.Id) && x.Edit is not { Check: "checking" }))
             {
                 var applied = change.Status == "applied";
                 change.Status = applied ? "verified" : "retired"; change.ClosedAt = DateTimeOffset.UtcNow;

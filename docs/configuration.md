@@ -146,6 +146,23 @@ services:
 
 The container runs as the `app` user, which needs read access (and write access if you want restores). Secrets files and symbolic links are never read. Leave `ConfigFiles__Root` empty to turn this off. A restore writes a new version; it does not reload Predbat, so Joule pauses automatic changes until you reload Predbat and confirm in Files.
 
+### Letting Joule make apps.yaml edits
+
+When a check finds that the fix is an edit to `apps.yaml` (a missing `export_today` sensor, say), the suggestion shows the lines to add. By default you copy them in yourself and press **Mark as applied**. With the file mounted as above, Joule can make the edit for you instead: switch on **Let Joule edit Predbat's config files** in Setup › Files, or set it in the environment:
+
+```yaml
+      ConfigFiles__AllowEdits: "true"
+```
+
+The suggestion then offers **Review and apply**:
+
+1. **Review.** Joule shows your real file with the edit made: the lines it adds or replaces, with a few lines either side. Values that look like passwords or keys are hidden; `!secret` references are shown as written.
+2. **Apply.** Joule saves an exact copy of the file first (it appears in Files), then writes only those lines. It refuses, saying why, when the lines an edit replaces aren't in the file exactly once, when the result wouldn't be valid YAML, or when it would change any setting the edit doesn't name (usually a wrong indent). The file keeps its comments, line endings, permissions and owner. When Joule owns the file it writes a temporary file beside it and renames it over the original; otherwise (and always when the file has an ACL such as the `setfacl` grant below) it rewrites the file in place, so it stays the same file. If Predbat's own container mounts `apps.yaml` as a single file rather than its folder, a renamed file isn't seen there: mount the folder, or let Joule write in place by not giving it ownership of the file.
+3. **Watch Predbat.** Predbat notices a changed `apps.yaml` within seconds, stops (its log shows `Stopping Predbat`) and is started again with the new file by its add-on or container. Joule watches for that (in Predbat's log through MCP, or Predbat going away and coming back), waits for it to answer, then reads the errors logged since the edit.
+4. **Put it back.** If Predbat doesn't come back within three minutes (`ConfigFiles__ReloadWaitSeconds`, default 180, for slow hosts), or logs a new error about the edit, Joule puts the copy back by itself and says why. An error counts as about the edit when it mentions `apps.yaml`, a setting the edit changed, or an entity or value it wrote, or is a new Python traceback; errors Predbat was already logging in the hours before the edit (a cloud service timing out, say) are ignored. **Restore previous version** on the suggestion puts it back whenever you like, as long as the file hasn't changed again since (otherwise choose a copy in Files).
+
+Every edit and restore appears in Setup › Changes. The file's contents are never sent to the AI. Joule's container runs as user 1654, so it needs write access to `apps.yaml`; for example `sudo setfacl -m u:1654:rw ./predbat/config/apps.yaml` on the host, and no `:ro` on the volume.
+
 ## Data and backups
 
 Everything lives in the `/data` volume: `demo/joule.duckdb` and `live/joule.duckdb` databases (DuckDB; versions before the rename called them `predbat.duckdb`, and Joule renames them once on its first start), `settings.json` from Setup, and `auth/` for AI provider credentials. Joule keeps the newest few hundred reviews and the last 500 activity entries in its working state and moves older history into the database, so the dashboard stays quick as history grows.

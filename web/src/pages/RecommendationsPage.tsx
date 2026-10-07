@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { ArrowRight, FileCode2, FlaskConical, ListTodo, Sparkles, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, FileCode2, FlaskConical, ListTodo, RotateCcw, Sparkles, SlidersHorizontal } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { Button, ButtonLink, Chip, Disclosure, Segmented } from "../components/ui";
@@ -23,6 +23,7 @@ import {
   type ClosedItem,
 } from "../lib/insights";
 import { dayTime } from "../lib/time";
+import { canRestoreJouleEdit, restorePath } from "../lib/configEdits";
 import { buildHash, navigate } from "../lib/router";
 import { plainText } from "../lib/sanitize";
 import { closePaths } from "../lib/closing";
@@ -179,6 +180,11 @@ function ClosedRow({ item }: { item: ClosedItem }) {
     reopen = `/investigations/${encodeURIComponent(item.investigation.id)}/followups/${encodeURIComponent(item.step.id)}/reopen`;
   if (item.kind === "finding") reopen = closePaths("finding", item.investigation.id).reopen;
   const investigationId = item.kind === "proposal" ? item.proposal.investigationId : item.investigation.id;
+  // An apps.yaml edit Joule made that a later check verified is still in the file: it can still be put back.
+  const restore =
+    item.kind === "file" && canRestoreJouleEdit(item.change)
+      ? restorePath(item.investigation.id, item.change.id)
+      : null;
   return (
     <li className="closed-row">
       <span className="inbox-icon" aria-hidden="true">
@@ -199,6 +205,17 @@ function ClosedRow({ item }: { item: ClosedItem }) {
         )}
       </div>
       <div className="closed-actions">
+        {restore && item.kind === "file" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-describedby={titleId}
+            onClick={() => void mutate(restore, {}, `${item.change.file} is back as it was before Joule's edit.`)}
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            Restore previous version
+          </Button>
+        )}
         {reopen && (
           <Button
             variant="secondary"
@@ -312,7 +329,7 @@ export default function RecommendationsPage() {
               <section aria-labelledby="confirming-heading" className="suggestions-group">
                 <h2 id="confirming-heading" className="suggestions-group-title">
                   Waiting for the next check
-                  <span>You've made these; Joule confirms they took effect.</span>
+                  <span>These are in place; the next check confirms they took effect.</span>
                 </h2>
                 <div className="suggestion-list">
                   {confirming.map((i) => (

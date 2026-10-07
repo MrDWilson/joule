@@ -1,10 +1,11 @@
 import { useContext, useEffect, useId, useState } from "react";
-import { Check, Copy, FileCode2 } from "lucide-react";
+import { Check, Copy, FileCode2, RotateCcw, Wand2 } from "lucide-react";
 import { Button } from "./ui";
 import { InvestigationText, RichText } from "./InvestigationText";
 import { RecommendationReply } from "./RecommendationReply";
 import { CloseButtons } from "./CloseActions";
 import { closePaths } from "../lib/closing";
+import { PlainText } from "./PlainText";
 import type { Api, Mutate } from "../completion-types";
 import type { ConfigFileChange, Investigation } from "../types";
 import "./ConfigFileChangeCard.css";
@@ -12,6 +13,8 @@ import { AppContext } from "../context/AppContext";
 import { closedStatus, isOpenFileChange } from "../lib/insights";
 import { dayTime } from "../lib/time";
 import { plainText } from "../lib/sanitize";
+import { ConfigEditReviewDialog } from "./ConfigEditReview";
+import { canRestoreJouleEdit, editOutcome, restorePath, useConfigEditStatus } from "../lib/configEdits";
 
 export const isOpenConfigFileChange = isOpenFileChange;
 
@@ -41,7 +44,7 @@ export const fileEditsNeedingYou = (investigations: Investigation[]) =>
 
 function statusText(change: ConfigFileChange) {
   if (change.status === "pending") return "Waiting for you";
-  if (change.status === "applied") return "You applied this";
+  if (change.status === "applied") return change.edit ? "Joule applied this" : "You applied this";
   return closedStatus("file", change.status, change.thread, change.closedReason, change.decisionNote);
 }
 
@@ -50,6 +53,8 @@ export const isRedactedSnippet = (change: Pick<ConfigFileChange, "snippet">) => 
 /** True when the edit replaces lines already in the file: it carries the old lines, or its instructions say replace. */
 export const isReplacement = (change: Pick<ConfigFileChange, "before" | "location" | "summary">) =>
   !!change.before?.trim() || /\breplac/i.test(change.location) || /\breplac/i.test(change.summary);
+/** apps.yaml (or apps.yml): the file Joule can edit for you when it's mounted. */
+const isAppsFile = (file: string) => /^apps\.ya?ml$/i.test(file);
 
 /** The edit as a diff: removed lines from `before`, then the lines to add. */
 function SnippetDiff({ change }: { change: ConfigFileChange }) {
@@ -111,8 +116,9 @@ function useVerificationNote(change: ConfigFileChange) {
 }
 
 /**
- * A change to one of Predbat's configuration files, which you make by hand: where, the exact lines, why, and how Joule
- * will confirm it. embedded drops the card frame and title for an inbox row.
+ * A change to one of Predbat's configuration files: where, the exact lines, why, and how Joule will confirm it. When Joule may
+ * edit apps.yaml (Setup › Files) it offers "Review and apply" and, once it has, "Restore previous version"; otherwise you copy the
+ * snippet and mark it applied. embedded drops the card frame and title for an inbox row.
  */
 export function ConfigFileChangeCard({
   investigation,
@@ -136,10 +142,28 @@ export function ConfigFileChangeCard({
     const timer = setTimeout(() => setCopied(""), 2500);
     return () => clearTimeout(timer);
   }, [copied]);
+  const app = useContext(AppContext);
   const verification = useVerificationNote(change);
   const open = isOpenConfigFileChange(change);
   const redacted = isRedactedSnippet(change);
   const base = `/investigations/${encodeURIComponent(investigation.id)}/filechanges/${encodeURIComponent(change.id)}`;
+  const editStatus = useConfigEditStatus();
+  const [reviewing, setReviewing] = useState(false);
+  const appsFile = isAppsFile(change.file);
+  // Joule can make the edit itself: the file is mounted, editing is switched on, and the edit is waiting for you.
+  const offerApply = open && change.status === "pending" && appsFile && !!editStatus?.canApply;
+  // Joule's edit is still in the file, so its copy of the previous file can go back (also once a later check verified it).
+  const inPlace = canRestoreJouleEdit(change);
+  const outcome = change.edit ? editOutcome(change.edit, change.file || "apps.yaml", dayTime(change.edit.at)) : null;
+  const copy = async () => setCopied((await copyText(change.snippet)) ? "yes" : "no");
+  // While Joule watches Predbat reload the file (a minute or two), refresh sooner than the usual poll to show the outcome.
+  const checking = change.edit?.check === "checking";
+  const load = app?.load;
+  useEffect(() => {
+    if (!checking || !load) return;
+    const timer = setInterval(() => void load(), 5000);
+    return () => clearInterval(timer);
+  }, [checking, load]);
   return (
     <article
       className={`config-change${embedded ? " is-embedded" : ""}${open ? "" : " is-closed"}`}
@@ -165,7 +189,7 @@ export function ConfigFileChangeCard({
         </span>
       </p>
       <SnippetDiff change={change} />
-      {redacted && open && (
+      {redacted && open && !offerApply && !change.edit && (
         <p className="config-change-hidden">
           Part of this edit was hidden for safety. Open {change.file || "apps.yaml"} and replace the values by hand.
         </p>
@@ -173,11 +197,24 @@ export function ConfigFileChangeCard({
       <div className="config-change-reason">
         <InvestigationText text={change.reason} />
       </div>
+      {outcome && (
+        <p className={`config-change-outcome tone-${outcome.tone}`} role="status">
+          <PlainText text={outcome.text} />
+        </p>
+      )}
       {open && (
         <p className="config-change-note">
-          {change.status === "applied" && change.appliedAt
+          {change.status === "applied" && change.appliedAt && !change.edit
             ? `You marked this applied ${dayTime(change.appliedAt)}. ${verification}`
             : verification}
+        </p>
+      )}
+      {open && change.status === "pending" && appsFile && editStatus && !editStatus.canApply && (
+        <p className="config-change-note">
+          Joule can make edits like this for you, keeping a copy of {change.file} it can put back.{" "}
+          <a className="text-link" href="#/setup/files">
+            How to switch it on
+          </a>
         </p>
       )}
       {!open && (change.closedAt || change.decisionNote) && (
@@ -199,12 +236,35 @@ export function ConfigFileChangeCard({
         quickReplies={change.status === "pending"}
         actionsBefore={
           <>
-            {open && !redacted && (
+            {offerApply && (
+              <Button size="sm" aria-describedby={titleId} onClick={() => setReviewing(true)}>
+                <Wand2 size={14} aria-hidden="true" />
+                Review and apply
+              </Button>
+            )}
+            {inPlace && (
               <Button
                 size="sm"
-                variant={change.status === "pending" ? "primary" : "secondary"}
+                variant="secondary"
                 aria-describedby={titleId}
-                onClick={async () => setCopied((await copyText(change.snippet)) ? "yes" : "no")}
+                onClick={() =>
+                  void mutate(
+                    restorePath(investigation.id, change.id),
+                    {},
+                    `${change.file} is back as it was before Joule's edit.`,
+                  )
+                }
+              >
+                <RotateCcw size={14} aria-hidden="true" />
+                Restore previous version
+              </Button>
+            )}
+            {open && !redacted && !inPlace && change.edit?.check !== "attention" && (
+              <Button
+                size="sm"
+                variant={change.status === "pending" && !offerApply ? "primary" : "secondary"}
+                aria-describedby={titleId}
+                onClick={() => void copy()}
               >
                 {copied === "yes" ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                 {copied === "yes" ? "Copied" : copied === "no" ? "Copy failed" : "Copy snippet"}
@@ -213,7 +273,7 @@ export function ConfigFileChangeCard({
             {change.status === "pending" && (
               <Button
                 size="sm"
-                variant={redacted ? "primary" : "secondary"}
+                variant={redacted && !offerApply ? "primary" : "secondary"}
                 aria-describedby={titleId}
                 onClick={() => void mutate(`${base}/applied`, {}, "Marked as applied. The next check confirms it.")}
               >
@@ -228,7 +288,7 @@ export function ConfigFileChangeCard({
                 describedBy={titleId}
               />
             )}
-            {change.status === "applied" && (
+            {change.status === "applied" && !change.edit && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -259,6 +319,19 @@ export function ConfigFileChangeCard({
           )
         }
       />
+      {offerApply && (
+        <ConfigEditReviewDialog
+          open={reviewing}
+          onOpenChange={setReviewing}
+          investigationId={investigation.id}
+          change={change}
+          onApplied={() => {
+            void app?.load();
+            app?.notify(`Joule made the edit to ${change.file}. Watching Predbat reload it…`);
+          }}
+          onCopy={() => void copy()}
+        />
+      )}
     </article>
   );
 }

@@ -99,7 +99,7 @@ export interface ReplyOutcome {
   /** True when closing this item left nothing open from its check, so the check closed too. */
   findingClosed?: boolean;
 }
-/** A Predbat configuration file edit the user reviews and applies by hand; the app never writes the file. */
+/** A Predbat configuration file edit the user copies by hand, or lets Joule make (with a copy it can put back). */
 export type ConfigFileChangeStatus = "pending" | "applied" | "verified" | "dismissed" | "retired";
 export interface ConfigFileChange {
   id: string;
@@ -116,6 +116,25 @@ export interface ConfigFileChange {
   decisionNote?: string | null;
   decidedAt?: string | null;
   thread?: ReplyMessage[];
+  /** Set when Joule made the edit itself. */
+  edit?: ConfigFileEdit | null;
+}
+/**
+ * An edit Joule wrote to a configuration file. check: checking (watching Predbat reload), confirmed, unconfirmed (Predbat kept running
+ * but Joule couldn't see the reload), rolled_back (Predbat had a problem, so Joule put the file back), restored (you put it back) or
+ * attention (the file changed again, so it wasn't put back automatically).
+ */
+export interface ConfigFileEdit {
+  at: string;
+  snapshotVersion: string;
+  appliedVersion: string;
+  placement: string;
+  /** Settings the edit added, changed or removed, by name ("pred_bat › export_today"). */
+  keys: string[];
+  check: "checking" | "confirmed" | "unconfirmed" | "rolled_back" | "restored" | "attention";
+  checkNote?: string | null;
+  checkedAt?: string | null;
+  restoredAt?: string | null;
 }
 export interface Proposal {
   id: string;
