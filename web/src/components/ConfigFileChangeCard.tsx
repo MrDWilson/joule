@@ -3,6 +3,8 @@ import { Check, Copy, FileCode2 } from "lucide-react";
 import { Button } from "./ui";
 import { InvestigationText, RichText } from "./InvestigationText";
 import { RecommendationReply } from "./RecommendationReply";
+import { CloseButtons } from "./CloseActions";
+import { closePaths } from "../lib/closing";
 import type { Api, Mutate } from "../completion-types";
 import type { ConfigFileChange, Investigation } from "../types";
 import "./ConfigFileChangeCard.css";
@@ -190,6 +192,7 @@ export function ConfigFileChangeCard({
         open={open}
         replyPath={`${base}/reply`}
         dismissPath={`${base}/dismiss`}
+        reopenPath={`${base}/reopen`}
         api={api}
         mutate={mutate}
         target="file"
@@ -216,6 +219,14 @@ export function ConfigFileChangeCard({
               >
                 Mark as applied
               </Button>
+            )}
+            {change.status === "pending" && (
+              <CloseButtons
+                kind="file"
+                title={plainText(change.summary)}
+                paths={closePaths("file", investigation.id, change.id)}
+                describedBy={titleId}
+              />
             )}
             {change.status === "applied" && (
               <Button

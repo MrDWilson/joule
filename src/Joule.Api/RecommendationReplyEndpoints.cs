@@ -17,12 +17,14 @@ public static class RecommendationReplyEndpoints
         app.MapPost("/api/investigations/{id}/filechanges/{changeId}/reply", (string id, string changeId, DecisionNoteRequest request, RecommendationReplyService replies, CancellationToken ct) =>
             replies.ReplyAsync(new("filechange", id, changeId), request.Note, ct));
 
+        // Each close takes an optional note and an outcome: dismissed (the default), not_needed, or done.
+        static string Outcome(DecisionNoteRequest? request) => RecommendationDecisions.Outcome(request?.Outcome);
         app.MapPost("/api/investigations/{id}/dismiss", (string id, DecisionNoteRequest? request, StateService state, IConfiguration configuration, CancellationToken ct) =>
-        { var note = Note(request, configuration); return Decide(state, s => RecommendationDecisions.DismissFinding(s, id, note), ct); });
+        { var note = Note(request, configuration); var outcome = Outcome(request); return Decide(state, s => RecommendationDecisions.DismissFinding(s, id, note, outcome), ct); });
         app.MapPost("/api/investigations/{id}/followups/{stepId}/dismiss", (string id, string stepId, DecisionNoteRequest? request, StateService state, IConfiguration configuration, CancellationToken ct) =>
-        { var note = Note(request, configuration); return Decide(state, s => RecommendationDecisions.DismissFollowUp(s, id, stepId, note), ct); });
+        { var note = Note(request, configuration); var outcome = Outcome(request); return Decide(state, s => RecommendationDecisions.DismissFollowUp(s, id, stepId, note, outcome), ct); });
         app.MapPost("/api/investigations/{id}/filechanges/{changeId}/dismiss", (string id, string changeId, DecisionNoteRequest? request, StateService state, IConfiguration configuration, CancellationToken ct) =>
-        { var note = Note(request, configuration); return Decide(state, s => RecommendationDecisions.DismissFileChange(s, id, changeId, note), ct); });
+        { var note = Note(request, configuration); var outcome = Outcome(request); return Decide(state, s => RecommendationDecisions.DismissFileChange(s, id, changeId, note, outcome), ct); });
         app.MapPost("/api/investigations/{id}/filechanges/{changeId}/applied", (string id, string changeId, StateService state, CancellationToken ct) =>
             Decide(state, s => InvestigationFileChanges.MarkApplied(s, id, changeId), ct));
     }

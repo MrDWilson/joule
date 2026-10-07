@@ -14,6 +14,7 @@ public static class InsightsDecisions
         if (p.Status != "Pending") throw new DomainException("This suggestion has already been decided.");
         p.Status = "Done"; p.DecidedAt = DateTimeOffset.UtcNow;
         ChangeEngine.Log(s, "decision", $"You made “{p.Title}” in Predbat yourself.");
+        if (s.Investigations.FirstOrDefault(i => i.Id == p.InvestigationId) is { } source) RecommendationDecisions.CloseFindingIfDone(s, source, p.DecidedAt.Value);
     }
 
     /// <summary>A suggestion you declined (or marked done) goes back on your list. It is checked against the current settings again.</summary>
@@ -21,15 +22,23 @@ public static class InsightsDecisions
     {
         var p = s.Proposals.FirstOrDefault(x => x.Id == id) ?? throw new DomainException("Suggestion not found.", 404);
         if (p.Status is not ("Denied" or "Done")) throw new DomainException(p.Status == "Pending" ? "This suggestion is already open." : "Only a declined suggestion can be reopened.");
-        p.Status = "Pending"; p.DecidedAt = null; p.DecisionNote = null;
+        p.Status = "Pending"; p.DecidedAt = null; p.DecisionNote = null; p.ClosedReason = null;
+        RecommendationDecisions.ReopenResolvedFinding(s, p.InvestigationId);
         ChangeEngine.Log(s, "decision", $"You reopened the suggestion “{p.Title}”.");
     }
 
+    /// <summary>The to-do comes back, with any copies from other checks that closed with it (they show as one item).</summary>
     public static void ReopenFollowUp(AppState s, string investigationId, string stepId)
     {
         var step = Investigation(s, investigationId).NextSteps.FirstOrDefault(x => x.Id == stepId) ?? throw new DomainException("To-do not found.", 404);
         if (step.Status == "open") throw new DomainException("This to-do is already open.");
-        step.Status = "open"; step.ClosedAt = null; step.ClosedReason = null; step.DecidedAt = null; step.DecisionNote = null;
+        var (closedAt, reason, key) = (step.ClosedAt, step.ClosedReason, RecommendationDecisions.TitleKey(step.Title));
+        foreach (var i in s.Investigations)
+            foreach (var twin in i.NextSteps.Where(x => ReferenceEquals(x, step) || (x.Status != "open" && closedAt != null && x.ClosedAt == closedAt && x.ClosedReason == reason && RecommendationDecisions.TitleKey(x.Title) == key)))
+            {
+                twin.Status = "open"; twin.ClosedAt = null; twin.ClosedReason = null; twin.DecidedAt = null; twin.DecisionNote = null;
+                RecommendationDecisions.ReopenResolvedFinding(s, i.Id);
+            }
         ChangeEngine.Log(s, "decision", $"You reopened the to-do “{step.Title}”.");
     }
 
@@ -37,7 +46,13 @@ public static class InsightsDecisions
     {
         var change = InvestigationFileChanges.Find(s, investigationId, changeId);
         if (InvestigationFileChanges.IsOpen(change)) throw new DomainException("This file edit is already open.");
-        change.Status = "pending"; change.AppliedAt = null; change.ClosedAt = null; change.ClosedReason = null; change.DecidedAt = null; change.DecisionNote = null;
+        var (closedAt, reason) = (change.ClosedAt, change.ClosedReason);
+        foreach (var i in s.Investigations)
+            foreach (var twin in i.FileChanges.Where(x => ReferenceEquals(x, change) || (!InvestigationFileChanges.IsOpen(x) && closedAt != null && x.ClosedAt == closedAt && x.ClosedReason == reason && InvestigationFileChanges.SameChange(x, change))))
+            {
+                twin.Status = "pending"; twin.AppliedAt = null; twin.ClosedAt = null; twin.ClosedReason = null; twin.DecidedAt = null; twin.DecisionNote = null;
+                RecommendationDecisions.ReopenResolvedFinding(s, i.Id);
+            }
         ChangeEngine.Log(s, "decision", $"You reopened the {change.File} edit “{change.Summary}”.");
     }
 
@@ -50,12 +65,20 @@ public static class InsightsDecisions
         ChangeEngine.Log(s, "decision", $"You took back “applied” on the {change.File} edit “{change.Summary}”.");
     }
 
-    /// <summary>Findings you dismissed come back; follow-ups and file edits closed with them stay closed (reopen those one by one).</summary>
+    /// <summary>Findings you closed come back with the to-dos, file edits and suggestions that closed with them (an undo); items you
+    /// closed one by one before that stay closed.</summary>
     public static void ReopenFinding(AppState s, string investigationId)
     {
         var investigation = Investigation(s, investigationId);
-        if (investigation.DismissedAt is null) throw new DomainException("These findings aren't dismissed.");
-        investigation.DismissedAt = null; investigation.DecisionNote = null;
+        if (investigation.DismissedAt is not { } closed) throw new DomainException("These findings aren't dismissed.");
+        const string with = RecommendationDecisions.WithFindings;
+        foreach (var step in investigation.NextSteps.Where(x => x.Status == "closed" && x.ClosedReason == with && x.ClosedAt == closed))
+        { step.Status = "open"; step.ClosedAt = null; step.ClosedReason = null; }
+        foreach (var change in investigation.FileChanges.Where(x => x.Status == "retired" && x.ClosedReason == with && x.ClosedAt == closed))
+        { change.Status = change.AppliedAt is null ? "pending" : "applied"; change.ClosedAt = null; change.ClosedReason = null; }
+        foreach (var p in s.Proposals.Where(p => p.InvestigationId == investigation.Id && p.Status == "Denied" && p.ClosedReason == with && p.DecidedAt == closed))
+        { p.Status = "Pending"; p.DecidedAt = null; p.ClosedReason = null; p.DecisionNote = null; }
+        investigation.DismissedAt = null; investigation.DecisionNote = null; investigation.ClosedReason = null;
         ChangeEngine.Log(s, "decision", $"You reopened the findings “{investigation.Title}”.");
     }
 

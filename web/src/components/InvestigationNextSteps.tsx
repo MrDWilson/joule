@@ -4,6 +4,8 @@ import { Button } from "./ui";
 import { InvestigationSummary, InvestigationText, RichText } from "./InvestigationText";
 import { EvidencePanel } from "./InvestigationSources";
 import { RecommendationReply } from "./RecommendationReply";
+import { CloseButtons, useCloseItem } from "./CloseActions";
+import { closePaths } from "../lib/closing";
 import type { Api, Mutate } from "../completion-types";
 import type { Investigation, InvestigationNextStep } from "../types";
 import { closedStatus, isOpenNextStep } from "../lib/insights";
@@ -51,14 +53,16 @@ export function InvestigationNextStepCard({
   embedded?: boolean;
 }) {
   const titleId = useId();
+  const close = useCloseItem();
   const open = isOpenNextStep(step);
   const stepId = step.id;
   const base = stepId
     ? `/investigations/${encodeURIComponent(investigation.id)}/followups/${encodeURIComponent(stepId)}`
     : "";
-  // Only to-dos the server has given an id can be dismissed; older records stay read-only. Done sends no note: it is
+  const paths = closePaths("todo", investigation.id, stepId);
+  // Only to-dos the server has given an id can be closed; older records stay read-only. Done sends no note: it is
   // not something you wrote, so it must never show up later as "Your note: Done".
-  const done = mutate && open && stepId ? () => void mutate(`${base}/dismiss`, {}, "Marked as done.") : null;
+  const done = mutate && open && stepId ? () => void close("todo", paths, "done") : null;
   const reopen = mutate && !open && stepId ? () => void mutate(`${base}/reopen`, {}, "Back on your list.") : null;
   const source = onSource && (
     <Button variant="link" size="sm" onClick={() => onSource(investigation.id)} aria-describedby={titleId}>
@@ -123,15 +127,19 @@ export function InvestigationNextStepCard({
           open={open}
           replyPath={`${base}/reply`}
           dismissPath={`${base}/dismiss`}
+          reopenPath={`${base}/reopen`}
           api={api}
           mutate={mutate}
           target="todo"
           actionsBefore={
             done && (
-              <Button size="sm" onClick={done} aria-describedby={titleId}>
-                <Check size={14} aria-hidden="true" />
-                Done
-              </Button>
+              <>
+                <Button size="sm" onClick={done} aria-describedby={titleId}>
+                  <Check size={14} aria-hidden="true" />
+                  Done
+                </Button>
+                <CloseButtons kind="todo" title={plainText(step.title)} paths={paths} describedBy={titleId} />
+              </>
             )
           }
           actionsAfter={

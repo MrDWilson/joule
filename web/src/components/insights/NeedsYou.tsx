@@ -6,6 +6,8 @@ import { Button, ButtonLink, Chip } from "../ui";
 import { RichText } from "../InvestigationText";
 import { InvestigationNextStepCard } from "../InvestigationNextSteps";
 import { ConfigFileChangeCard } from "../ConfigFileChangeCard";
+import { NotNeededButton } from "../CloseActions";
+import { inboxClosePaths } from "../../lib/closing";
 import {
   changeView,
   impactChipFor,
@@ -86,6 +88,7 @@ function InboxRow({ item }: { item: InboxItem }) {
     meta = `Review was due ${dayTime(item.experiment.reviewAt)}`;
   }
   const expandable = item.kind === "file" || item.kind === "todo";
+  const closable = inboxClosePaths(item);
   return (
     <li className={`inbox-row inbox-${item.kind}${open ? " is-open" : ""}`}>
       <div className="inbox-main">
@@ -126,6 +129,13 @@ function InboxRow({ item }: { item: InboxItem }) {
             <ButtonLink size="sm" variant="secondary" href="#/insights/experiments" aria-describedby={titleId}>
               Decide
             </ButtonLink>
+          )}
+          {closable && !open && (
+            <NotNeededButton
+              kind={item.kind === "proposal" ? "proposal" : item.kind === "file" ? "file" : "todo"}
+              paths={closable}
+              describedBy={titleId}
+            />
           )}
         </div>
       </div>
@@ -173,11 +183,19 @@ export function NeedsYou({ limit, closedCount = 0 }: { limit?: number; closedCou
           Needs you
           {items.length > 0 && <span className="count-pill">{items.length}</span>}
         </h2>
-        {limit && items.length > limit && (
-          <a className="text-link" href="#/insights/suggestions">
-            See all {items.length}
-          </a>
-        )}
+        <span className="insights-section-links">
+          {limit && items.length > limit && (
+            <a className="text-link" href="#/insights/suggestions">
+              See all {items.length}
+            </a>
+          )}
+          {/* What you closed is one click away, so nothing closed by mistake is lost. */}
+          {closedCount > 0 && items.length > 0 && (
+            <a className="text-link" href="#/insights/suggestions?view=closed">
+              Show closed ({closedCount})
+            </a>
+          )}
+        </span>
       </div>
       {items.length ? (
         <ul className="inbox" aria-label="Waiting for you">

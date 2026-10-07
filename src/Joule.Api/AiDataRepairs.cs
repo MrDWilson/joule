@@ -8,23 +8,25 @@ namespace Joule;
 /// dismissal (the note offered as a fact) is removed.</item>
 /// <item>failed-verdict-null-v1: checks that didn't finish were stored with the verdict "problem". They get no verdict, a failure kind
 /// and a plain headline, so they never show as a household problem.</item>
+/// <item>own-traffic-close-v1: checks reported Predbat log lines caused by Joule's own MCP sign-in ("Not enough segments", "legacy
+/// bearer token") as household problems. Those open findings, to-dos and file edits are closed with a plain note.</item>
 /// </list>
 /// </summary>
 public static class AiDataRepairs
 {
-    public const string ReopenUnavailableReplies = "reply-unavailable-reopen-v1", FailedVerdicts = "failed-verdict-null-v1";
+    public const string ReopenUnavailableReplies = "reply-unavailable-reopen-v1", FailedVerdicts = "failed-verdict-null-v1", OwnTraffic = "own-traffic-close-v1";
     public const string UnavailablePrefix = "AI review unavailable:";
     public const string ReopenedNotice = "Reopened: this was dismissed only because the AI couldn't read your reply at the time. Nothing else changed.";
 
-    public sealed record RepairResult(int Reopened, int MemoryRemoved, int FailedRelabelled)
+    public sealed record RepairResult(int Reopened, int MemoryRemoved, int FailedRelabelled, int OwnTrafficClosed = 0)
     {
-        public int Total => Reopened + MemoryRemoved + FailedRelabelled;
-        public string Summary => $"{Reopened} item(s) reopened, {MemoryRemoved} memory fact(s) removed, {FailedRelabelled} unfinished check(s) relabelled";
+        public int Total => Reopened + MemoryRemoved + FailedRelabelled + OwnTrafficClosed;
+        public string Summary => $"{Reopened} item(s) reopened, {MemoryRemoved} memory fact(s) removed, {FailedRelabelled} unfinished check(s) relabelled, {OwnTrafficClosed} item(s) about Joule's own connection closed";
     }
 
     public static RepairResult Apply(AppState s, DataStore? db)
     {
-        int reopened = 0, removed = 0, relabelled = 0;
+        int reopened = 0, removed = 0, relabelled = 0, ownTraffic = 0;
         if (!s.AiRepairs.Contains(ReopenUnavailableReplies))
         {
             (reopened, removed) = ReopenWronglyDismissed(s, db);
@@ -36,7 +38,13 @@ public static class AiDataRepairs
             relabelled = RelabelFailedChecks(s);
             s.AiRepairs.Add(FailedVerdicts);
         }
-        return new(reopened, removed, relabelled);
+        if (!s.AiRepairs.Contains(OwnTraffic))
+        {
+            ownTraffic = JouleOwnTraffic.CloseExisting(s, DateTimeOffset.UtcNow);
+            s.AiRepairs.Add(OwnTraffic);
+            if (ownTraffic > 0) ChangeEngine.Log(s, "decision", $"Closed {ownTraffic} item{(ownTraffic == 1 ? "" : "s")} about Joule's own sign-in to Predbat. {(ownTraffic == 1 ? "It wasn't" : "They weren't")} about your system.");
+        }
+        return new(reopened, removed, relabelled, ownTraffic);
     }
 
     /// <summary>The system message that closed a thread through the old "AI unavailable means dismiss" path, if that is how it ended.</summary>

@@ -1,16 +1,18 @@
 import { useId } from "react";
-import { ArrowRight, FileCode2, FlaskConical, ListTodo, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, FileCode2, FlaskConical, ListTodo, Sparkles, SlidersHorizontal } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { Button, ButtonLink, Chip, Disclosure, Segmented } from "../components/ui";
 import { InvestigationNextStepCard } from "../components/InvestigationNextSteps";
 import { ConfigFileChangeCard } from "../components/ConfigFileChangeCard";
 import { RecommendationReply } from "../components/RecommendationReply";
+import { CloseButtons } from "../components/CloseActions";
 import { RichText } from "../components/InvestigationText";
 import { ExperimentCard } from "../components/ExperimentCard";
 import {
   changeView,
   closedItems,
+  headlineOf,
   isStale,
   needsYou,
   waitingToConfirm,
@@ -23,6 +25,7 @@ import {
 import { dayTime } from "../lib/time";
 import { buildHash, navigate } from "../lib/router";
 import { plainText } from "../lib/sanitize";
+import { closePaths } from "../lib/closing";
 import type { Change, Proposal, Setting } from "../types";
 import "./insights.css";
 
@@ -99,14 +102,23 @@ export function RecommendationCard({ proposal: p, onSource }: { proposal: Propos
         open={pending}
         replyPath={`/proposals/${p.id}/reply`}
         dismissPath={`/proposals/${p.id}/deny`}
+        reopenPath={`/proposals/${p.id}/reopen`}
         api={api}
         mutate={mutate}
         target="proposal"
         actionsBefore={
           pending && (
-            <Button size="sm" onClick={() => reviewProposal(p)} aria-describedby={titleId}>
-              Review
-            </Button>
+            <>
+              <Button size="sm" onClick={() => reviewProposal(p)} aria-describedby={titleId}>
+                Review
+              </Button>
+              <CloseButtons
+                kind="proposal"
+                title={plainText(p.title)}
+                paths={closePaths("proposal", p.investigationId, p.id)}
+                describedBy={titleId}
+              />
+            </>
           )
         }
         actionsAfter={
@@ -126,11 +138,13 @@ const CLOSED_ICON: Record<ClosedItem["kind"], LucideIcon> = {
   proposal: SlidersHorizontal,
   file: FileCode2,
   todo: ListTodo,
+  finding: Sparkles,
 };
 const CLOSED_KIND: Record<ClosedItem["kind"], string> = {
   proposal: "Setting change",
   file: "File edit",
   todo: "To-do",
+  finding: "Finding",
 };
 
 function ClosedRow({ item }: { item: ClosedItem }) {
@@ -138,15 +152,23 @@ function ClosedRow({ item }: { item: ClosedItem }) {
   const titleId = useId();
   const Icon = CLOSED_ICON[item.kind];
   const title =
-    item.kind === "proposal" ? item.proposal.title : item.kind === "file" ? item.change.summary : item.step.title;
+    item.kind === "proposal"
+      ? item.proposal.title
+      : item.kind === "file"
+        ? item.change.summary
+        : item.kind === "finding"
+          ? headlineOf(item.investigation)
+          : item.step.title;
   const note =
     item.kind === "proposal"
       ? item.proposal.decisionNote
       : item.kind === "file"
         ? item.change.decisionNote
-        : item.step.decisionNote;
+        : item.kind === "finding"
+          ? item.investigation.decisionNote
+          : item.step.decisionNote;
   // "Done" or "Thanks" is a button's word, not something you wrote: no "Your note" for it.
-  const ownNote = note && !/^(done|thanks)\.?$/i.test(note.trim()) ? note : null;
+  const ownNote = note && !/^(done|thanks|not needed)\.?$/i.test(note.trim()) ? note : null;
   let reopen: string | null = null;
   // Declined, done in Predbat, or applied and then undone: each can go back on your list.
   if (item.kind === "proposal" && ["Denied", "Done", "Reverted"].includes(item.proposal.status))
@@ -155,6 +177,7 @@ function ClosedRow({ item }: { item: ClosedItem }) {
     reopen = `/investigations/${encodeURIComponent(item.investigation.id)}/filechanges/${encodeURIComponent(item.change.id)}/reopen`;
   if (item.kind === "todo" && item.step.id)
     reopen = `/investigations/${encodeURIComponent(item.investigation.id)}/followups/${encodeURIComponent(item.step.id)}/reopen`;
+  if (item.kind === "finding") reopen = closePaths("finding", item.investigation.id).reopen;
   const investigationId = item.kind === "proposal" ? item.proposal.investigationId : item.investigation.id;
   return (
     <li className="closed-row">
@@ -209,9 +232,12 @@ export default function RecommendationsPage() {
   const items = needsYou(s);
   const confirming = waitingToConfirm(s);
   const closed = closedItems(s);
-  // Items a later check retired on its own fold away; what you decided stays in view.
+  // Items Joule closed on its own fold away; what you decided stays in view.
   const retiredClosed = closed.filter(
-      (c) => c.status === "No longer needed" || c.status === "Replaced by a newer suggestion",
+      (c) =>
+        c.status === "No longer needed" ||
+        c.status === "Replaced by a newer suggestion" ||
+        c.status === "About Joule's own connection, not your system",
     ),
     decidedClosed = closed.filter((c) => !retiredClosed.includes(c));
   const declined = closed.filter((c) => c.kind === "proposal" && c.proposal.status === "Denied").length;
@@ -330,7 +356,7 @@ export default function RecommendationsPage() {
           )}
           {retiredClosed.length > 0 && (
             <Disclosure summary="No longer needed" count={retiredClosed.length} className="closed-retired">
-              <p className="muted">Later checks found these weren't needed any more.</p>
+              <p className="muted">Joule closed these itself: later checks found they weren't needed.</p>
               <ul className="closed-list" aria-label="No longer needed">
                 {retiredClosed.map((item) => (
                   <ClosedRow key={item.key} item={item} />

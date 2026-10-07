@@ -107,7 +107,7 @@ public sealed class RecommendationReplyTests : IDisposable
         Assert.Contains("Bring the evening load forecast closer to reality", prompt);
         Assert.Contains("\"key\":\"load_scaling\"", prompt); Assert.Contains("\"value\":\"1.08\"", prompt);
         Assert.Contains("verdict", prompt);
-        Assert.Contains(services.State.Read().Activities, a => a.Message.Contains("The AI agreed and it was dismissed"));
+        Assert.Contains(services.State.Read().Activities, a => a.Message.Contains("The AI agreed and it was closed"));
         services.Http.Dispose();
     }
 

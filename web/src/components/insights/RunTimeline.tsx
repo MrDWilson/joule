@@ -5,6 +5,7 @@ import { Button, ButtonLink, Chip } from "../ui";
 import { RichText } from "../InvestigationText";
 import {
   failureView,
+  findingClosedStatus,
   headlineOf,
   impactChipFor,
   isQuiet,
@@ -33,7 +34,7 @@ function RunChips({ i, proposals }: { i: Investigation; proposals: number }) {
   if (todos) chips.push({ label: todos === 1 ? "1 to-do" : `${todos} to-dos`, tone: "neutral" });
   if (files) chips.push({ label: files === 1 ? "1 file edit" : `${files} file edits`, tone: "neutral" });
   if (i.occurrences && i.occurrences > 1) chips.push({ label: `Seen ${i.occurrences}×`, tone: "neutral" });
-  if (i.dismissedAt) chips.push({ label: "Dismissed", tone: "neutral" });
+  if (i.dismissedAt) chips.push({ label: `Closed · ${findingClosedStatus(i)}`, tone: "neutral" });
   if (!chips.length) return null;
   return (
     <span className="run-chips">
@@ -188,8 +189,14 @@ const PAGE = 14;
 export function RunTimeline({ selectedId }: { selectedId?: string }) {
   const { data, timeZone } = useApp();
   const [shown, setShown] = useState(PAGE);
+  const [showClosed, setShowClosed] = useState(false);
   const headingId = useId();
-  const days = runTimeline(data.state.investigations, quietChecks(data.state.activities), { timeZone });
+  // Findings you closed leave the list (the open one stays while you read it); "Show closed" brings them back.
+  const closed = data.state.investigations.filter((i) => i.dismissedAt && !i.repeatOf).length;
+  const listed = showClosed
+    ? data.state.investigations
+    : data.state.investigations.filter((i) => !i.dismissedAt || i.id === selectedId);
+  const days = runTimeline(listed, quietChecks(data.state.activities), { timeZone });
   let budget = shown;
   const visible = days
     .map((d) => {
@@ -203,6 +210,11 @@ export function RunTimeline({ selectedId }: { selectedId?: string }) {
     <section className="insights-section recent-checks" aria-labelledby={headingId}>
       <div className="insights-section-head">
         <h2 id={headingId}>Recent checks</h2>
+        {closed > 0 && (
+          <Button variant="ghost" size="sm" aria-pressed={showClosed} onClick={() => setShowClosed(!showClosed)}>
+            {showClosed ? "Hide closed" : `Show closed (${closed})`}
+          </Button>
+        )}
       </div>
       {visible.length ? (
         visible.map((day) => (

@@ -13,6 +13,7 @@ import { EvidencePanel } from "./InvestigationSources";
 import { InvestigationNextStepCard } from "./InvestigationNextSteps";
 import { ConfigFileChangeCard } from "./ConfigFileChangeCard";
 import { ComposerWatch, RecommendationReply } from "./RecommendationReply";
+import { CloseButtons } from "./CloseActions";
 import { RecommendationCard } from "../pages/RecommendationsPage";
 import type { Investigation } from "../types";
 import {
@@ -28,6 +29,7 @@ import {
   stepsOf,
 } from "../lib/insights";
 import { providerLabel } from "../lib/labels";
+import { closePaths } from "../lib/closing";
 import { dayTime, range } from "../lib/time";
 import { plainText } from "../lib/sanitize";
 import "./InvestigationEvidence.css";
@@ -198,6 +200,23 @@ function LeftForYou({ i }: { i: Investigation }) {
   );
 }
 
+/** Why the findings are closed, in a sentence: "You dismissed this finding 14:05: “…”". */
+function closedNote(i: Investigation) {
+  const when = i.dismissedAt ? dayTime(i.dismissedAt) : "";
+  switch (i.closedReason) {
+    case "not_needed":
+      return `Closed as not needed ${when}.`;
+    case "resolved":
+      return `Closed ${when}: nothing from it is waiting for you.`;
+    case "repeat":
+      return "Not raised again: you closed the same finding recently.";
+    case "own_traffic":
+      return `Closed ${when}: it was about Joule's own connection to Predbat, not your system.`;
+    default:
+      return `You dismissed this finding ${when}${i.decisionNote ? `: “${i.decisionNote}”` : "."}`;
+  }
+}
+
 /** What the AI said it would test next time, and how it turned out. */
 function Claims({ i }: { i: Investigation }) {
   const { data } = useApp();
@@ -252,8 +271,13 @@ export function InvestigationDetail({
   /** Two-pane layout: a close button beside the badges. */
   onClose?: () => void;
 }) {
-  const { api, mutate } = useApp();
+  const { api, mutate, data } = useApp();
   const unfinished = isUnfinished(i);
+  // What closes with the finding if you dismiss it: its pending suggestions, open to-dos and file edits.
+  const openItems =
+    data.state.proposals.filter((p) => p.investigationId === i.id && p.status === "Pending").length +
+    (i.nextSteps ?? []).filter(isOpenNextStep).length +
+    (i.fileChanges ?? []).filter(isOpenFileChange).length;
   const verdict = investigationVerdict(i);
   const impact = impactChipFor(i);
   const repeat = repeatText(i);
@@ -364,9 +388,8 @@ export function InvestigationDetail({
         {i.status === "Completed" && verdict !== "no_change" && (
           <section className="detail-section investigation-reply" aria-label={`Reply to: ${plainText(i.title)}`}>
             {i.dismissedAt && (
-              <p className="follow-up-note">
-                You dismissed these findings {dayTime(i.dismissedAt)}
-                {i.decisionNote ? `: “${i.decisionNote}”` : "."}{" "}
+              <p className="follow-up-note finding-closed-note">
+                {closedNote(i)}{" "}
                 <Button
                   variant="link"
                   size="sm"
@@ -388,8 +411,20 @@ export function InvestigationDetail({
               hideReplyButton={composers.size > 0}
               replyPath={`/investigations/${encodeURIComponent(i.id)}/reply`}
               dismissPath={`/investigations/${encodeURIComponent(i.id)}/dismiss`}
+              reopenPath={`/investigations/${encodeURIComponent(i.id)}/reopen`}
               api={api}
               mutate={mutate}
+              actionsAfter={
+                !i.dismissedAt && (
+                  <CloseButtons
+                    kind="finding"
+                    title={plainText(headlineOf(i))}
+                    paths={closePaths("finding", i.id)}
+                    describedBy="check-title"
+                    openItems={openItems}
+                  />
+                )
+              }
             />
           </section>
         )}

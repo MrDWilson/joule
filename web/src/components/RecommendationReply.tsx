@@ -18,6 +18,8 @@ import type { ReplyMessage, ReplyOutcome, ReplyVerdict } from "../types";
 import { useMediaQuery, breakpoints } from "../lib/useMediaQuery";
 import { dayTime } from "../lib/time";
 import { providerLabel } from "../lib/labels";
+import { useCloseItem } from "./CloseActions";
+import { notNeededNote, type ClosableKind } from "../lib/closing";
 import "./RecommendationReply.css";
 
 /*
@@ -25,7 +27,7 @@ import "./RecommendationReply.css";
  * answer and anything it remembered) is shown by one host at the app root, which also owns the state refresh.
  * Everything else (an answer, a disagreement, a failed reply) stays inline in the thread.
  */
-type Outcome = ReplyOutcome & { title: string };
+type Outcome = ReplyOutcome & { title: string; reopenPath?: string };
 let shown: Outcome | null = null;
 let refresh: (() => unknown) | null = null;
 const listeners = new Set<() => void>();
@@ -65,6 +67,12 @@ export const ComposerWatch = createContext<((key: string, open: boolean) => void
 
 /** What a thread is about: it decides which quick replies make sense after Joule answers. */
 export type ReplyTarget = "check" | "todo" | "proposal" | "file";
+const closableKind: Record<ReplyTarget, ClosableKind> = {
+  check: "finding",
+  todo: "todo",
+  proposal: "proposal",
+  file: "file",
+};
 
 /** The conversation as chat: your messages on the right, the AI's on the left with what it concluded. */
 export function ReplyThread({ thread, label = "Replies" }: { thread?: ReplyMessage[]; label?: string }) {
@@ -141,6 +149,7 @@ export function RecommendationReply({
   open,
   replyPath,
   dismissPath,
+  reopenPath,
   api,
   mutate,
   replyLabel = "Reply",
@@ -156,6 +165,8 @@ export function RecommendationReply({
   open: boolean;
   replyPath: string;
   dismissPath: string;
+  /** Reopens the item: the Undo after a close (from a quick reply, the composer, or a reply the AI agreed with). */
+  reopenPath?: string;
   api: Api;
   mutate: Mutate;
   replyLabel?: string;
@@ -180,6 +191,7 @@ export function RecommendationReply({
     [failed, setFailed] = useState<{ note: string; message: string } | null>(null),
     [acknowledged, setAcknowledged] = useState<{ at: string; text: string } | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
+  const close = useCloseItem();
   const trimmed = note.trim();
   const lastMessage = thread.at(-1);
   const verdict = lastMessage?.role === "ai" ? lastMessage.verdict : null;
@@ -228,7 +240,7 @@ export function RecommendationReply({
       } else {
         setNote("");
         setComposing(false);
-        if (outcome.retired || outcome.notice) publish({ ...outcome, title });
+        if (outcome.retired || outcome.notice) publish({ ...outcome, title, reopenPath });
       }
       await refresh?.();
     } catch (e) {
@@ -237,13 +249,18 @@ export function RecommendationReply({
       setSending(false);
     }
   }
-  async function dismiss(text: string, message: string) {
-    if (await mutate(dismissPath, { note: text }, message)) {
+  /** Closes the item with a note (and Undo in the toast when it can be reopened). */
+  async function dismiss(text: string, outcome: "dismissed" | "not_needed") {
+    const closed = reopenPath
+      ? await close(closableKind[target], { close: dismissPath, reopen: reopenPath }, outcome, text)
+      : await mutate(dismissPath, { note: text, outcome }, "Dismissed with your note.");
+    if (closed) {
       setNote("");
       setComposing(false);
       setFailed(null);
     }
   }
+  const lastUserNote = [...thread].reverse().find((m) => m.role === "user")?.text ?? "";
   const startReply = (prefill = "") => {
     setNote(prefill);
     setAcknowledged(null);
@@ -340,7 +357,7 @@ export function RecommendationReply({
             variant="ghost"
             size="sm"
             disabled={!trimmed}
-            onClick={() => void dismiss(trimmed, "Dismissed with your note.")}
+            onClick={() => void dismiss(trimmed, "dismissed")}
           >
             Dismiss with this note
           </Button>
@@ -389,6 +406,16 @@ export function RecommendationReply({
           ) : (
             <button type="button" className="suggestion-chip" onClick={() => startReply()}>
               {verdict === "clarify" ? "Answer Joule" : "Ask something else"}
+            </button>
+          )}
+          {/* Talked it through and it isn't worth doing: close it here. Your last reply is the note only when it says so. */}
+          {reopenPath && (
+            <button
+              type="button"
+              className="suggestion-chip"
+              onClick={() => void dismiss(notNeededNote(lastUserNote), "not_needed")}
+            >
+              {target === "check" ? "Not needed: close this finding" : "Not needed: close it"}
             </button>
           )}
         </div>
@@ -471,8 +498,7 @@ export function ReplyOutcomeHost({ mutate, reload }: { mutate: Mutate; reload: (
           )}
           {outcome.retired && (
             <p className="muted">
-              Closed after your reply. You'll find it under Suggestions › Closed, and it won't come back unless
-              something new turns up.
+              You'll find {outcome.findingClosed ? "both" : "it"} under Suggestions › Closed if you change your mind.
             </p>
           )}
           {outcome.notice && <p className="reply-error">{outcome.notice}</p>}
@@ -492,6 +518,16 @@ export function ReplyOutcomeHost({ mutate, reload }: { mutate: Mutate; reload: (
               <span className="reply-saved" role="status">
                 Remembered.
               </span>
+            )}
+            {outcome.retired && outcome.reopenPath && (
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (await mutate(outcome.reopenPath!, {}, "Back on your list.")) publish(null);
+                }}
+              >
+                Undo
+              </Button>
             )}
             <Button variant={offer && !saved ? "ghost" : "primary"} onClick={() => publish(null)}>
               Close

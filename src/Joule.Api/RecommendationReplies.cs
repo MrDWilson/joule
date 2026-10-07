@@ -32,33 +32,55 @@ public partial class Proposal
     /// <summary>The user's note when they denied it; with DecidedAt it suppresses re-proposing the same change.</summary>
     public string? DecisionNote { get; set; }
     public DateTimeOffset? DecidedAt { get; set; }
+    /// <summary>Why a declined suggestion closed when it wasn't a plain decline: "Not needed", or "Findings dismissed by user" when it
+    /// closed with its finding (so reopening the finding brings it back).</summary>
+    public string? ClosedReason { get; set; }
     List<ReplyMessage> thread = [];
     public List<ReplyMessage> Thread { get => thread; set => thread = value ?? []; }
 }
 
 public partial class Investigation
 {
-    /// <summary>Set when the user dismissed the findings as a whole.</summary>
+    /// <summary>Set when the findings closed as a whole (by the user, after a reply, or because nothing from them was left open).</summary>
     public DateTimeOffset? DismissedAt { get; set; }
     public string? DecisionNote { get; set; }
+    /// <summary>How the findings closed: dismissed (the user disputed them; also every older record), not_needed, resolved (the user
+    /// closed the last thing from them), repeat (the same finding the user closed recently) or own_traffic (about Joule's own
+    /// connection to Predbat). Null while open.</summary>
+    public string? ClosedReason { get; set; }
     List<ReplyMessage> thread = [];
     public List<ReplyMessage> Thread { get => thread; set => thread = value ?? []; }
 }
 
 /// <summary>What the user is replying to: a proposal (Id), a follow-up or file change (Id = investigation, ItemId = item), or a finding (Id = investigation).</summary>
 public record ReplyTarget(string Kind, string Id, string? ItemId = null);
-public record DecisionNoteRequest(string? Note);
+/// <summary>A note, and how the user is closing the item: dismissed (the default), not_needed or done.</summary>
+public record DecisionNoteRequest(string? Note, string? Outcome = null);
 public record ReplyOutcome(string Verdict, string Reply, bool Retired, string? Memory, string? SuggestedMemory, string? Notice, string Provider, List<ReplyMessage> Thread)
 {
     /// <summary>A configuration edit the AI drafted in its answer, now listed on the investigation for the user to review.</summary>
     public ConfigFileChange? FileChange { get; init; }
+    /// <summary>True when closing this item left nothing open from its check, so the check's findings closed too.</summary>
+    public bool FindingClosed { get; init; }
 }
 public sealed record ReplyEvaluation(string Verdict, string Reply, string? Memory, bool Retire, long InputTokens = 0, long OutputTokens = 0, string? Action = null, ConfigFileChange? FileChange = null);
 
-/// <summary>Dismissals and denials that carry the user's note. Notes feed the next investigation's brief and suppress re-raising.</summary>
+/// <summary>
+/// Closing things: dismissals, "not needed" and "done", each with an optional note. Notes feed the next investigation's brief and,
+/// with DecidedAt, suppress re-raising the same thing for 30 days. Closing an item also closes its open twins from other checks (the
+/// inbox shows a repeated to-do or edit once, so closing it must not uncover an older copy), and closing the last open thing from a
+/// check closes that check's findings as resolved.
+/// </summary>
 public static class RecommendationDecisions
 {
     public const int SuppressionDays = 30, NoteLimit = 1000;
+    public const string Dismissed = "dismissed", NotNeeded = "not_needed", Done = "done";
+    public const string DismissedByUser = "Dismissed by you", NotNeededReason = "Not needed", DoneByUser = "Done by you", WithFindings = "Findings dismissed by user";
+    /// <summary>Finding close reasons besides dismissed and not_needed: resolved (the user closed the last thing from it; it may be
+    /// raised again), repeat (the same finding the user closed recently) and own_traffic (about Joule's own connection).</summary>
+    public const string Resolved = "resolved", Repeat = "repeat", OwnTraffic = "own_traffic";
+    /// <summary>What the AI's reply says when the conversation closed the item.</summary>
+    public const string ClosedLine = "Closed — I won't raise this again for 30 days.";
 
     public static string? Note(string? note, string[] secrets)
     {
@@ -68,53 +90,138 @@ public static class RecommendationDecisions
         return PredbatMcpSafety.CleanText(text, secrets);
     }
 
-    public static void Decline(AppState s, ReplyTarget target, string? note)
+    /// <summary>dismissed (the default), not_needed or done; anything else is refused.</summary>
+    public static string Outcome(string? outcome) => (outcome ?? "").Trim().ToLowerInvariant() switch
+    {
+        "" or Dismissed => Dismissed,
+        NotNeeded or "not-needed" => NotNeeded,
+        Done => Done,
+        _ => throw new DomainException("Close it as dismissed, not_needed or done.", 400)
+    };
+
+    public static void Decline(AppState s, ReplyTarget target, string? note, string outcome = Dismissed)
     {
         switch (target.Kind)
         {
-            case "proposal": ChangeEngine.Deny(s, target.Id, note); break;
-            case "followup": DismissFollowUp(s, target.Id, target.ItemId ?? "", note); break;
-            case "filechange": DismissFileChange(s, target.Id, target.ItemId ?? "", note); break;
-            case "finding": DismissFinding(s, target.Id, note); break;
+            case "proposal": DeclineProposal(s, target.Id, note, outcome); break;
+            case "followup": DismissFollowUp(s, target.Id, target.ItemId ?? "", note, outcome); break;
+            case "filechange": DismissFileChange(s, target.Id, target.ItemId ?? "", note, outcome); break;
+            case "finding": DismissFinding(s, target.Id, note, outcome); break;
             default: throw new DomainException("Unknown recommendation type.", 400);
         }
     }
 
     static Investigation FindInvestigation(AppState s, string id) => s.Investigations.FirstOrDefault(i => i.Id == id) ?? throw new DomainException("Investigation not found.", 404);
     static string Suffix(string? note) => note is null ? "" : $" Note: {note}";
+    static string Reason(string outcome) => outcome switch { NotNeeded => NotNeededReason, Done => DoneByUser, _ => DismissedByUser };
+    static string Verb(string outcome) => outcome switch { NotNeeded => "closed as not needed", Done => "marked as done", _ => "dismissed" };
+    /// <summary>Whitespace- and case-insensitive identity of a to-do title, used to recognise the same to-do raised again.</summary>
+    public static string TitleKey(string title) => Regex.Replace(title, @"\s+", " ").Trim().ToLowerInvariant();
 
-    public static void DismissFollowUp(AppState s, string investigationId, string stepId, string? note)
+    /// <summary>A setting suggestion you don't want: declined; "not needed" is remembered so the next check skips it quietly.</summary>
+    public static void DeclineProposal(AppState s, string id, string? note, string outcome = Dismissed)
+    {
+        ChangeEngine.Deny(s, id, note);
+        var p = s.Proposals.First(x => x.Id == id);
+        // Every close carries a reason, so the same-direction suppression in the next check applies even without a note.
+        p.ClosedReason = Reason(outcome);
+        if (s.Investigations.FirstOrDefault(i => i.Id == p.InvestigationId) is { } source) CloseFindingIfDone(s, source, p.DecidedAt ?? DateTimeOffset.UtcNow);
+    }
+
+    public static void DismissFollowUp(AppState s, string investigationId, string stepId, string? note, string outcome = Dismissed)
     {
         var step = FindInvestigation(s, investigationId).NextSteps.FirstOrDefault(x => x.Id == stepId) ?? throw new DomainException("Follow-up not found.", 404);
         if (step.Status != "open") throw new DomainException("This follow-up is already closed.");
-        var now = DateTimeOffset.UtcNow;
-        step.Status = "closed"; step.ClosedAt = now; step.ClosedReason = "Dismissed by user"; step.DecidedAt = now; step.DecisionNote = note;
-        ChangeEngine.Log(s, "decision", $"You dismissed the follow-up “{step.Title}”." + Suffix(note));
+        var now = DateTimeOffset.UtcNow; var key = TitleKey(step.Title);
+        var touched = new List<Investigation>();
+        foreach (var i in s.Investigations)
+            foreach (var twin in i.NextSteps.Where(x => x.Status == "open" && (ReferenceEquals(x, step) || TitleKey(x.Title) == key)))
+            {
+                twin.Status = "closed"; twin.ClosedAt = now; twin.ClosedReason = Reason(outcome); twin.DecidedAt = now; twin.DecisionNote = note;
+                if (!touched.Contains(i)) touched.Add(i);
+            }
+        ChangeEngine.Log(s, "decision", $"You {Verb(outcome)} the to-do “{step.Title}”." + Suffix(note));
+        foreach (var i in touched) CloseFindingIfDone(s, i, now);
     }
 
-    public static void DismissFileChange(AppState s, string investigationId, string changeId, string? note)
+    public static void DismissFileChange(AppState s, string investigationId, string changeId, string? note, string outcome = Dismissed)
     {
         var change = InvestigationFileChanges.Find(s, investigationId, changeId);
         if (!InvestigationFileChanges.IsOpen(change)) throw new DomainException("This configuration file change is already closed.");
+        // "Done" for a file edit is "I've made it": the next check confirms it.
+        if (outcome == Done) { InvestigationFileChanges.MarkApplied(s, investigationId, changeId); return; }
         var now = DateTimeOffset.UtcNow;
-        change.Status = "dismissed"; change.ClosedAt = now; change.ClosedReason = "Dismissed by user"; change.DecidedAt = now; change.DecisionNote = note;
-        ChangeEngine.Log(s, "decision", $"You dismissed the {change.File} change “{change.Summary}”." + Suffix(note));
+        var touched = new List<Investigation>();
+        foreach (var i in s.Investigations)
+            foreach (var twin in i.FileChanges.Where(x => InvestigationFileChanges.IsOpen(x) && (ReferenceEquals(x, change) || InvestigationFileChanges.SameChange(x, change))))
+            {
+                twin.Status = "dismissed"; twin.ClosedAt = now; twin.ClosedReason = Reason(outcome); twin.DecidedAt = now; twin.DecisionNote = note;
+                if (!touched.Contains(i)) touched.Add(i);
+            }
+        ChangeEngine.Log(s, "decision", $"You {Verb(outcome)} the {change.File} change “{change.Summary}”." + Suffix(note));
+        foreach (var i in touched) CloseFindingIfDone(s, i, now);
     }
 
-    /// <summary>Disputing the findings closes the follow-ups and file edits that came from them; setting proposals keep their own decision.</summary>
-    public static void DismissFinding(AppState s, string investigationId, string? note)
+    /// <summary>Closing the findings closes everything still open from them (to-dos, file edits and setting suggestions), marked so that
+    /// reopening the findings brings exactly those back.</summary>
+    public static void DismissFinding(AppState s, string investigationId, string? note, string outcome = Dismissed)
     {
         var investigation = FindInvestigation(s, investigationId);
-        if (investigation.DismissedAt != null) throw new DomainException("These findings are already dismissed.");
+        if (investigation.DismissedAt != null) throw new DomainException("These findings are already closed.");
         if (investigation.Status != "Completed") throw new DomainException("Only completed findings can be dismissed.");
         var now = DateTimeOffset.UtcNow;
-        investigation.DismissedAt = now; investigation.DecisionNote = note;
-        foreach (var step in investigation.NextSteps.Where(x => x.Status == "open"))
-        { step.Status = "closed"; step.ClosedAt = now; step.ClosedReason = "Findings dismissed by user"; }
-        foreach (var change in investigation.FileChanges.Where(InvestigationFileChanges.IsOpen))
-        { change.Status = "retired"; change.ClosedAt = now; change.ClosedReason = "Findings dismissed by user"; }
-        ChangeEngine.Log(s, "decision", $"You dismissed the findings “{investigation.Title}”." + Suffix(note));
+        investigation.DismissedAt = now; investigation.DecisionNote = note; investigation.ClosedReason = outcome == NotNeeded ? NotNeeded : Dismissed;
+        CloseItemsWith(s, investigation, now, WithFindings);
+        ChangeEngine.Log(s, "decision", $"You {(outcome == NotNeeded ? "closed as not needed" : "dismissed")} the findings “{investigation.Title}”." + Suffix(note));
     }
+
+    /// <summary>Closes every open to-do, file edit and pending suggestion from a check with one reason, so a reopen can find them.</summary>
+    public static int CloseItemsWith(AppState s, Investigation investigation, DateTimeOffset now, string reason)
+    {
+        var count = 0;
+        foreach (var step in investigation.NextSteps.Where(x => x.Status == "open"))
+        { step.Status = "closed"; step.ClosedAt = now; step.ClosedReason = reason; count++; }
+        foreach (var change in investigation.FileChanges.Where(InvestigationFileChanges.IsOpen))
+        { change.Status = "retired"; change.ClosedAt = now; change.ClosedReason = reason; count++; }
+        foreach (var p in s.Proposals.Where(p => p.Status == "Pending" && p.InvestigationId.Length > 0 && p.InvestigationId == investigation.Id))
+        { p.Status = "Denied"; p.DecidedAt = now; p.ClosedReason = reason; count++; }
+        return count;
+    }
+
+    /// <summary>True while something from the check still waits for the user (or, for an edit they applied, for the next check).</summary>
+    public static bool HasOpenItems(AppState s, Investigation i) =>
+        i.NextSteps.Any(x => x.Status == "open") || i.FileChanges.Any(InvestigationFileChanges.IsOpen) || s.Proposals.Any(p => p.Status == "Pending" && p.InvestigationId == i.Id);
+
+    /// <summary>The user closed the last open thing from a check: its findings close as resolved, so the check stops asking for
+    /// attention. Findings that never had anything to do stay until they are dismissed.</summary>
+    public static bool CloseFindingIfDone(AppState s, Investigation i, DateTimeOffset now)
+    {
+        if (i.DismissedAt != null || i.Status != "Completed" || i.Verdict == "no_change" || HasOpenItems(s, i)) return false;
+        if (i.NextSteps.Count + i.FileChanges.Count + s.Proposals.Count(p => p.InvestigationId == i.Id) == 0) return false;
+        i.DismissedAt = now; i.ClosedReason = Resolved; i.DecisionNote = null;
+        ChangeEngine.Log(s, "decision", $"Nothing from “{i.Title}” is waiting for you any more, so it is closed.");
+        return true;
+    }
+
+    /// <summary>A finding that closed only because its last item did reopens with that item.</summary>
+    public static void ReopenResolvedFinding(AppState s, string? investigationId)
+    {
+        if (s.Investigations.FirstOrDefault(i => i.Id == investigationId) is { ClosedReason: Resolved } i)
+        { i.DismissedAt = null; i.ClosedReason = null; i.DecisionNote = null; }
+    }
+
+    /// <summary>How a closed finding ended, for the next check's brief.</summary>
+    public static string FindingClosedText(Investigation i) => i.ClosedReason switch
+    {
+        NotNeeded => "the user closed this finding as not needed",
+        Resolved => "the user dealt with everything from this finding",
+        Repeat => "closed automatically: the same finding the user closed recently",
+        OwnTraffic => "closed: it was about Joule's own connection to Predbat, not the household's system; never raise it",
+        _ => "the user disputed this finding"
+    };
+
+    /// <summary>A finding the user closed (not one that resolved itself) suppresses the same finding for 30 days.</summary>
+    public static bool ClosedByUser(Investigation i) => i.DismissedAt != null && i.ClosedReason is null or Dismissed or NotNeeded or OwnTraffic;
 }
 /// <summary>
 /// Lets the user answer a recommendation. One short model call decides what the reply means: accept (the user is right; it may store a
@@ -167,6 +274,30 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
     /// <summary>A reply that asks something gets an answer and stays open; it is never treated as a reason to dismiss.</summary>
     public static bool IsQuestion(string note) => note.TrimEnd().EndsWith('?') || note.Split(['.', '!', '\n'], StringSplitOptions.RemoveEmptyEntries).Any(s => QuestionStart.IsMatch(s) && s.TrimEnd().EndsWith('?'));
 
+    static readonly Regex NotNeededWords = new(@"\b(nah|nope|not needed|no need|not necessary|unnecessary|leave it|leave that|leave this|ignore (it|this|that)|don't bother|dont bother|not worth (it|the|doing|bothering)|skip (it|this|that)|forget (it|about it)|no thanks|no thank you|close (it|this)|dismiss (it|this)|drop (it|this)|not interested|won't do (it|this)|not doing (it|this))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>A negation just before the phrase turns it round: "don't close it", "please don't forget it", "never ignore this".</summary>
+    static readonly Regex Negated = new(@"\b(don't|dont|do not|never|not|won't|wont|shouldn't|mustn't|can't|cannot)\s+(\w+\s+){0,2}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>Words that mean the user still wants it: "I'll do it at the weekend", "keep it", "leave it open", "later".</summary>
+    static readonly Regex KeepOpen = new(@"\b(leave (it|this|that) open|keep (it|this|that)|(i'll|ill|i will|we'll|we will|i'm going to|i am going to|going to) (do|sort|look|get|check|fix|deal|try|make|change|move|handle)|later|at the weekend|tomorrow|tonight|next week|soon|still (want|need))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>
+    /// "Nah, leave it": the user is saying the item isn't needed. Anything that might mean the opposite keeps it open: a question ("is
+    /// it not needed?", "not needed?"), a negated phrase ("don't close it") or a plan to do it ("I'll sort it later").
+    /// </summary>
+    public static bool SaysNotNeeded(string raw)
+    {
+        var note = raw.Replace('\u2019', '\'').Replace('\u2018', '\'');
+        if (IsQuestion(note) || QuestionStart.IsMatch(note) || KeepOpen.IsMatch(note)) return false;
+        var matched = false;
+        foreach (Match m in NotNeededWords.Matches(note))
+        {
+            var before = note[..m.Index];
+            var clause = before[(before.LastIndexOfAny([',', ';', '.', '!', '?', '\n', ':']) + 1)..];
+            if (Negated.IsMatch(clause)) return false;
+            matched = true;
+        }
+        return matched;
+    }
+
     public async Task<ReplyOutcome> ReplyAsync(ReplyTarget target, string? rawNote, CancellationToken ct)
     {
         var note = RecommendationDecisions.Note(rawNote, Secrets) ?? throw new DomainException("Write a reply first.", 400);
@@ -200,13 +331,18 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
                 }
             }
             // A question is answered, never resolved by dismissal; an answer that still asks the user to do something keeps the item open.
-            if (evaluation is { Verdict: "accept" } && IsQuestion(note)) evaluation = evaluation with { Verdict = "answer", Retire = false, Memory = null };
+            var question = IsQuestion(note);
+            var notNeeded = !question && SaysNotNeeded(note);
+            if (evaluation is { Verdict: "accept" } && question) evaluation = evaluation with { Verdict = "answer", Retire = false, Memory = null };
+            // "Nah, leave it" and the AI agrees: the item closes, whatever the model said about retiring it. Never for a question.
+            if (evaluation is { Verdict: "accept", Action: null } && notNeeded) evaluation = evaluation with { Retire = true };
             if (evaluation is { Retire: true, Action: { Length: > 0 } }) evaluation = evaluation with { Retire = false };
             var now = DateTimeOffset.UtcNow;
             var retired = evaluation is { Verdict: "accept", Retire: true };
             var memory = evaluation is { Verdict: "accept", Memory: { } fact } ? fact : null;
             string? stored = null, suggestion = null, notice = null;
             ConfigFileChange? attached = null;
+            var findingClosed = false;
             List<ReplyMessage> thread = [];
             await state.MutateAsync(s =>
             {
@@ -223,15 +359,19 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
                     if (investigation.FileChanges.FirstOrDefault(x => InvestigationFileChanges.IsOpen(x) && InvestigationFileChanges.SameChange(x, draft)) is { } existing) attached = existing;
                     else if (investigation.FileChanges.Count < 8) { investigation.FileChanges.Add(draft); attached = draft; ChangeEngine.Log(s, "decision", $"The AI drafted a {draft.File} edit in reply: “{draft.Summary}”."); }
                 }
+                // Closing the item may leave nothing open from its check; then the check's findings close too, and the reply says so.
+                var parent = target.Kind == "finding" ? null : s.Investigations.FirstOrDefault(i => i.Id == current.InvestigationId);
+                var parentOpen = parent is { DismissedAt: null };
                 current.Thread.Add(new ReplyMessage { At = now, Role = "user", Text = note });
+                if (retired) RecommendationDecisions.Decline(s, target, note, notNeeded ? RecommendationDecisions.NotNeeded : RecommendationDecisions.Dismissed);
+                findingClosed = parentOpen && parent is { DismissedAt: not null };
                 current.Thread.Add(evaluation is null
                     ? new ReplyMessage { At = now, Role = "system", Verdict = "unavailable", Provider = prefs.Provider, Text = $"{UnavailableNotice} ({failure}.) Try again in a moment, or dismiss it with your note if you're sure." }
-                    : new ReplyMessage { At = now, Role = "ai", Verdict = evaluation.Verdict, Provider = prefs.Provider, Text = evaluation.Reply, Memory = stored, SuggestedMemory = stored == null ? suggestion : null, InputTokens = evaluation.InputTokens, OutputTokens = evaluation.OutputTokens, FileChangeId = attached?.Id, Action = evaluation.Action });
-                if (retired) RecommendationDecisions.Decline(s, target, note);
+                    : new ReplyMessage { At = now, Role = "ai", Verdict = evaluation.Verdict, Provider = prefs.Provider, Text = Concluded(evaluation, retired, findingClosed, target.Kind), Memory = stored, SuggestedMemory = stored == null ? suggestion : null, InputTokens = evaluation.InputTokens, OutputTokens = evaluation.OutputTokens, FileChangeId = attached?.Id, Action = evaluation.Action });
                 ChangeEngine.Log(s, "decision", evaluation switch
                 {
                     null => $"You replied to “{current.Title}”. The AI couldn't read it just now, so it stays open; nothing was dismissed.",
-                    { Verdict: "accept" } => $"You replied to “{current.Title}”. The AI agreed{(retired ? " and it was dismissed" : "; it stays open")}{(stored != null ? "; the point was added to shared memory" : "")}.",
+                    { Verdict: "accept" } => $"You replied to “{current.Title}”. The AI agreed{(retired ? " and it was closed" : "; it stays open")}{(findingClosed ? "; nothing else from its check was open, so the check closed too" : "")}{(stored != null ? "; the point was added to shared memory" : "")}.",
                     { Verdict: "answer" } => $"You asked about “{current.Title}”. The AI answered; it stays open.",
                     { Verdict: "disagree" } => $"You replied to “{current.Title}”. The AI disagreed; it stays open.",
                     _ => $"You replied to “{current.Title}”. The AI asked a question; it stays open."
@@ -239,9 +379,19 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
                 thread = current.Thread.ToList();
             }, CancellationToken.None);
             var last = thread[^1];
-            return new(last.Verdict ?? "unavailable", last.Text, retired, stored, suggestion, notice, prefs.Provider, thread) { FileChange = attached };
+            return new(last.Verdict ?? "unavailable", last.Text, retired, stored, suggestion, notice, prefs.Provider, thread) { FileChange = attached, FindingClosed = findingClosed };
         }
         finally { gate.Release(); }
+    }
+
+    /// <summary>The AI's answer plus what happened to the item, in the server's words, so the reply never leaves it unclear whether
+    /// the item is still open.</summary>
+    public static string Concluded(ReplyEvaluation e, bool retired, bool findingClosed, string kind)
+    {
+        var reply = e.Reply.TrimEnd();
+        if (retired)
+            return $"{reply} {RecommendationDecisions.ClosedLine}{(findingClosed ? " Nothing else from that check is waiting for you, so the check is closed too." : "")}";
+        return e.Verdict == "accept" ? $"{reply} {(kind == "finding" ? "It stays open." : "It stays on your list.")}" : reply;
     }
 
     async Task<ReplyEvaluation> EvaluateAsync(AppState s, Item item, string note, AiPreferences prefs, CancellationToken ct)
@@ -257,7 +407,7 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
         You are the energy analyst for a UK home whose battery, solar and EV charging are controlled by Predbat. You made the recommendation below; the user has replied to it. Work out what the reply means, using the item's own evidence, the earlier replies, shared memory, the sensor notes and the current setting values.
         Return exactly one JSON object and nothing else: {"verdict":"answer","reply":"...","action":null,"memory":null,"retire":false,"fileChange":null}
         verdict answer: the user asked a question. Answer it directly and helpfully. Use answer whenever the reply is a question, even a rhetorical one ("is this a non-issue?"). retire false.
-        verdict accept: the user is right, or states a household fact or preference that the evidence cannot disprove. Household preferences are authoritative. retire true when the item should be dismissed and not raised again; false when it should stay open (for example the user will do it later).
+        verdict accept: the user is right, or states a household fact or preference that the evidence cannot disprove. Household preferences are authoritative. retire true when the item should be dismissed and not raised again; false when it should stay open (for example the user will do it later). When the user says it isn't needed ("nah", "leave it", "not worth it") and you agree, use accept with retire true. The server adds what happened to the item after your reply ("Closed — I won't raise this again for 30 days." or "It stays on your list."), so don't say it yourself.
         verdict disagree: the evidence shows the user is mistaken about what happened or how the system works. Say exactly why, citing the specific numbers, times or settings. Don't disagree on a technicality when the user's underlying point is right. retire false.
         verdict clarify: you cannot decide without one specific fact from the user. Ask one short question. retire false.
         action: what the user still needs to do, in one sentence, or null. When your reply asks the user to do anything, the item stays open.
@@ -371,9 +521,10 @@ public sealed class RecommendationReplyService(StateService state, DataStore db,
     static ReplyEvaluation DemoEvaluate(Item item, string note)
     {
         var lower = note.ToLowerInvariant();
+        if (SaysNotNeeded(note)) return new("accept", "Fair enough: on the sample figures it isn't worth your time. (Scripted demo reply.)", null, true);
         if (IsQuestion(note)) return new("answer", Cut(DemoAnswer(item, lower), ReplyLimit), null, false);
         if (new[] { "because", "prefer", "don't want", "do not want", "dont want", "already", "we always", "we never" }.Any(lower.Contains))
-            return new("accept", "Understood. That is a household rule the sample evidence cannot override, so this is dismissed and I will not raise it again. (Scripted demo reply.)", ThirdPerson(note), true);
+            return new("accept", "Understood. That is a household rule the sample evidence cannot override. (Scripted demo reply.)", ThirdPerson(note), true);
         var evidence = item.Evidence.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "the recorded evidence";
         return new("disagree", Cut($"The evidence still supports this: {evidence} Your note does not change that. If something about the house is different, tell me what and why. (Scripted demo reply.)", ReplyLimit), null, false);
     }

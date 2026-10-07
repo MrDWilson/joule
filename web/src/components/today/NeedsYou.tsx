@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "../ui";
 import { PlainText } from "../PlainText";
 import { plainText } from "../../lib/sanitize";
+import { inboxClosePaths } from "../../lib/closing";
+import { NotNeededButton } from "../CloseActions";
 import { trialHeading, type InboxItem } from "../../lib/insights";
 import { useMediaQuery, breakpoints } from "../../lib/useMediaQuery";
 import type { Proposal, Revision, Setting } from "../../types";
@@ -67,6 +69,7 @@ export function NeedsYou({
           const { label, icon: Icon } = KIND[item.kind];
           const title = needTitle(item, revisions, settings);
           const verb = item.kind === "proposal" ? "Review" : item.kind === "trial" ? "Decide" : "Open";
+          const closable = inboxClosePaths(item);
           return (
             <li key={item.key} className={`needs-row needs-${item.kind}`} data-key={item.key}>
               <span className="needs-kind">
@@ -76,25 +79,36 @@ export function NeedsYou({
               <span className="needs-title">
                 <PlainText text={title} />
               </span>
-              {item.kind === "trial" ? (
-                <ButtonLink
-                  size="sm"
-                  variant="secondary"
-                  href="#/insights/experiments"
-                  aria-label={`${verb}: ${plainText(title)}`}
-                >
-                  {verb}
-                </ButtonLink>
-              ) : (
-                <Button
-                  size="sm"
-                  variant={item.kind === "proposal" ? "primary" : "secondary"}
-                  onClick={() => (item.kind === "proposal" ? onReview(item.proposal) : onOpen(item.investigation.id))}
-                  aria-label={`${verb}: ${plainText(title)}`}
-                >
-                  {verb}
-                </Button>
-              )}
+              <span className="needs-actions">
+                {item.kind === "trial" ? (
+                  <ButtonLink
+                    size="sm"
+                    variant="secondary"
+                    href="#/insights/experiments"
+                    aria-label={`${verb}: ${plainText(title)}`}
+                  >
+                    {verb}
+                  </ButtonLink>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant={item.kind === "proposal" ? "primary" : "secondary"}
+                    onClick={() => (item.kind === "proposal" ? onReview(item.proposal) : onOpen(item.investigation.id))}
+                    aria-label={`${verb}: ${plainText(title)}`}
+                  >
+                    {verb}
+                  </Button>
+                )}
+                {/* Closes it here, with Undo in the toast; the count above drops at once. */}
+                {closable && (
+                  <NotNeededButton
+                    kind={item.kind === "proposal" ? "proposal" : item.kind === "file" ? "file" : "todo"}
+                    paths={closable}
+                    label={`Not needed: ${plainText(title)}`}
+                    className="needs-not-needed"
+                  />
+                )}
+              </span>
             </li>
           );
         })}

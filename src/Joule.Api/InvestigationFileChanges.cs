@@ -102,7 +102,7 @@ public static class InvestigationFileChanges
                 current.Steps.Add($"server: file change “{Cut(change.Summary)}” is already open from an earlier investigation; carried forward");
                 current.StepDetails.Add(new(DateTimeOffset.UtcNow, "server", $"The {change.File} edit is already waiting for you from an earlier check", current.Steps[^1]));
             }
-            else if (earlier.Any(x => x.Status == "dismissed" && x.DecidedAt >= cutoff && SameChange(x, change)))
+            else if (earlier.Any(x => ((x.Status == "dismissed" && x.DecidedAt >= cutoff) || (x.ClosedReason is RecommendationDecisions.WithFindings or JouleOwnTraffic.ClosedReason && x.ClosedAt >= cutoff)) && SameChange(x, change)))
             {
                 current.FileChanges.Remove(change);
                 current.Steps.Add($"server: file change “{Cut(change.Summary)}” not raised; you dismissed the same change in the last {suppressionDays} days");

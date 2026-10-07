@@ -92,6 +92,8 @@ public static class ChangeEngine
         p.Status = "Applied"; p.DecidedAt = DateTimeOffset.UtcNow; p.AppliedRevision = s.Revision;
         // The trial is named after the suggestion the homeowner approved, so Insights and Changes call it the same thing.
         var trial = s.Experiments.Last(); trial.Title = p.Title; trial.Hypothesis = p.ExpectedEffect; trial.ReviewAt = trial.StartedAt.AddDays(Math.Clamp(p.ReviewDays, 1, 30)); trial.AutomaticRollback = automatic;
+        // Like a to-do or file edit, approving the last open suggestion from a check closes its findings as resolved.
+        if (s.Investigations.FirstOrDefault(i => i.Id == p.InvestigationId) is { } source) RecommendationDecisions.CloseFindingIfDone(s, source, p.DecidedAt.Value);
     }
     public static void Deny(AppState s, string id, string? note = null)
     {
