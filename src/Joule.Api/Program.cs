@@ -52,6 +52,9 @@ while (true)
     builder.Services.AddSingleton<ReportService>();
     builder.Services.AddHostedService<ReportWorker>();
     builder.Services.AddHomeAssistantTelemetry(builder.Configuration);
+    // Sensors nobody chose are found from Predbat (its apps.yaml and entity list); environment variables and Setup always win.
+    if (!demo) builder.Services.AddSingleton(sp => new SensorAutoDetect(sp.GetRequiredService<HomeAssistantOptions>(), Path.Combine(dataDirectory, SensorAutoDetect.FileName),
+        ct => SetupConfigEndpoints.DetectLive(sp, ct), sp.GetService<TimeProvider>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger<SensorAutoDetect>()));
     builder.Services.AddHostedService<CollectorWorker>(); builder.Services.AddHostedService<AnalysisWorker>();
     builder.Services.AddSingleton(authOptions);
     builder.Services.AddSingleton(savedSettings);

@@ -40,6 +40,8 @@ public sealed class McpAnalysisTests : IDisposable
                 return JsonOrText("# Configuration\ninput_number.predbat_load_scaling adjusts historical load forecasts.\n", false);
             if (request.RequestUri.Host == "predbat.test")
             {
+                // A Predbat from before MCP sign-in tokens: the token endpoint isn't there and the secret is used directly.
+                if (request.RequestUri.AbsolutePath == "/oauth/token") return new(HttpStatusCode.NotFound);
                 using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
                 var root = doc.RootElement; var method = root.GetProperty("method").GetString();
                 if (method == "notifications/initialized") return new(HttpStatusCode.Accepted);

@@ -106,7 +106,9 @@ public sealed class SavedSettings
                 return Uri.TryCreate(v, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment) && v.Length <= 500
                     ? null : "Enter an address like http://192.168.1.20:5052 (http or https, no user name, password or ?query).";
             case "entity":
-                return EntityId.IsMatch(v) && v.Length <= 255 ? null : $"\"{Short(v)}\" isn't a Home Assistant entity id (like sensor.house_load_today).";
+                // "none" leaves the meter unmapped on purpose, so Joule doesn't fill it in from Predbat either.
+                if (v.Equals(HomeAssistantOptions.NotMapped, StringComparison.OrdinalIgnoreCase)) return null;
+                return EntityId.IsMatch(v) && v.Length <= 255 ? null : $"\"{Short(v)}\" isn't a Home Assistant entity id (like sensor.house_load_today), or none to leave it unmapped.";
             case "accessKey":
                 if (v.Length < AppAuthOptions.MinimumKeyLength) return $"The access key needs at least {AppAuthOptions.MinimumKeyLength} characters.";
                 return v.Length <= 256 && v.All(c => c is >= '!' and <= '~') ? null : "The access key can only use letters, digits and punctuation (no spaces), up to 256 characters.";

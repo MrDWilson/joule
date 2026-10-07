@@ -284,7 +284,7 @@ sealed class FakePredbat : IAsyncDisposable
     readonly HttpListener listener = new();
     readonly Task loop;
     public string Url { get; }
-    FakePredbat(string state, int port)
+    FakePredbat(string state, int port, IReadOnlyDictionary<string, string>? pages = null)
     {
         Url = $"http://127.0.0.1:{port}";
         listener.Prefixes.Add(Url + "/");
@@ -296,7 +296,7 @@ sealed class FakePredbat : IAsyncDisposable
                 HttpListenerContext context;
                 try { context = await listener.GetContextAsync(); } catch (Exception e) when (e is HttpListenerException or ObjectDisposedException or InvalidOperationException) { return; }
                 var path = context.Request.Url!.AbsolutePath;
-                var body = path == "/api/state" ? state : path == "/api/plan_data" ? "{}" : "";
+                var body = path == "/api/state" ? state : path == "/api/plan_data" ? "{}" : pages?.GetValueOrDefault(path) ?? "";
                 context.Response.StatusCode = body.Length > 0 ? 200 : 404;
                 context.Response.ContentType = "application/json";
                 var bytes = Encoding.UTF8.GetBytes(body);
@@ -310,7 +310,8 @@ sealed class FakePredbat : IAsyncDisposable
         var port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
         return port;
     }
-    public static Task<FakePredbat> Start(string state) => Task.FromResult(new FakePredbat(state, FreePort()));
+    /// <param name="pages">Other paths to answer, such as /debug_apps_live.</param>
+    public static Task<FakePredbat> Start(string state, IReadOnlyDictionary<string, string>? pages = null) => Task.FromResult(new FakePredbat(state, FreePort(), pages));
     public async ValueTask DisposeAsync()
     {
         try { listener.Stop(); listener.Close(); } catch (ObjectDisposedException) { }
@@ -386,6 +387,52 @@ public class SetupConfigProcessTests
         Assert.True(fields["App:AccessKey"].GetProperty("set").GetBoolean());
         Assert.DoesNotContain(key, view.RootElement.ToString());
         Assert.Contains(key, File.ReadAllText(Path.Combine(app.Directory, SavedSettings.FileName)));
+    }
+
+    [Fact]
+    public async Task ALiveJouleFindsItsSensorsFromPredbatWithoutConfigurationAndKeepsTheOnesSetInTheEnvironment()
+    {
+        const string state = """
+            {"predbat.status": {"state": "Idle"}, "update.predbat_version": {"state": "on", "attributes": {"installed_version": "v8.30.1"}},
+             "sensor.givtcp_ce2000a000_load_energy_today_kwh": {"state": "7.4", "attributes": {"unit_of_measurement": "kWh"}},
+             "sensor.givtcp_ce2000a000_import_energy_today_kwh": {"state": "3.2", "attributes": {"unit_of_measurement": "kWh"}},
+             "sensor.givtcp_ce2000a000_pv_energy_today_kwh": {"state": "9.0", "attributes": {"unit_of_measurement": "kWh"}},
+             "sensor.my_own_pv_meter": {"state": "8.9", "attributes": {"unit_of_measurement": "kWh"}},
+             "sensor.house_meter_today": {"state": "7.1", "attributes": {"unit_of_measurement": "kWh"}},
+             "sensor.octopus_energy_electricity_22l0000000_1900000000000_current_standing_charge": {"state": "0.4891", "attributes": {"unit_of_measurement": "GBP"}}}
+            """;
+        const string apps = """
+            pred_bat:
+              geserial: ce2000a000
+              load_today:
+              - sensor.givtcp_{geserial}_load_energy_today_kwh
+              import_today:
+              - sensor.givtcp_{geserial}_import_energy_today_kwh
+              pv_today:
+              - sensor.givtcp_{geserial}_pv_energy_today_kwh
+              metric_standing_charge: sensor.octopus_energy_electricity_22l0000000_1900000000000_current_standing_charge
+            """;
+        await using var predbat = await FakePredbat.Start(state, new Dictionary<string, string> { ["/debug_apps_live"] = apps });
+        await using var app = new JouleProcess(new() { ["App__Demo"] = "false", ["App__AuthMode"] = "None", ["Predbat__BaseUrl"] = predbat.Url, ["HomeAssistant__Entities__Pv"] = "sensor.my_own_pv_meter" });
+        Assert.True(await app.Start(), app.Log);
+        Dictionary<string, JsonElement> meters = [];
+        for (var i = 0; i < 100 && !meters.ContainsKey("load"); i++)
+        {
+            using var setup = JsonDocument.Parse(await app.Http.GetStringAsync("api/setup"));
+            meters = setup.RootElement.GetProperty("sensors").GetProperty("meters").EnumerateArray().Where(m => m.GetProperty("entity").ValueKind == JsonValueKind.String)
+                .ToDictionary(m => m.GetProperty("metric").GetString()!, m => m.Clone());
+            if (!meters.ContainsKey("load")) await Task.Delay(200);
+        }
+        Assert.True(meters.ContainsKey("load"), app.Log);
+        Assert.Equal("sensor.givtcp_ce2000a000_load_energy_today_kwh", meters["load"].GetProperty("entity").GetString());
+        Assert.Equal("load_today in apps.yaml", meters["load"].GetProperty("foundFrom").GetString());
+        Assert.Equal("sensor.octopus_energy_electricity_22l0000000_1900000000000_current_standing_charge", meters["standing_charge"].GetProperty("entity").GetString());
+        // The environment's choice stands, and isn't labelled as found.
+        Assert.Equal("sensor.my_own_pv_meter", meters["pv"].GetProperty("entity").GetString());
+        Assert.Equal(JsonValueKind.Null, meters["pv"].GetProperty("foundFrom").ValueKind);
+        var saved = File.ReadAllText(Path.Combine(app.Directory, SensorAutoDetect.FileName));
+        Assert.Contains("web interface", saved);
+        Assert.DoesNotContain("sensor.my_own_pv_meter", saved);
     }
 
     [Fact]

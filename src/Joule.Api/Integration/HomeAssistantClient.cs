@@ -5,14 +5,45 @@ using System.Text.RegularExpressions;
 
 namespace Joule;
 
+/// <summary>A sensor found automatically from Predbat: the entity and where it came from ("load_today in apps.yaml" or "name and unit match").</summary>
+public sealed record DetectedSensor(string Entity,string From);
 public sealed class HomeAssistantOptions
 {
+    /// <summary>The mapping value that means "leave this meter unmapped", so it isn't filled in automatically either.</summary>
+    public const string NotMapped="none";
     internal Uri? BaseUri { get; }
     internal string? AccessToken { get; }
     public string TimeZone { get; }
     public TimeSpan MaxGap { get; }
     public TimeSpan PollInterval { get; }
-    public Dictionary<string,string> Entities { get; }=[];
+    /// <summary>The sensor for each metric: chosen in configuration (environment or Setup), else found automatically from Predbat
+    /// (<see cref="Detected"/>). Replaced as a whole when detection changes, so a reader always sees one consistent set.</summary>
+    public Dictionary<string,string> Entities { get; private set; }=[];
+    /// <summary>Metrics whose sensor was chosen in configuration, including "none" (<see cref="Declined"/>). Detection never changes these.</summary>
+    public IReadOnlySet<string> Chosen=>chosen;
+    /// <summary>Metrics deliberately left unmapped (HomeAssistant__Entities__Ev=none): not collected and never filled in automatically.</summary>
+    public IReadOnlySet<string> Declined=>declined;
+    /// <summary>Sensors found automatically from Predbat and in use, by metric (see SensorAutoDetect).</summary>
+    public IReadOnlyDictionary<string,DetectedSensor> Detected { get; private set; }=new Dictionary<string,DetectedSensor>();
+    /// <summary>Metrics where Predbat suggests more than one sensor, or one Joule isn't sure of: Setup asks.</summary>
+    public IReadOnlyList<string> NeedsChoice { get; private set; }=[];
+    /// <summary>A standing charge apps.yaml gives as a number (metric_standing_charge: 0.50), in pence a day.</summary>
+    public double? FixedStandingChargePence { get; private set; }
+    readonly HashSet<string> chosen=[],declined=[];
+    readonly object detectedGate=new();
+    /// <summary>Uses what detection found for every metric not chosen in configuration, replacing what it found before.</summary>
+    public void ApplyDetected(IReadOnlyDictionary<string,DetectedSensor> found,IEnumerable<string> needsChoice,double? fixedStandingChargePence)
+    {
+        lock(detectedGate)
+        {
+            var use=found.Where(x=>!chosen.Contains(x.Key)&&Regex.IsMatch(x.Value.Entity,"^[a-z_]+\\.[a-z0-9_]+$")).ToDictionary(x=>x.Key,x=>x.Value);
+            var next=Entities.Where(x=>!Detected.ContainsKey(x.Key)).ToDictionary(x=>x.Key,x=>x.Value);
+            foreach(var (metric,sensor) in use)next[metric]=sensor.Entity;
+            Detected=use;Entities=next;
+            NeedsChoice=needsChoice.Where(m=>!chosen.Contains(m)&&!use.ContainsKey(m)).Distinct().ToList();
+            FixedStandingChargePence=fixedStandingChargePence;
+        }
+    }
     public Dictionary<string,string> Units { get; }=[];
     /// <summary>Sensor profile overrides by metric (HomeAssistant:Profiles:Ev=session_counter, …). Unset metrics are detected from history.</summary>
     public Dictionary<string,string> Profiles { get; }=[];
@@ -37,10 +68,13 @@ public sealed class HomeAssistantOptions
         var gap=config.GetValue("HomeAssistant:MaxGapMinutes",Math.Max(15,2.5*(double.IsFinite(poll)?poll:5)));
         if(!double.IsFinite(gap) || !double.IsFinite(poll) || poll is <1 or >60 || gap<poll || gap>1440)throw new DomainException("Set HA poll interval 1–60 minutes and maximum gap between poll interval and 1440 minutes.",400);
         MaxGap=TimeSpan.FromMinutes(gap);PollInterval=TimeSpan.FromMinutes(poll);
-        var names=new Dictionary<string,string>{["Load"]="load",["Pv"]="pv",["GridImport"]="grid_import",["GridExport"]="grid_export",["BatteryCharge"]="battery_charge",["BatteryDischarge"]="battery_discharge",["Ev"]="ev",["Soc"]="soc",["ImportTariff"]="import_tariff",["ExportTariff"]="export_tariff",["IntelligentSlots"]="intelligent_slots",["AlternativeForecast"]="alternative_forecast"};
+        var names=new Dictionary<string,string>{["Load"]="load",["Pv"]="pv",["GridImport"]="grid_import",["GridExport"]="grid_export",["BatteryCharge"]="battery_charge",["BatteryDischarge"]="battery_discharge",["Ev"]="ev",["Soc"]="soc",["ImportTariff"]="import_tariff",["ExportTariff"]="export_tariff",["StandingCharge"]="standing_charge",["IntelligentSlots"]="intelligent_slots",["AlternativeForecast"]="alternative_forecast"};
         foreach(var (name,metric) in names)
         {
             if(config["HomeAssistant:Entities:"+name] is not {} entity || string.IsNullOrWhiteSpace(entity))continue;
+            entity=entity.Trim();
+            chosen.Add(metric);
+            if(entity.Equals(NotMapped,StringComparison.OrdinalIgnoreCase)){declined.Add(metric);continue;}
             if(!Regex.IsMatch(entity,"^[a-z_]+\\.[a-z0-9_]+$"))throw new DomainException("Home Assistant entity mapping is invalid.",400);
             Entities[metric]=entity;
             if(config["HomeAssistant:Units:"+name] is {} unit)Units[metric]=unit;
@@ -60,13 +94,13 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
 {
     public const string DirectSource="HomeAssistant";
     public const string MirrorSource="Predbat mirror";
-    /// <summary>Mappings are always explicit. Readings come from Home Assistant directly when credentials exist, otherwise from Predbat's mirror.</summary>
+    /// <summary>Needs at least one sensor, chosen or found automatically from Predbat. Readings come from Home Assistant directly when credentials exist, otherwise from Predbat's mirror.</summary>
     public bool Configured=>options.Entities.Count>0 && (options.DirectConfigured || fallback?.Configured==true);
     /// <summary>True when the last collection could not read Home Assistant (directly or through Predbat's mirror) at all.</summary>
     public bool LastReadFailed { get; private set; }
     public async Task<List<TelemetrySample>> CollectAsync(CancellationToken ct)
     {
-        if(!Configured)throw new DomainException("Configure explicit entity mappings plus either the HA URL and server token or a Predbat URL for mirrored readings.",503);
+        if(!Configured)throw new DomainException("No meters yet: Joule finds them from Predbat once it can read Predbat, or choose them in Setup. Readings need either the Home Assistant URL and token or the Predbat URL.",503);
         var source=DirectSource;
         var states=options.DirectConfigured?await ReadDirectAsync(ct):null;
         if(states is null && fallback?.Configured==true){source=MirrorSource;states=await ReadMirrorAsync(ct);}
@@ -134,6 +168,8 @@ public sealed class HomeAssistantClient(HttpClient http,HomeAssistantOptions opt
         if(TelemetrySchema.EnergyMetrics.Contains(metric)){unit="kWh";value=normalized switch{"kwh"=>n,"wh"=>n/1000,"mwh"=>n*1000,_=>null};if(value<0)value=null;}
         else if(metric=="soc"){unit="%";value=normalized=="%" && n is >=0 and <=100 ? n : null;}
         else if(metric is "import_tariff" or "export_tariff"){unit="p/kWh";value=normalized switch {"p/kwh" or "pence/kwh"=>n,"£/kwh" or "gbp/kwh"=>n*100,"p/wh"=>n*1000,"£/mwh" or "gbp/mwh"=>n/10,_=>null};}
+        // The daily standing charge (Octopus reports pounds, unit GBP), in pence a day.
+        else if(metric=="standing_charge"){unit="p/day";value=n<0?null:normalized switch {"p" or "pence" or "p/day" or "pence/day"=>n,"£" or "gbp" or "£/day" or "gbp/day"=>n*100,_=>null};}
         if(value is {} converted && !double.IsFinite(converted))return (null,unit,"invalid");
         return (value,unit,value is null?"unsupported_unit":"observed");
     }

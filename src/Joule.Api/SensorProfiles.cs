@@ -27,7 +27,7 @@ public static class SensorProfiles
     /// <summary>Profiles for metrics whose kind is fixed by what they measure.</summary>
     public static string? Fixed(string metric) => metric switch
     {
-        "import_tariff" or "export_tariff" => Price,
+        "import_tariff" or "export_tariff" or "standing_charge" => Price,
         "soc" or "intelligent_slots" or "alternative_forecast" => State,
         _ => null
     };
